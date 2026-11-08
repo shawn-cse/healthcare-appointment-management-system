@@ -1,0 +1,193 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Doctor Approvals - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <h3 class="page-title">Doctor Registration & Credential Approvals</h3>
+            <ul class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'admin-dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Doctor Approvals</li>
+            </ul>
+        </div>
+        <div class="col-auto">
+            <span class="badge badge-warning p-2">Pending Approvals: {{ pending_count }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="form-row align-items-center">
+                    <div class="col-md-4">
+                        <input type="text" name="q" class="form-control" placeholder="Search by name, BMDC, department..." value="{{ request.GET.q }}">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="status" class="form-control">
+                            <option value="">All Statuses</option>
+                            {% for s_val, s_label in status_choices %}
+                            <option value="{{ s_val }}" {% if selected_status == s_val %}selected{% endif %}>{{ s_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary btn-block"><i class="fa fa-filter mr-1"></i> Filter</button>
+                    </div>
+                    {% if selected_status or request.GET.q %}
+                    <div class="col-md-2">
+                        <a href="{% url 'admin-doctor-approvals' %}" class="btn btn-secondary btn-block">Reset</a>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Registered Doctor Directory</h4>
+                <p class="card-text text-muted">
+                    Only approved and active doctors appear publicly and can accept patient bookings. Hospital Administrators and Super Admins may approve, reject, verify BMDC, or suspend doctor registrations.
+                </p>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-center mb-0">
+                        <thead>
+                            <tr>
+                                <th>Doctor / Contact</th>
+                                <th>BMDC Number</th>
+                                <th>BMDC Status</th>
+                                <th>Department / Chamber</th>
+                                <th>Registration Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doctor in doctors %}
+                            <tr>
+                                <td>
+                                    <strong>Dr. {{ doctor.get_full_name }}</strong>
+                                    <br>
+                                    <small class="text-muted">@{{ doctor.username }} | {{ doctor.email }} | {{ doctor.profile.phone|default:"N/A" }}</small>
+                                </td>
+                                <td>
+                                    <code>{{ doctor.bmdc_number|default:"Not Provided" }}</code>
+                                </td>
+                                <td>
+                                    {% if doctor.bmdc_verified %}
+                                        <span class="badge badge-success"><i class="fa fa-check-circle mr-1"></i> Verified</span>
+                                        <br><small class="text-muted">by {{ doctor.bmdc_verified_by.username }}</small>
+                                    {% else %}
+                                        <span class="badge badge-warning"><i class="fa fa-clock mr-1"></i> Unverified</span>
+                                        <form method="post" action="{% url 'admin-doctor-verify-bmdc' doctor.id %}" class="d-inline mt-1">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1" title="Mark BMDC Verified after manual check">Verify</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ doctor.profile.department|default:"General" }}
+                                    <br>
+                                    <small class="text-muted">Chamber: {{ doctor.profile.chamber_number|default:"Unassigned" }}</small>
+                                </td>
+                                <td>
+                                    {% if doctor.status == 'active' %}
+                                        <span class="badge badge-success">Approved / Active</span>
+                                    {% elif doctor.status == 'pending_approval' %}
+                                        <span class="badge badge-warning">Pending Approval</span>
+                                    {% elif doctor.status == 'suspended' %}
+                                        <span class="badge badge-danger">Suspended</span>
+                                    {% elif doctor.status == 'rejected' %}
+                                        <span class="badge badge-secondary">Rejected</span>
+                                    {% endif %}
+                                    {% if doctor.rejection_reason %}
+                                        <br><small class="text-danger" title="{{ doctor.rejection_reason }}">{{ doctor.rejection_reason|truncatechars:25 }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'admin-doctor-approval-detail' doctor.id %}" class="btn btn-sm btn-info mr-1" title="Review Full Details">
+                                            <i class="fa fa-eye"></i> Details
+                                        </a>
+
+                                        {% if doctor.status == 'pending_approval' or doctor.status == 'rejected' %}
+                                        <form method="post" action="{% url 'admin-doctor-approve' doctor.id %}" class="d-inline mr-1">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-success" title="Approve Doctor">
+                                                <i class="fa fa-check"></i> Approve
+                                            </button>
+                                        </form>
+                                        {% endif %}
+
+                                        {% if doctor.status == 'pending_approval' %}
+                                        <button type="button" class="btn btn-sm btn-danger mr-1" data-toggle="modal" data-target="#rejectModal{{ doctor.id }}" title="Reject Doctor">
+                                            <i class="fa fa-times"></i> Reject
+                                        </button>
+                                        {% endif %}
+
+                                        {% if doctor.status == 'active' %}
+                                        <form method="post" action="{% url 'admin-doctor-suspend-reactivate' doctor.id 'suspend' %}" class="d-inline mr-1">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Suspend Doctor">
+                                                <i class="fa fa-ban"></i> Suspend
+                                            </button>
+                                        </form>
+                                        {% elif doctor.status == 'suspended' %}
+                                        <form method="post" action="{% url 'admin-doctor-suspend-reactivate' doctor.id 'reactivate' %}" class="d-inline mr-1">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Reactivate Doctor">
+                                                <i class="fa fa-refresh"></i> Reactivate
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Rejection Modal -->
+                                    <div class="modal fade" id="rejectModal{{ doctor.id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered" role="document">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Reject Registration: Dr. {{ doctor.get_full_name }}</h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                        <span aria-hidden="true">&times;</span>
+                                                    </button>
+                                                </div>
+                                                <form method="post" action="{% url 'admin-doctor-reject' doctor.id %}">
+                                                    {% csrf_token %}
+                                                    <div class="modal-body">
+                                                        <div class="form-group">
+                                                            <label>Reason for Rejection <span class="text-danger">*</span></label>
+                                                            <textarea name="rejection_reason" class="form-control" rows="3" required placeholder="Specify reason (e.g. invalid BMDC registration, incomplete credentials)..."></textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                                        <button type="submit" class="btn btn-danger">Confirm Rejection</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">No doctor records found matching criteria.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

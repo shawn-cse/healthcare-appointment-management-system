@@ -1,0 +1,204 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Review Doctor: Dr. {{ doctor.get_full_name }} - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <h3 class="page-title">Doctor Credential & Profile Dossier</h3>
+            <ul class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'admin-dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'admin-doctor-approvals' %}">Doctor Approvals</a></li>
+                <li class="breadcrumb-item active">Dr. {{ doctor.get_full_name }}</li>
+            </ul>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'admin-doctor-approvals' %}" class="btn btn-outline-secondary">
+                <i class="fa fa-arrow-left mr-1"></i> Back to Directory
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Doctor Summary Card -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <img src="{{ doctor.profile.image }}" class="rounded-circle mb-3" width="120" height="120" alt="Doctor Photo">
+                <h4>Dr. {{ doctor.get_full_name }}</h4>
+                <p class="text-muted mb-2">@{{ doctor.username }}</p>
+                <div class="mb-3">
+                    {% if doctor.status == 'active' %}
+                        <span class="badge badge-success px-3 py-2">Approved / Active</span>
+                    {% elif doctor.status == 'pending_approval' %}
+                        <span class="badge badge-warning px-3 py-2">Pending Approval</span>
+                    {% elif doctor.status == 'suspended' %}
+                        <span class="badge badge-danger px-3 py-2">Suspended</span>
+                    {% elif doctor.status == 'rejected' %}
+                        <span class="badge badge-secondary px-3 py-2">Rejected</span>
+                    {% endif %}
+                </div>
+                <hr>
+                <div class="text-left">
+                    <p><strong>BMDC Number:</strong> <code>{{ doctor.bmdc_number|default:"N/A" }}</code></p>
+                    <p>
+                        <strong>BMDC Verified:</strong>
+                        {% if doctor.bmdc_verified %}
+                            <span class="text-success"><i class="fa fa-check-circle"></i> Yes</span> (by {{ doctor.bmdc_verified_by.username }})
+                        {% else %}
+                            <span class="text-warning"><i class="fa fa-clock"></i> No</span>
+                            <form method="post" action="{% url 'admin-doctor-verify-bmdc' doctor.id %}" class="mt-2">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-success btn-block">Verify BMDC Record</button>
+                            </form>
+                        {% endif %}
+                    </p>
+                    <p><strong>Department:</strong> {{ doctor.profile.department|default:"General" }}</p>
+                    <p><strong>Specialization:</strong> {{ doctor.profile.specialization|default:"General Medicine" }}</p>
+                    <p><strong>Chamber Room:</strong> {{ doctor.profile.chamber_number|default:"Unassigned" }}</p>
+                    <p><strong>Personal Phone:</strong> {{ doctor.profile.phone|default:"N/A" }}</p>
+                    <p><strong>Office Phone:</strong> {{ doctor.profile.office_phone|default:"N/A" }}</p>
+                    <p><strong>Email:</strong> {{ doctor.email }}</p>
+                    <p><strong>Registered Date:</strong> {{ doctor.date_joined|date:"d M Y, h:i A" }}</p>
+                </div>
+                <hr>
+                <!-- Decision Buttons -->
+                <div class="d-flex justify-content-around">
+                    {% if doctor.status != 'active' %}
+                    <form method="post" action="{% url 'admin-doctor-approve' doctor.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success"><i class="fa fa-check mr-1"></i> Approve Doctor</button>
+                    </form>
+                    {% endif %}
+
+                    {% if doctor.status == 'pending_approval' %}
+                    <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#rejectModal">
+                        <i class="fa fa-times mr-1"></i> Reject
+                    </button>
+                    {% endif %}
+
+                    {% if doctor.status == 'active' %}
+                    <form method="post" action="{% url 'admin-doctor-suspend-reactivate' doctor.id 'suspend' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger"><i class="fa fa-ban mr-1"></i> Suspend</button>
+                    </form>
+                    {% elif doctor.status == 'suspended' %}
+                    <form method="post" action="{% url 'admin-doctor-suspend-reactivate' doctor.id 'reactivate' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-success"><i class="fa fa-refresh mr-1"></i> Reactivate</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Doctor Qualifications & Fees -->
+    <div class="col-md-8">
+        <!-- 4-Tier BDT Consultation Fees -->
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Configured Consultation Fees (BDT)</h4>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-sm-3">
+                        <div class="p-3 border rounded">
+                            <span class="text-muted d-block">1st Regular Visit</span>
+                            <h4 class="text-primary mt-2">৳{{ doctor.profile.fee_first_visit }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="p-3 border rounded">
+                            <span class="text-muted d-block">2nd Regular Visit</span>
+                            <h4 class="text-info mt-2">৳{{ doctor.profile.fee_second_visit }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="p-3 border rounded">
+                            <span class="text-muted d-block">3rd Regular Visit</span>
+                            <h4 class="text-success mt-2">৳{{ doctor.profile.fee_third_visit }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="p-3 border rounded">
+                            <span class="text-muted d-block">Report Checking</span>
+                            <h4 class="text-warning mt-2">৳{{ doctor.profile.fee_report_check }}</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Educational Qualifications -->
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Educational Qualifications</h4>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    {% for edu in doctor.educations.all %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ edu.degree }}</strong>
+                            <div class="text-muted">{{ edu.college }}</div>
+                        </div>
+                        <span class="badge badge-light badge-pill">{{ edu.year_of_completion|default:"Completed" }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-muted">No academic degrees logged yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Experience & History -->
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Work Experience & Past Positions</h4>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    {% for exp in doctor.experiences.all %}
+                    <li class="list-group-item">
+                        <strong>{{ exp.designation|default:"Physician" }}</strong> at {{ exp.institution }}
+                        <div class="text-muted">{{ exp.from_year }} - {% if exp.working_here %}Present{% else %}{{ exp.to_year }}{% endif %}</div>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-muted">No experience entries recorded. (Experience is not mandatory).</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rejection Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reject Registration: Dr. {{ doctor.get_full_name }}</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form method="post" action="{% url 'admin-doctor-reject' doctor.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Reason for Rejection <span class="text-danger">*</span></label>
+                        <textarea name="rejection_reason" class="form-control" rows="3" required placeholder="Specify reason (e.g. invalid BMDC registration, credentials mismatch)..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-danger">Confirm Rejection</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

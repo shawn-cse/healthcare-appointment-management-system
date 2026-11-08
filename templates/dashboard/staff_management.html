@@ -1,0 +1,128 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Staff Management - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row">
+        <div class="col-sm-12">
+            <h3 class="page-title">Staff Role & Privilege Management</h3>
+            <ul class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'admin-dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Staff Management (Super Admin Only)</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Authorized Staff Accounts</h4>
+                <p class="card-text text-muted">
+                    Only Super Administrators have authority to grant or revoke privileged roles (Hospital Admin, Receptionist, Super Admin).
+                </p>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-center mb-0">
+                        <thead>
+                            <tr>
+                                <th>Username / Name</th>
+                                <th>Current Role</th>
+                                <th>Account Status</th>
+                                <th>Date Joined</th>
+                                <th>Change Role / Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for member in staff_members %}
+                            <tr>
+                                <td>
+                                    <strong>{{ member.username }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ member.get_full_name }} ({{ member.email }})</small>
+                                </td>
+                                <td>
+                                    <span class="badge badge-pill badge-primary">{{ member.get_role_display }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-pill {% if member.status == 'active' %}badge-success{% elif member.status == 'suspended' %}badge-danger{% else %}badge-warning{% endif %}">
+                                        {{ member.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>{{ member.date_joined|date:"d M Y" }}</td>
+                                <td>
+                                    <form method="post" action="{% url 'admin-staff-role-change' member.id %}" class="form-inline">
+                                        {% csrf_token %}
+                                        <select name="role" class="form-control form-control-sm mr-2">
+                                            {% for r_val, r_label in role_choices %}
+                                                <option value="{{ r_val }}" {% if member.role == r_val %}selected{% endif %}>{{ r_label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <select name="status" class="form-control form-control-sm mr-2">
+                                            {% for s_val, s_label in status_choices %}
+                                                <option value="{{ s_val }}" {% if member.status == s_val %}selected{% endif %}>{{ s_label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-primary">Update</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">No staff accounts found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Promote User to Staff -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4 class="card-title">Promote Existing User to Staff</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Select an existing registered account to grant a privileged staff role:</p>
+                <form method="post" action="" id="promoteForm" class="form-inline">
+                    {% csrf_token %}
+                    <select id="userSelect" class="form-control mr-2" style="min-width: 250px;" required>
+                        <option value="">Select User</option>
+                        {% for u in all_users %}
+                            <option value="{{ u.id }}">{{ u.username }} ({{ u.get_full_name }} - {{ u.role }})</option>
+                        {% endfor %}
+                    </select>
+                    <select name="role" id="roleSelect" class="form-control mr-2" required>
+                        {% for r_val, r_label in role_choices %}
+                            <option value="{{ r_val }}">{{ r_label }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="status" id="statusSelect" class="form-control mr-2" required>
+                        {% for s_val, s_label in status_choices %}
+                            <option value="{{ s_val }}">{{ s_label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="btn btn-success" onclick="submitPromote()">Promote User</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function submitPromote() {
+    var userId = document.getElementById('userSelect').value;
+    if (!userId) {
+        alert('Please select a user to promote.');
+        return;
+    }
+    var form = document.getElementById('promoteForm');
+    form.action = '/admin/staff/' + userId + '/role/';
+    form.submit();
+}
+</script>
+{% endblock %}

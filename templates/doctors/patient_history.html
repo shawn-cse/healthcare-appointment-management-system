@@ -1,0 +1,76 @@
+{% extends 'includes/doctor-sidebar.html' %}
+{% load static %}
+
+{% block title %}Patient Consultation History - Green Hospital{% endblock %}
+
+{% block main %}
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <h3>Patient Consultation Record: {{ patient.get_full_name }}</h3>
+        <p class="text-muted mb-0">Total Completed Regular Consultations: <strong class="text-primary">{{ completed_regular_visits }}</strong> (Determines Visit Fee Cycle)</p>
+    </div>
+    <div class="col-auto">
+        <a href="{% url 'doctors:dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left mr-1"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Past Consultations & Prescriptions</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date & Time</th>
+                                <th>Serial # / Ref</th>
+                                <th>Visit Type</th>
+                                <th>Stage</th>
+                                <th>Fee Snapshot</th>
+                                <th>Status</th>
+                                <th>Diagnosis / Prescription</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for appt in appointments %}
+                            <tr>
+                                <td>{{ appt.appointment_date|date:"d M Y" }} at {{ appt.appointment_time|time:"h:i A" }}</td>
+                                <td>
+                                    <span class="badge badge-primary">#{{ appt.serial_number }}</span>
+                                    <br><small class="text-muted"><code>{{ appt.appointment_reference }}</code></small>
+                                </td>
+                                <td>{{ appt.get_visit_type_display }}</td>
+                                <td>{% if appt.visit_stage %}Stage {{ appt.visit_stage }}{% else %}N/A{% endif %}</td>
+                                <td>৳{{ appt.fee_amount }}</td>
+                                <td>
+                                    <span class="badge badge-pill {% if appt.status == 'completed' %}badge-success{% elif appt.status == 'cancelled' %}badge-danger{% elif appt.status == 'no_show' %}badge-warning{% else %}badge-info{% endif %}">
+                                        {{ appt.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if appt.prescription %}
+                                        <strong>{{ appt.prescription.diagnosis }}</strong>
+                                        <div class="small text-muted">{{ appt.prescription.notes|truncatechars:40 }}</div>
+                                    {% else %}
+                                        <span class="text-muted">No notes</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">No past appointments recorded for this patient with you.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

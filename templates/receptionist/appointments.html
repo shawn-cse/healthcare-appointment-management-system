@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Doctor Appointments - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="card-title">Appointments for Dr. {{ doctor.get_full_name }}</h4>
+                        <a href="{% url 'accounts:receptionist-dashboard' %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        {% if appointments %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-center mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Patient</th>
+                                            <th>Appt Date</th>
+                                            <th>Time</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for appt in appointments %}
+                                            <tr>
+                                                <td>{{ appt.patient.get_full_name }}</td>
+                                                <td>{{ appt.appointment_date }}</td>
+                                                <td>{{ appt.appointment_time|time:"h:i A" }}</td>
+                                                <td>
+                                                    <span class="badge badge-pill {% if appt.status == 'confirmed' %}badge-success{% elif appt.status == 'cancelled' %}badge-danger{% else %}badge-warning{% endif %}">
+                                                        {{ appt.status|capfirst }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {% if appt.status == 'pending' %}
+                                                        <form method="post" action="{% url 'accounts:receptionist-check-in' appt.id %}" style="display:inline;">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn btn-sm btn-success">
+                                                                <i class="fas fa-check"></i> Check-in
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                    <a href="{% url 'bookings:booking-invoice' appt.id %}" class="btn btn-sm bg-info-light">
+                                                        <i class="fas fa-file-invoice"></i> Invoice
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-muted mb-0">No appointments found for Dr. {{ doctor.get_full_name }}.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

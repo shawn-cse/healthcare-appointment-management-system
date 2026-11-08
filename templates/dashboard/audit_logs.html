@@ -1,0 +1,93 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Audit Logs - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row">
+        <div class="col-sm-12">
+            <h3 class="page-title">Audit Logs</h3>
+            <ul class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'admin-dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Audit Trail</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <form method="get" class="form-inline">
+            <label class="mr-2">Filter by Action:</label>
+            <select name="action" class="form-control form-control-sm mr-2" onchange="this.form.submit()">
+                <option value="">All Actions</option>
+                {% for act_val, act_label in actions %}
+                    <option value="{{ act_val }}" {% if selected_action == act_val %}selected{% endif %}>{{ act_label }}</option>
+                {% endfor %}
+            </select>
+            {% if selected_action %}
+                <a href="{% url 'admin-audit-logs' %}" class="btn btn-sm btn-outline-secondary">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Security & Sensitive Action Trail</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-center mb-0">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Actor</th>
+                                <th>Action</th>
+                                <th>Target User</th>
+                                <th>IP Address</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in audit_logs %}
+                            <tr>
+                                <td>{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+                                <td>
+                                    {% if log.actor %}
+                                        <strong>{{ log.actor.username }}</strong>
+                                        <br><small class="text-muted">{{ log.actor.role }}</small>
+                                    {% else %}
+                                        <span class="text-muted">Anonymous / System</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge badge-pill badge-info">{{ log.get_action_display }}</span>
+                                </td>
+                                <td>
+                                    {% if log.target_user %}
+                                        {{ log.target_user.username }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ log.ip_address|default:"-" }}</td>
+                                <td>
+                                    <code>{{ log.details }}</code>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">No audit logs recorded.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

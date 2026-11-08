@@ -1,0 +1,339 @@
+{% extends 'includes/doctor-sidebar.html' %}
+{% load static %}
+
+{% block page_name1 %}Dashboard{% endblock %}
+{% block page_name2 %}Doctor Dashboard{% endblock %}
+
+{% block title %}Doctor Dashboard{% endblock %}
+
+{% block main %}
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card dash-card">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12 col-lg-3">
+                            <div class="dash-widget dct-border-rht">
+                                <div class="dash-widget-info pl-2">
+                                    <h6>Total Patients</h6>
+                                    <h3>{{ total_patients }}</h3>
+                                    <p class="text-muted">Registered in practice</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 col-lg-3">
+                            <div class="dash-widget dct-border-rht">
+                                <div class="dash-widget-info pl-2">
+                                    <h6>Today's Bookings</h6>
+                                    <h3>{{ today_patients }}</h3>
+                                    <p class="text-muted">Total queued today</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 col-lg-3">
+                            <div class="dash-widget dct-border-rht">
+                                <div class="dash-widget-info pl-2">
+                                    <h6>Today's Capacity</h6>
+                                    <h3>{{ daily_booked_capacity }} / {{ daily_max_capacity }}</h3>
+                                    <p class="text-muted">{% if is_capacity_full %}<span class="text-danger font-weight-bold">Capacity Full</span>{% else %}<span class="text-success">{{ daily_remaining_capacity }} slots remaining</span>{% endif %}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 col-lg-3">
+                            <div class="dash-widget">
+                                <div class="dash-widget-info pl-2">
+                                    <h6>Total Appointments</h6>
+                                    <h3>{{ total_appointments }}</h3>
+                                    <p class="text-muted">All-time count</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <h4 class="mb-4">Patient Appointments</h4>
+            <div class="appointment-tab">
+                <!-- Appointment Tab -->
+                <ul class="nav nav-tabs nav-tabs-solid nav-tabs-rounded">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#upcoming-appointments" data-toggle="tab">Upcoming</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#today-appointments" data-toggle="tab">Today</a>
+                    </li>
+                </ul>
+                <!-- /Appointment Tab -->
+
+                <div class="tab-content">
+                    <!-- Upcoming Appointment Tab -->
+                    <div class="tab-pane show active" id="upcoming-appointments">
+                        <div class="card card-table mb-0">
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-center mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Patient Name</th>
+                                                <th>Appointment Date</th>
+                                                <th>Status</th>
+                                                <th class="text-center">Amount</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for appointment in upcoming_appointments %}
+                                            <tr>
+                                                <td>
+                                                    <h2 class="table-avatar">
+                                                        <a href="#" class="avatar avatar-sm mr-2">
+                                                            <img class="avatar-img rounded-circle" src="{{ appointment.patient.profile.image }}" alt="Patient Image">
+                                                        </a>
+                                                        <a href="#">{{ appointment.patient.get_full_name }}</a>
+                                                    </h2>
+                                                </td>
+                                                <td>
+                                                    {{ appointment.appointment_date }}
+                                                    <span class="d-block text-info">{{ appointment.appointment_time|time:"h:i A" }}</span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge badge-pill 
+                                                        {% if appointment.status == 'confirmed' %}bg-success-light{% endif %}
+                                                        {% if appointment.status == 'pending' %}bg-warning-light{% endif %}
+                                                        {% if appointment.status == 'cancelled' %}bg-danger-light{% endif %}
+                                                        {% if appointment.status == 'completed' %}bg-info-light{% endif %}">
+                                                        {{ appointment.status|title }}
+                                                    </span>
+                                                </td>
+                                                <td class="text-center">৳{{ appointment.doctor.profile.price_per_consultation }}</td>
+                                                <td>
+                                                    <div class="table-action">
+                                                        <a href="{% url 'doctors:appointment-detail' appointment.pk %}" class="btn btn-sm bg-info-light">
+                                                            <i class="far fa-eye"></i> View
+                                                        </a>
+                                                        {% if appointment.status == 'pending' %}
+                                                            <form method="post" action="{% url 'doctors:appointment-action' appointment.pk 'accept' %}" style="display: inline;">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-sm bg-success-light" onclick="return confirm('Are you sure you want to accept this appointment?')">
+                                                                    <i class="fas fa-check"></i> Accept
+                                                                </button>
+                                                            </form>
+                                                            <form method="post" action="{% url 'doctors:appointment-action' appointment.pk 'cancel' %}" style="display: inline;">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-sm bg-danger-light" onclick="return confirm('Are you sure you want to cancel this appointment?')">
+                                                                    <i class="fas fa-times"></i> Cancel
+                                                                </button>
+                                                            </form>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="5" class="text-center">No upcoming appointments</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- /Upcoming Appointment Tab -->
+
+                    <!-- Today Appointment Tab -->
+                    <div class="tab-pane" id="today-appointments">
+                        <div class="card card-table mb-0">
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-center mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Queue Serial #</th>
+                                                <th>Patient Name</th>
+                                                <th>Time & Chamber</th>
+                                                <th>Visit Type & Fee</th>
+                                                <th>Attendance Status</th>
+                                                <th class="text-right">Consultation Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for appointment in today_appointments %}
+                                            <tr>
+                                                <td>
+                                                    <span class="badge badge-primary px-3 py-1" style="font-size: 15px;">#{{ appointment.serial_number }}</span>
+                                                    <br><small class="text-muted"><code>{{ appointment.appointment_reference }}</code></small>
+                                                </td>
+                                                <td>
+                                                    <h2 class="table-avatar">
+                                                        <a href="{% url 'doctors:doctor-patient-history' appointment.patient.id %}" class="avatar avatar-sm mr-2">
+                                                            <img class="avatar-img rounded-circle" src="{{ appointment.patient.profile.image }}" alt="Patient Image">
+                                                        </a>
+                                                        <a href="{% url 'doctors:doctor-patient-history' appointment.patient.id %}">
+                                                            {{ appointment.patient.get_full_name }}
+                                                            <span class="d-block text-muted small">{{ appointment.patient.profile.phone|default:"No phone" }}</span>
+                                                        </a>
+                                                    </h2>
+                                                </td>
+                                                <td>
+                                                    <span class="d-block text-info font-weight-bold">{{ appointment.appointment_time|time:"h:i A" }}</span>
+                                                    <small class="text-muted">Chamber: {{ appointment.chamber|default:appointment.doctor.profile.chamber_number|default:"401" }}</small>
+                                                </td>
+                                                <td>
+                                                    <strong>{{ appointment.get_visit_type_display }}</strong>
+                                                    {% if appointment.visit_stage %}<span class="badge badge-light">(Stage {{ appointment.visit_stage }})</span>{% endif %}
+                                                    <div class="text-success font-weight-bold">৳{{ appointment.fee_amount }}</div>
+                                                </td>
+                                                <td>
+                                                    {% if appointment.status == 'checked_in' %}
+                                                        <span class="badge badge-pill badge-success"><i class="fas fa-user-check mr-1"></i> Checked In (Waiting Area)</span>
+                                                    {% elif appointment.status == 'confirmed' %}
+                                                        <span class="badge badge-pill badge-info"><i class="fas fa-clock mr-1"></i> Confirmed</span>
+                                                    {% elif appointment.status == 'completed' %}
+                                                        <span class="badge badge-pill badge-dark"><i class="fas fa-check-circle mr-1"></i> Completed</span>
+                                                    {% elif appointment.status == 'no_show' %}
+                                                        <span class="badge badge-pill badge-warning">No Show</span>
+                                                    {% elif appointment.status == 'cancelled' %}
+                                                        <span class="badge badge-pill badge-danger">Cancelled</span>
+                                                    {% else %}
+                                                        <span class="badge badge-pill badge-secondary">{{ appointment.status|title }}</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-right">
+                                                    <div class="btn-group">
+                                                        <a href="{% url 'doctors:doctor-patient-history' appointment.patient.id %}" class="btn btn-sm btn-outline-info" title="View Patient Consultation History">
+                                                            <i class="far fa-user"></i> History
+                                                        </a>
+
+                                                        {% if appointment.status in 'confirmed checked_in' %}
+                                                            <button type="button" class="btn btn-sm btn-success ml-1" data-toggle="modal" data-target="#completeModal{{ appointment.id }}" title="Complete Consultation">
+                                                                <i class="fas fa-check-double"></i> Complete
+                                                            </button>
+                                                            <form method="post" action="{% url 'doctors:appointment-no-show' appointment.id %}" class="d-inline ml-1">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Mark No Show">
+                                                                    No Show
+                                                                </button>
+                                                            </form>
+                                                            <form method="post" action="{% url 'doctors:appointment-cancel' appointment.id %}" class="d-inline ml-1" onsubmit="return confirm('Cancel this appointment?');">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancel Appointment">
+                                                                    <i class="fas fa-times"></i>
+                                                                </button>
+                                                            </form>
+                                                        {% endif %}
+                                                    </div>
+
+                                                    <!-- Complete Consultation Modal -->
+                                                    <div class="modal fade text-left" id="completeModal{{ appointment.id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                                                        <div class="modal-dialog modal-dialog-centered" role="document">
+                                                            <div class="modal-content">
+                                                                <div class="modal-header">
+                                                                    <h5 class="modal-title">Complete Consultation: {{ appointment.patient.get_full_name }} (Serial #{{ appointment.serial_number }})</h5>
+                                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                                        <span aria-hidden="true">&times;</span>
+                                                                    </button>
+                                                                </div>
+                                                                <form method="post" action="{% url 'doctors:appointment-complete' appointment.id %}">
+                                                                    {% csrf_token %}
+                                                                    <div class="modal-body">
+                                                                        <div class="form-group">
+                                                                            <label>Diagnosis / Clinical Findings</label>
+                                                                            <input type="text" name="diagnosis" class="form-control" placeholder="e.g. Hypertension, Viral Pharyngitis" required>
+                                                                        </div>
+                                                                        <div class="form-group">
+                                                                            <label>Presenting Symptoms</label>
+                                                                            <textarea name="symptoms" class="form-control" rows="2" placeholder="Patient symptoms..."></textarea>
+                                                                        </div>
+                                                                        <div class="form-group">
+                                                                            <label>Advised Medications</label>
+                                                                            <textarea name="medications" class="form-control" rows="2" placeholder="Prescribed medicines and dosage..."></textarea>
+                                                                        </div>
+                                                                        <div class="form-group">
+                                                                            <label>Doctor's Advice & Follow-up Notes</label>
+                                                                            <textarea name="notes" class="form-control" rows="2" placeholder="Dietary instructions, return in 2 weeks..."></textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="modal-footer">
+                                                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                                                        <button type="submit" class="btn btn-success">Mark Completed & Update Cycle</button>
+                                                                    </div>
+                                                                </form>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="6" class="text-center py-4 text-muted">No appointments scheduled for today.</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- /Today Appointment Tab -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Recent Prescriptions</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Patient</th>
+                                    <th>Diagnosis</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for prescription in recent_prescriptions %}
+                                <tr>
+                                    <td>{{ prescription.created_at|date:"d M Y" }}</td>
+                                    <td>
+                                        <h2 class="table-avatar">
+                                            <a href="#" class="avatar avatar-sm mr-2">
+                                                <img class="avatar-img rounded-circle" src="{{ prescription.patient.profile.image }}" alt="Patient Image">
+                                            </a>
+                                            <a href="#">{{ prescription.patient.get_full_name }}</a>
+                                        </h2>
+                                    </td>
+                                    <td>{{ prescription.diagnosis|truncatechars:50 }}</td>
+                                    <td>
+                                        <a href="#" class="btn btn-sm bg-info-light">
+                                            <i class="far fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center">No prescriptions found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Receptionist Dashboard - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-5 col-lg-4 col-xl-3">
+                <div class="profile-sidebar">
+                    <div class="widget-profile pat-widget-profile">
+                        <div class="profile-info-widget">
+                            <a href="#" class="booking-doc-img">
+                                <img src="{{ user.profile.image }}" alt="User Image">
+                            </a>
+                            <div class="profile-det-info">
+                                <h3>{{ user.get_full_name }}</h3>
+                                <div class="patient-details">
+                                    <h5><i class="fas fa-id-badge"></i> Receptionist</h5>
+                                    <h5 class="mb-0"><i class="fas fa-hospital"></i> Green Hospital Chamber Desk</h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dashboard-widget">
+                        <nav class="dashboard-menu">
+                            <ul>
+                                <li class="active">
+                                    <a href="{% url 'accounts:receptionist-dashboard' %}">
+                                        <i class="fas fa-columns"></i>
+                                        <span>Queue Dashboard</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'accounts:receptionist-walk-in' %}">
+                                        <i class="fas fa-user-plus"></i>
+                                        <span>Create Walk-in Booking</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'accounts:logout' %}">
+                                        <i class="fas fa-sign-out-alt"></i>
+                                        <span>Logout</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-7 col-lg-8 col-xl-9">
+                <!-- Action Header -->
+                <div class="row mb-3 align-items-center">
+                    <div class="col">
+                        <h4 class="mb-0">Reception Queue & Attendance</h4>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{% url 'accounts:receptionist-walk-in' %}" class="btn btn-primary">
+                            <i class="fas fa-plus mr-1"></i> New Walk-In Patient
+                        </a>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card dash-widget">
+                            <div class="card-body">
+                                <div class="dash-widget-info">
+                                    <h6>Assigned Doctors</h6>
+                                    <h3>{{ total_assigned_doctors }}</h3>
+                                    <p class="text-muted">Doctors in your wing</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card dash-widget">
+                            <div class="card-body">
+                                <div class="dash-widget-info">
+                                    <h6>Today's Bookings</h6>
+                                    <h3>{{ today_appointments_count }}</h3>
+                                    <p class="text-muted">Total scheduled today</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card dash-widget">
+                            <div class="card-body">
+                                <div class="dash-widget-info">
+                                    <h6>Checked-In Waiting</h6>
+                                    <h3>{{ checked_in_count }}</h3>
+                                    <p class="text-muted">Waiting outside chamber</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assigned Doctor Capacity Summary -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Assigned Doctors & Today's Patient Capacity</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if doctor_capacity_stats %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-center mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Doctor</th>
+                                            <th>Chamber</th>
+                                            <th>Today's Booked</th>
+                                            <th>Max Capacity</th>
+                                            <th>Remaining</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for stat in doctor_capacity_stats %}
+                                            <tr>
+                                                <td>
+                                                    <strong>Dr. {{ stat.doctor.get_full_name }}</strong>
+                                                    <br><small class="text-muted">{{ stat.doctor.profile.specialization|default:"General" }}</small>
+                                                </td>
+                                                <td>{{ stat.doctor.profile.chamber_number|default:"Chamber Main" }}</td>
+                                                <td><span class="badge badge-info">{{ stat.booked_count }}</span></td>
+                                                <td>{{ stat.max_capacity }}</td>
+                                                <td>
+                                                    {% if stat.is_full %}
+                                                        <span class="badge badge-danger">Capacity Full</span>
+                                                    {% else %}
+                                                        <span class="badge badge-success">{{ stat.remaining_capacity }} slots left</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <a href="{% url 'accounts:receptionist-walk-in-doctor' stat.doctor.id %}" class="btn btn-sm btn-outline-primary mr-1">
+                                                        <i class="fas fa-plus"></i> Walk-in
+                                                    </a>
+                                                    <a href="{% url 'accounts:receptionist-doctor-appointments' stat.doctor.id %}" class="btn btn-sm btn-outline-secondary">
+                                                        <i class="fas fa-list"></i> Appointments
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning mb-0">
+                                You are not currently assigned to any doctors. Please contact Hospital Administration.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Today's Queue & Attendance Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Today's Appointment Queue & Check-In Desk</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if today_appointments %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-center mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Serial #</th>
+                                            <th>Reference</th>
+                                            <th>Patient</th>
+                                            <th>Doctor / Chamber</th>
+                                            <th>Time</th>
+                                            <th>Visit / Fee</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for appt in today_appointments %}
+                                            <tr>
+                                                <td>
+                                                    <span class="badge badge-primary px-2 py-1" style="font-size: 14px;">#{{ appt.serial_number }}</span>
+                                                </td>
+                                                <td><code>{{ appt.appointment_reference }}</code></td>
+                                                <td>
+                                                    <strong>{{ appt.patient.get_full_name }}</strong>
+                                                    <br><small class="text-muted">{{ appt.patient.profile.phone|default:"No phone" }}</small>
+                                                </td>
+                                                <td>
+                                                    Dr. {{ appt.doctor.get_full_name }}
+                                                    <br><small class="text-muted">Chamber: {{ appt.chamber|default:appt.doctor.profile.chamber_number }}</small>
+                                                </td>
+                                                <td>{{ appt.appointment_time|time:"h:i A" }}</td>
+                                                <td>
+                                                    {{ appt.get_visit_type_display }}
+                                                    {% if appt.visit_stage %}(Stage {{ appt.visit_stage }}){% endif %}
+                                                    <br><strong>৳{{ appt.fee_amount }}</strong>
+                                                    <span class="badge {% if appt.payment_status == 'paid' %}badge-success{% else %}badge-warning{% endif %}">
+                                                        {{ appt.get_payment_status_display }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {% if appt.status == 'confirmed' %}
+                                                        <span class="badge badge-info">Confirmed (Waiting)</span>
+                                                    {% elif appt.status == 'checked_in' %}
+                                                        <span class="badge badge-success">Checked In</span>
+                                                    {% elif appt.status == 'completed' %}
+                                                        <span class="badge badge-dark">Completed</span>
+                                                    {% elif appt.status == 'no_show' %}
+                                                        <span class="badge badge-warning">No Show</span>
+                                                    {% elif appt.status == 'cancelled' %}
+                                                        <span class="badge badge-danger">Cancelled</span>
+                                                    {% else %}
+                                                        <span class="badge badge-secondary">{{ appt.status|capfirst }}</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if appt.status == 'confirmed' %}
+                                                        <form method="post" action="{% url 'accounts:receptionist-check-in' appt.id %}" style="display:inline;">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn btn-sm btn-success" title="Check In Patient">
+                                                                <i class="fas fa-check"></i> Check-in
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+
+                                                    {% if appt.status in 'confirmed checked_in' %}
+                                                        <form method="post" action="{% url 'accounts:receptionist-no-show' appt.id %}" style="display:inline;">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Mark No Show">
+                                                                No-Show
+                                                            </button>
+                                                        </form>
+                                                        <form method="post" action="{% url 'accounts:receptionist-cancel' appt.id %}" style="display:inline;" onsubmit="return confirm('Cancel this appointment?');">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancel Appointment">
+                                                                <i class="fas fa-times"></i>
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-muted mb-0">No appointments scheduled for today across your assigned chambers.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

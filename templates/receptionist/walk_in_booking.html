@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Walk-In Booking - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title text-white mb-0"><i class="fas fa-stethoscope mr-1"></i> Assigned Chamber Doctor</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if assigned_doctors %}
+                            <label>Select Doctor</label>
+                            <div class="list-group mb-3">
+                                {% for doc in assigned_doctors %}
+                                <a href="{% url 'accounts:receptionist-walk-in-doctor' doc.id %}" class="list-group-item list-group-item-action {% if selected_doctor.id == doc.id %}active{% endif %}">
+                                    <strong>Dr. {{ doc.get_full_name }}</strong>
+                                    <div class="small">{{ doc.profile.department|default:"General" }} | Chamber {{ doc.profile.chamber_number|default:"401" }}</div>
+                                </a>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning">No doctors currently assigned to your account.</div>
+                        {% endif %}
+
+                        {% if selected_doctor and slots_data %}
+                        <div class="border p-3 rounded bg-light">
+                            <h6>Today's Capacity: {{ today }}</h6>
+                            <p class="mb-1"><strong>Max Capacity:</strong> {{ slots_data.max_capacity }} patients</p>
+                            <p class="mb-1"><strong>Booked Today:</strong> {{ slots_data.booked_count }} patients</p>
+                            <p class="mb-0"><strong>Remaining:</strong>
+                                {% if slots_data.is_full %}
+                                    <span class="text-danger font-weight-bold">FULL</span>
+                                {% else %}
+                                    <span class="text-success font-weight-bold">{{ slots_data.remaining_capacity }} slots</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title mb-0">Create Walk-In Appointment for Dr. {{ selected_doctor.get_full_name }}</h4>
+                    </div>
+                    <div class="card-body">
+                        {% if not selected_doctor %}
+                            <div class="alert alert-info">Please select a doctor from the left panel to proceed.</div>
+                        {% else %}
+                        <form method="post" action="{% url 'accounts:receptionist-walk-in-doctor' selected_doctor.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="doctor_id" value="{{ selected_doctor.id }}">
+
+                            <!-- Patient Selection / Quick Registration -->
+                            <h5 class="mb-3 text-primary">1. Patient Identification</h5>
+                            <div class="form-group">
+                                <label>Patient Option</label>
+                                <select name="patient_id" id="patient_select" class="form-control" onchange="toggleNewPatientFields(this.value)">
+                                    <option value="new">+ Register New Walk-in Patient</option>
+                                    <optgroup label="Existing Registered Patients">
+                                        {% for p in patients %}
+                                        <option value="{{ p.id }}">{{ p.get_full_name }} ({{ p.username }} - {{ p.profile.phone|default:"No phone" }})</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                </select>
+                            </div>
+
+                            <div id="new_patient_fields">
+                                <div class="form-row">
+                                    <div class="col-md-6 form-group">
+                                        <label>First Name <span class="text-danger">*</span></label>
+                                        <input type="text" name="first_name" class="form-control" placeholder="Patient's first name">
+                                    </div>
+                                    <div class="col-md-6 form-group">
+                                        <label>Last Name <span class="text-danger">*</span></label>
+                                        <input type="text" name="last_name" class="form-control" placeholder="Patient's last name">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="col-md-6 form-group">
+                                        <label>Contact Phone</label>
+                                        <input type="text" name="phone" class="form-control" placeholder="e.g. 01712345678">
+                                    </div>
+                                    <div class="col-md-6 form-group">
+                                        <label>Username (Optional)</label>
+                                        <input type="text" name="username" class="form-control" placeholder="Auto-generated if blank">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr>
+                            <!-- Appointment Details -->
+                            <h5 class="mb-3 text-primary">2. Appointment & Slot Details</h5>
+                            <div class="form-row">
+                                <div class="col-md-6 form-group">
+                                    <label>Date</label>
+                                    <input type="date" name="selected_date" class="form-control" value="{{ today|date:'Y-m-d' }}" required>
+                                </div>
+                                <div class="col-md-6 form-group">
+                                    <label>Consultation Visit Type <span class="text-danger">*</span></label>
+                                    <select name="visit_type" class="form-control">
+                                        <option value="regular">Regular Consultation (Cycles 1st ৳{{ selected_doctor.profile.fee_first_visit }} → 2nd ৳{{ selected_doctor.profile.fee_second_visit }} → 3rd ৳{{ selected_doctor.profile.fee_third_visit }})</option>
+                                        <option value="report_check">Report Checking (Fixed ৳{{ selected_doctor.profile.fee_report_check }})</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Select Available Time Slot <span class="text-danger">*</span></label>
+                                <select name="selected_time" class="form-control" required>
+                                    <option value="">-- Choose Time Slot --</option>
+                                    {% for slot in slots_data.slots %}
+                                        {% if slot.is_available %}
+                                            <option value="{{ slot.time_str }}">{{ slot.formatted_time }} ({{ slot.session_name }})</option>
+                                        {% else %}
+                                            <option value="{{ slot.time_str }}" disabled>{{ slot.formatted_time }} - {{ slot.reason }}</option>
+                                        {% endif %}
+                                    {% empty %}
+                                        <option value="" disabled>No slots configured for doctor today</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Reception Administrative Notes</label>
+                                <textarea name="admin_notes" class="form-control" rows="2" placeholder="e.g. Walk-in patient arrived at reception counter..."></textarea>
+                            </div>
+
+                            <div class="alert alert-info small">
+                                <i class="fas fa-money-bill-wave mr-1"></i> Payment Method: <strong>Pay at Chamber</strong>. The fee snapshot will be deterministically locked based on the patient's completed visit sequence.
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg btn-block" {% if slots_data.is_full %}disabled{% endif %}>
+                                <i class="fas fa-check-circle mr-1"></i> Confirm Walk-In Booking
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleNewPatientFields(val) {
+    var fields = document.getElementById("new_patient_fields");
+    if (val === "new") {
+        fields.style.display = "block";
+    } else {
+        fields.style.display = "none";
+    }
+}
+</script>
+{% endblock %}

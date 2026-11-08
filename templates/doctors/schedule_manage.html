@@ -1,0 +1,275 @@
+{% extends 'includes/doctor-sidebar.html' %}
+{% load static %}
+
+{% block title %}Doctor Schedule & Availability Management - Green Hospital{% endblock %}
+
+{% block main %}
+<div class="row">
+    <div class="col-md-12 mb-3">
+        <h3>Doctor Schedule & Availability Engine</h3>
+        <p class="text-muted">Configure weekly recurring consultation sessions, consultation slot durations, breaks, daily capacity, and blocked dates or temporary leave.</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Add Weekly Recurring Session -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title text-white mb-0"><i class="fa fa-calendar-plus-o mr-2"></i>Add Weekly Working Session</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'doctors:manage-schedules' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_session">
+
+                    <div class="form-group">
+                        <label>Weekday <span class="text-danger">*</span></label>
+                        <select name="weekday" class="form-control" required>
+                            {% for w_val, w_label in weekday_choices %}
+                            <option value="{{ w_val }}">{{ w_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Session Name</label>
+                        <input type="text" name="session_name" class="form-control" value="Morning Session" placeholder="e.g. Morning OPD, Evening Clinic">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="col-md-6 form-group">
+                            <label>Start Time <span class="text-danger">*</span></label>
+                            <input type="time" name="start_time" class="form-control" required value="09:00">
+                        </div>
+                        <div class="col-md-6 form-group">
+                            <label>End Time <span class="text-danger">*</span></label>
+                            <input type="time" name="end_time" class="form-control" required value="13:00">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="col-md-6 form-group">
+                            <label>Slot Duration (Minutes)</label>
+                            <input type="number" name="slot_duration" class="form-control" value="15" min="5" max="60" required>
+                        </div>
+                        <div class="col-md-6 form-group">
+                            <label>Maximum Patient Capacity</label>
+                            <input type="number" name="max_capacity" class="form-control" value="20" min="1" max="100" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Chamber / Room Number</label>
+                        <input type="text" name="chamber_number" class="form-control" value="{{ user.profile.chamber_number }}" placeholder="e.g. Room 402, 4th Floor">
+                    </div>
+
+                    <hr>
+                    <h6>Optional Session Break (e.g. Lunch or Prayer)</h6>
+                    <div class="form-row">
+                        <div class="col-md-4 form-group">
+                            <label>Break Name</label>
+                            <input type="text" name="break_name" class="form-control" placeholder="Lunch">
+                        </div>
+                        <div class="col-md-4 form-group">
+                            <label>Break Start</label>
+                            <input type="time" name="break_start" class="form-control">
+                        </div>
+                        <div class="col-md-4 form-group">
+                            <label>Break End</label>
+                            <input type="time" name="break_end" class="form-control">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block"><i class="fa fa-save mr-1"></i> Save Working Session</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Availability Exception / Day Off -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="card-title text-white mb-0"><i class="fa fa-calendar-times-o mr-2"></i>Availability Exception / Leave</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'doctors:manage-exceptions' %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label>Exception Type <span class="text-danger">*</span></label>
+                        <select name="exception_type" class="form-control" required>
+                            <option value="day_off">Not Available / Day Off</option>
+                            <option value="holiday">Holiday / Temporary Leave</option>
+                            <option value="blocked_interval">Blocked Time Interval</option>
+                            <option value="blocked_session">Blocked Entire Session</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="col-md-6 form-group">
+                            <label>Start Date <span class="text-danger">*</span></label>
+                            <input type="date" name="start_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 form-group">
+                            <label>End Date (Inclusive)</label>
+                            <input type="date" name="end_date" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="col-md-6 form-group">
+                            <label>Start Time (Optional)</label>
+                            <input type="time" name="start_time" class="form-control">
+                        </div>
+                        <div class="col-md-6 form-group">
+                            <label>End Time (Optional)</label>
+                            <input type="time" name="end_time" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Reason / Note</label>
+                        <input type="text" name="reason" class="form-control" placeholder="e.g. Attending Medical Conference, Family Emergency">
+                    </div>
+
+                    <div class="alert alert-warning small mb-3">
+                        <i class="fa fa-info-circle mr-1"></i> <strong>Scheduling Safety:</strong> Green Hospital never silently cancels booked appointments. If any bookings conflict with this period, you will be notified to explicitly reschedule or cancel them with patient agreement.
+                    </div>
+
+                    <button type="submit" class="btn btn-danger btn-block"><i class="fa fa-ban mr-1"></i> Save Availability Exception</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recurring Weekly Schedules List -->
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Active Recurring Weekly Schedules</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Weekday</th>
+                                <th>Session</th>
+                                <th>Working Hours</th>
+                                <th>Slot Duration</th>
+                                <th>Max Capacity</th>
+                                <th>Chamber</th>
+                                <th>Breaks</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in schedules %}
+                            <tr>
+                                <td><strong>{{ s.get_weekday_display }}</strong></td>
+                                <td>{{ s.session_name }}</td>
+                                <td>{{ s.start_time|time:"h:i A" }} - {{ s.end_time|time:"h:i A" }}</td>
+                                <td>{{ s.slot_duration }} mins</td>
+                                <td>{{ s.max_capacity }} patients</td>
+                                <td>{{ s.chamber_number|default:"Default Chamber" }}</td>
+                                <td>
+                                    {% for b in s.breaks.all %}
+                                        <span class="badge badge-info">{{ b.name }}: {{ b.start_time|time:"h:i A" }}-{{ b.end_time|time:"h:i A" }}</span><br>
+                                    {% empty %}
+                                        <span class="text-muted">None</span>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% if s.is_active %}
+                                        <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Deactivated</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="post" action="{% url 'doctors:manage-schedules' %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="toggle_session">
+                                        <input type="hidden" name="session_id" value="{{ s.id }}">
+                                        <button type="submit" class="btn btn-sm {% if s.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}">
+                                            {% if s.is_active %}Deactivate{% else %}Activate{% endif %}
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{% url 'doctors:manage-schedules' %}" class="d-inline ml-1" onsubmit="return confirm('Delete this schedule session?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_session">
+                                        <input type="hidden" name="session_id" value="{{ s.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fa fa-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center py-4 text-muted">No weekly schedules configured yet. Use the form above to add your working sessions.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Exceptions List -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Recorded Exceptions & Leave</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Exception Type</th>
+                                <th>Dates</th>
+                                <th>Time Interval</th>
+                                <th>Reason</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for exc in exceptions %}
+                            <tr>
+                                <td><span class="badge badge-danger">{{ exc.get_exception_type_display }}</span></td>
+                                <td>{{ exc.start_date|date:"d M Y" }} to {{ exc.end_date|date:"d M Y" }}</td>
+                                <td>
+                                    {% if exc.start_time and exc.end_time %}
+                                        {{ exc.start_time|time:"h:i A" }} - {{ exc.end_time|time:"h:i A" }}
+                                    {% else %}
+                                        Full Day
+                                    {% endif %}
+                                </td>
+                                <td>{{ exc.reason|default:"No reason stated" }}</td>
+                                <td>
+                                    {% if exc.is_active %}
+                                        <span class="badge badge-warning">Active Exception</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-3 text-muted">No availability exceptions or leave recorded.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

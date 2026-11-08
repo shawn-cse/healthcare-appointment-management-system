@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %}
+Booking Success
+{% endblock %}
+
+{% block content %}
+<div class="content success-page-cont">
+    <div class="container-fluid">
+    
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+            
+                <!-- Success Card -->
+                <div class="card success-card">
+                    <div class="card-body">
+                        <div class="success-cont">
+                            <i class="fas fa-check"></i>
+                            <h3>Appointment Booked Successfully!</h3>
+                            <div class="my-3 p-3 bg-light border rounded text-left">
+                                <div class="row">
+                                    <div class="col-sm-6 mb-2">
+                                        <span class="text-muted small d-block">Daily Serial Number</span>
+                                        <h4 class="text-primary font-weight-bold mb-0">Serial #{{ booking.serial_number }}</h4>
+                                    </div>
+                                    <div class="col-sm-6 mb-2">
+                                        <span class="text-muted small d-block">Appointment Reference</span>
+                                        <code>{{ booking.appointment_reference }}</code>
+                                    </div>
+                                    <div class="col-sm-6 mb-2">
+                                        <span class="text-muted small d-block">Doctor</span>
+                                        <strong>Dr. {{ booking.doctor.get_full_name }}</strong>
+                                        <div class="small text-muted">{{ booking.doctor.profile.specialization|default:"General" }}</div>
+                                    </div>
+                                    <div class="col-sm-6 mb-2">
+                                        <span class="text-muted small d-block">Chamber Room</span>
+                                        <strong>{{ booking.chamber|default:booking.doctor.profile.chamber_number|default:"Room 401" }}</strong>
+                                    </div>
+                                    <div class="col-sm-6 mb-2">
+                                        <span class="text-muted small d-block">Date & Time</span>
+                                        <strong>{{ booking.appointment_date|date:"d M Y" }} at {{ booking.appointment_time|time:"h:i A" }}</strong>
+                                    </div>
+                                    <div class="col-sm-6 mb-2">
+                                        <span class="text-muted small d-block">Consultation Fee</span>
+                                        <strong class="text-success">৳{{ booking.fee_amount }} BDT</strong>
+                                        <span class="badge badge-info ml-1">{{ booking.get_visit_type_display }}</span>
+                                    </div>
+                                    <div class="col-sm-12">
+                                        <span class="text-muted small d-block">Payment Status</span>
+                                        <span class="badge {% if booking.payment_status == 'paid' %}badge-success{% else %}badge-warning{% endif %}">
+                                            {{ booking.get_payment_method_display }} - {{ booking.get_payment_status_display }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="{% url 'bookings:booking-invoice' booking.id %}" class="btn btn-primary view-inv-btn mr-2">View Invoice</a>
+                            <a href="{% url 'bookings:booking-list' %}" class="btn btn-outline-secondary">My Bookings</a>
+                        </div>
+                    </div>
+                </div>
+                <!-- /Success Card -->
+                
+            </div>
+        </div>
+        
+    </div>
+</div>
+{% endblock %}
