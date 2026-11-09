@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Official Payment Receipt #{{ receipt.receipt_number }} - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="content py-4">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-9">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge badge-success text-uppercase font-weight-bold px-2 py-1">Official Money Receipt</span>
+                            <h4 class="mb-0 text-dark font-weight-bold mt-1">Receipt #{{ receipt.receipt_number }}</h4>
+                        </div>
+                        <div>
+                            <a href="{% url 'payments:receipt-print' receipt.receipt_number %}" target="_blank" class="btn btn-outline-primary btn-sm mr-2">
+                                <i class="fas fa-print mr-1"></i> Print Receipt
+                            </a>
+                            {% if request.user.is_patient %}
+                            <a href="{% url 'patients:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-arrow-left mr-1"></i> Dashboard
+                            </a>
+                            {% elif request.user.is_doctor %}
+                            <a href="{% url 'doctors:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-arrow-left mr-1"></i> Dashboard
+                            </a>
+                            {% else %}
+                            <a href="{% url 'payments:admin-transactions' %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-arrow-left mr-1"></i> Transactions
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <!-- Hospital Header -->
+                        <div class="row mb-4 pb-3 border-bottom align-items-center">
+                            <div class="col-sm-6">
+                                <h3 class="text-success font-weight-bold mb-1"><i class="fas fa-hospital-alt mr-2"></i>Green Hospital</h3>
+                                <p class="text-muted small mb-0">
+                                    Panthapath, Dhanmondi, Dhaka-1205, Bangladesh<br>
+                                    Phone: +880 2 9876543 | Email: billing@greenhospital.org
+                                </p>
+                            </div>
+                            <div class="col-sm-6 text-sm-right mt-3 mt-sm-0">
+                                <span class="text-muted small d-block">Issued Date & Time</span>
+                                <strong>{{ receipt.issued_at|date:"d M Y, h:i A" }} (Dhaka)</strong>
+                                <span class="text-muted small d-block mt-1">Transaction Ref: <code>{{ receipt.transaction_reference }}</code></span>
+                                <span class="badge badge-pill badge-success mt-1">PAID IN FULL</span>
+                            </div>
+                        </div>
+
+                        <!-- Patient & Doctor Info -->
+                        <div class="row mb-4">
+                            <div class="col-sm-6">
+                                <h6 class="text-muted text-uppercase font-weight-bold small">Billed To (Patient)</h6>
+                                <h5 class="text-dark font-weight-bold mb-1">{{ receipt.patient.get_full_name }}</h5>
+                                <div class="text-muted small">
+                                    Username: {{ receipt.patient.username }}<br>
+                                    {% if receipt.patient.profile.phone %}Phone: {{ receipt.patient.profile.phone }}<br>{% endif %}
+                                    {% if receipt.patient.email %}Email: {{ receipt.patient.email }}<br>{% endif %}
+                                </div>
+                            </div>
+                            <div class="col-sm-6 text-sm-right mt-3 mt-sm-0">
+                                <h6 class="text-muted text-uppercase font-weight-bold small">Consultation With</h6>
+                                <h5 class="text-dark font-weight-bold mb-1">Dr. {{ receipt.doctor.get_full_name }}</h5>
+                                <div class="text-muted small">
+                                    Specialization: {{ receipt.doctor.profile.specialization|default:"General Medicine" }}<br>
+                                    BMDC Reg: {{ receipt.doctor.bmdc_number|default:"Verified" }}<br>
+                                    Chamber: {{ receipt.booking.chamber|default:receipt.doctor.profile.chamber_number|default:"Chamber 401" }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Appointment Summary -->
+                        <div class="bg-light p-3 rounded mb-4 border">
+                            <div class="row align-items-center">
+                                <div class="col-sm-3 mb-2 mb-sm-0">
+                                    <span class="text-muted small d-block">Daily Serial Number</span>
+                                    <h5 class="text-primary font-weight-bold mb-0">#{{ receipt.booking.serial_number }}</h5>
+                                </div>
+                                <div class="col-sm-3 mb-2 mb-sm-0">
+                                    <span class="text-muted small d-block">Appointment Ref</span>
+                                    <code>{{ receipt.booking.appointment_reference }}</code>
+                                </div>
+                                <div class="col-sm-3 mb-2 mb-sm-0">
+                                    <span class="text-muted small d-block">Scheduled Slot</span>
+                                    <span>{{ receipt.booking.appointment_date|date:"d M Y" }} at {{ receipt.booking.appointment_time|time:"h:i A" }}</span>
+                                </div>
+                                <div class="col-sm-3">
+                                    <span class="text-muted small d-block">Visit Type / Stage</span>
+                                    <span class="badge badge-info">{{ receipt.booking.get_visit_type_display }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Financial Ledger Table -->
+                        <div class="table-responsive mb-4">
+                            <table class="table table-bordered">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Description</th>
+                                        <th class="text-center">Locked Fee Snapshot</th>
+                                        <th class="text-center">Payment Method</th>
+                                        <th class="text-right">Collected Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <strong>Doctor Consultation Fee</strong>
+                                            <div class="small text-muted">Tiered patient visit sequence rate snapshot locked at booking.</div>
+                                        </td>
+                                        <td class="text-center font-weight-bold">৳{{ receipt.billed_fee }} BDT</td>
+                                        <td class="text-center">
+                                            <span class="badge badge-light border">{{ receipt.payment_method }}</span>
+                                        </td>
+                                        <td class="text-right font-weight-bold text-success">৳{{ receipt.collected_amount }} BDT</td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th colspan="3" class="text-right">Total Paid (BDT):</th>
+                                        <th class="text-right text-success font-weight-bold" style="font-size: 1.25rem;">৳{{ receipt.collected_amount }} BDT</th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <!-- Signatures & Notes -->
+                        <div class="row pt-4 border-top">
+                            <div class="col-sm-6 text-muted small">
+                                <strong>Payment Verification & Security:</strong><br>
+                                Provider: {{ receipt.transaction.payment_provider|upper|default:"CHAMBER CASH" }}<br>
+                                Collected By: {{ receipt.issued_by.get_full_name|default:"Patient Online" }}<br>
+                                {% if receipt.notes %}{{ receipt.notes }}<br>{% endif %}
+                                <em>This is an immutable computer-generated official receipt authorized by Green Hospital financial policy.</em>
+                            </div>
+                            <div class="col-sm-6 text-sm-right mt-3 mt-sm-0">
+                                <div class="d-inline-block border-top pt-2 px-4 text-center">
+                                    <small class="text-muted font-weight-bold d-block">Authorized Billing Counter</small>
+                                    <small class="text-success font-weight-bold">GREEN HOSPITAL DHAKA</small>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

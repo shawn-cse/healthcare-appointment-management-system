@@ -1,0 +1,133 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Payment Transactions & Revenue - Green Hospital Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <h3 class="page-title font-weight-bold">Payment Transactions & Revenue</h3>
+            <ul class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'admin-dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Payments</li>
+            </ul>
+        </div>
+        <div class="col-auto">
+            <span class="badge badge-success px-3 py-2 font-weight-bold" style="font-size: 1rem;">
+                Net Revenue: ৳{{ net_revenue }} BDT
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Revenue Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-xl-4 col-sm-6 col-12">
+        <div class="card shadow-sm border-left-success">
+            <div class="card-body">
+                <div class="dash-widget-header">
+                    <div>
+                        <small class="text-muted text-uppercase font-weight-bold">Total Collected (BDT)</small>
+                        <h3 class="font-weight-bold text-success mb-0">৳{{ total_collected }}</h3>
+                    </div>
+                    <span class="dash-widget-icon text-success border-success">
+                        <i class="fe fe-money"></i>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4 col-sm-6 col-12">
+        <div class="card shadow-sm border-left-danger">
+            <div class="card-body">
+                <div class="dash-widget-header">
+                    <div>
+                        <small class="text-muted text-uppercase font-weight-bold">Total Refunded (BDT)</small>
+                        <h3 class="font-weight-bold text-danger mb-0">৳{{ total_refunded }}</h3>
+                    </div>
+                    <span class="dash-widget-icon text-danger border-danger">
+                        <i class="fe fe-refresh-cw"></i>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4 col-sm-6 col-12">
+        <div class="card shadow-sm border-left-primary">
+            <div class="card-body">
+                <div class="dash-widget-header">
+                    <div>
+                        <small class="text-muted text-uppercase font-weight-bold">Net Hospital Revenue (BDT)</small>
+                        <h3 class="font-weight-bold text-primary mb-0">৳{{ net_revenue }}</h3>
+                    </div>
+                    <span class="dash-widget-icon text-primary border-primary">
+                        <i class="fe fe-credit-card"></i>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions Table Card -->
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-center mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Tx Reference</th>
+                        <th>Appointment / Serial</th>
+                        <th>Patient</th>
+                        <th>Doctor</th>
+                        <th>Method / Provider</th>
+                        <th>Amount (BDT)</th>
+                        <th>Status</th>
+                        <th>Date & Time</th>
+                        <th>Receipt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                    <tr>
+                        <td><code>{{ tx.transaction_reference }}</code></td>
+                        <td>
+                            <strong>Serial #{{ tx.booking.serial_number }}</strong>
+                            <div class="small text-muted">{{ tx.booking.appointment_reference }}</div>
+                        </td>
+                        <td>{{ tx.patient.get_full_name }}</td>
+                        <td>Dr. {{ tx.doctor.get_full_name }}</td>
+                        <td>
+                            <span class="badge badge-light border">{{ tx.get_payment_method_display }}</span>
+                            <div class="small text-muted">{{ tx.payment_provider|upper }}</div>
+                        </td>
+                        <td class="font-weight-bold">৳{{ tx.amount }}</td>
+                        <td>
+                            <span class="badge badge-pill {% if tx.status == 'success' %}badge-success{% elif tx.status == 'refunded' %}badge-info{% elif tx.status == 'partially_refunded' %}badge-warning{% elif tx.status == 'pending' %}badge-secondary{% else %}badge-danger{% endif %}">
+                                {{ tx.get_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ tx.created_at|date:"d M Y, h:i A" }}</td>
+                        <td>
+                            {% if tx.receipt %}
+                            <a href="{% url 'payments:receipt-detail' tx.receipt.receipt_number %}" class="btn btn-sm btn-outline-primary" title="View Official Receipt">
+                                <i class="fe fe-file-text"></i> Receipt
+                            </a>
+                            {% else %}
+                            <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">
+                            No payment transactions recorded yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

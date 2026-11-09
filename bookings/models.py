@@ -26,7 +26,9 @@ class Booking(models.Model):
     class PaymentStatus(models.TextChoices):
         UNPAID = "unpaid", "Unpaid"
         PAID = "paid", "Paid"
+        PARTIALLY_REFUNDED = "partially_refunded", "Partially Refunded"
         REFUNDED = "refunded", "Refunded"
+        FAILED = "failed", "Failed"
 
     class StatusChoices(models.TextChoices):
         PENDING = "pending", "Pending"

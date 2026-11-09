@@ -73,9 +73,35 @@
                                                     {% if appointment.status == 'completed' %}bg-info-light{% endif %}">
                                                     {{ appointment.status|title }}
                                                 </span>
+                                                <span class="badge badge-pill d-block mt-1
+                                                    {% if appointment.payment_status == 'paid' %}badge-success
+                                                    {% elif appointment.payment_status == 'refunded' %}badge-info
+                                                    {% elif appointment.payment_status == 'partially_refunded' %}badge-warning
+                                                    {% else %}badge-secondary{% endif %}">
+                                                    ৳{{ appointment.fee_amount }} ({{ appointment.get_payment_status_display }})
+                                                </span>
                                             </td>
                                             <td>
                                             <div class="table-action">
+                                                    {% if appointment.payment_status == 'unpaid' and appointment.status != 'cancelled' %}
+                                                        <a href="{% url 'payments:checkout-start' appointment.pk %}" class="btn btn-sm bg-success-light" title="Pay Online Now">
+                                                            <i class="fas fa-credit-card"></i> Pay
+                                                        </a>
+                                                    {% endif %}
+                                                    {% if appointment.receipts.exists %}
+                                                        <a href="{% url 'payments:receipt-detail' appointment.receipts.first.receipt_number %}" class="btn btn-sm bg-success-light" title="Official Receipt">
+                                                            <i class="fas fa-receipt"></i> Receipt
+                                                        </a>
+                                                    {% endif %}
+                                                    {% if appointment.status == 'cancelled' and appointment.refund_requests.exists %}
+                                                        <a href="{% url 'payments:refund-detail' appointment.refund_requests.first.refund_reference %}" class="btn btn-sm bg-warning-light" title="Track Refund">
+                                                            <i class="fas fa-undo"></i> Refund
+                                                        </a>
+                                                    {% elif appointment.status == 'cancelled' and appointment.payment_status == 'paid' %}
+                                                        <a href="{% url 'payments:refund-request' appointment.pk %}" class="btn btn-sm bg-warning-light" title="Request Refund">
+                                                            <i class="fas fa-undo"></i> Refund
+                                                        </a>
+                                                    {% endif %}
                                                     {% if appointment.status == 'pending' or appointment.status == 'confirmed' %}
                                                         <form method="post" action="{% url 'patients:appointment-cancel' appointment.pk %}" style="display: inline;">
                                                             {% csrf_token %}

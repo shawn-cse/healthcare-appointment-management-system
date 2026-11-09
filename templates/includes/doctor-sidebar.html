@@ -91,6 +91,12 @@
                                             <span>Schedule & Availability</span>
                                         </a>
                                     </li>
+                                    <li class="{% if request.resolver_match.url_name == 'doctor-session-cancel' %}active{% endif %}">
+                                        <a href="{% url 'payments:doctor-session-cancel' %}">
+                                            <i class="fas fa-calendar-times"></i>
+                                            <span>Cancel Session</span>
+                                        </a>
+                                    </li>
                                     <li class="{% if request.resolver_match.url_name == 'booking-list' %}active{% endif %}">
                                         <a href="{% url 'bookings:booking-list' %}">
                                             <i class="fas fa-calendar-alt"></i>

@@ -22,6 +22,7 @@
                                     <th>Doctor</th>
                                 {% endif %}
                                 <th>Status</th>
+                                <th>Payment</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -45,8 +46,28 @@
                                         </span>
                                     </td>
                                     <td>
+                                        <span class="badge {% if booking.payment_status == 'paid' %}badge-success{% elif booking.payment_status == 'refunded' %}badge-info{% elif booking.payment_status == 'partially_refunded' %}badge-warning{% else %}badge-secondary{% endif %}">
+                                            ৳{{ booking.fee_amount }} ({{ booking.get_payment_status_display }})
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if booking.payment_status == 'unpaid' and booking.status != 'cancelled' %}
+                                        <a href="{% url 'payments:checkout-start' booking.id %}" class="btn btn-sm btn-success">
+                                            Pay
+                                        </a>
+                                        {% endif %}
+                                        {% if booking.receipts.exists %}
+                                        <a href="{% url 'payments:receipt-detail' booking.receipts.first.receipt_number %}" class="btn btn-sm btn-outline-success">
+                                            Receipt
+                                        </a>
+                                        {% endif %}
+                                        {% if booking.refund_requests.exists %}
+                                        <a href="{% url 'payments:refund-detail' booking.refund_requests.first.refund_reference %}" class="btn btn-sm btn-outline-warning">
+                                            Refund
+                                        </a>
+                                        {% endif %}
                                         <a href="{% url 'bookings:booking-invoice' booking.id %}" class="btn btn-sm btn-primary">
-                                            View Details
+                                            Invoice
                                         </a>
                                     </td>
                                 </tr>

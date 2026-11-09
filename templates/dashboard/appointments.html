@@ -64,10 +64,25 @@
                                         {% if appointment.status == 'completed' %}bg-info-light{% endif %}">
                                         {{ appointment.status|title }}
                                     </span>
+                                    <div class="small mt-1">
+                                        <span class="badge {% if appointment.payment_status == 'paid' %}badge-success{% elif appointment.payment_status == 'refunded' %}badge-info{% elif appointment.payment_status == 'partially_refunded' %}badge-warning{% else %}badge-secondary{% endif %}">
+                                            {{ appointment.get_payment_status_display }}
+                                        </span>
+                                    </div>
                                 </td>
-                                <td class="text-right">৳{{ appointment.doctor.profile.price_per_consultation }}</td>
+                                <td class="text-right"><strong>৳{{ appointment.fee_amount }}</strong></td>
                                 <td>
                                     <div class="actions">
+                                        {% if appointment.receipts.exists %}
+                                        <a href="{% url 'payments:receipt-detail' appointment.receipts.first.receipt_number %}" class="btn btn-sm btn-outline-success" title="Receipt">
+                                            <i class="fe fe-file-text"></i>
+                                        </a>
+                                        {% endif %}
+                                        {% if appointment.refund_requests.exists %}
+                                        <a href="{% url 'payments:refund-detail' appointment.refund_requests.first.refund_reference %}" class="btn btn-sm btn-outline-warning" title="Refund Request">
+                                            <i class="fe fe-refresh-cw"></i>
+                                        </a>
+                                        {% endif %}
                                         <a href="#" class="btn btn-sm bg-info-light">
                                             <i class="fe fe-eye"></i> View
                                         </a>

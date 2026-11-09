@@ -251,6 +251,17 @@ class AuditLog(models.Model):
         APPOINTMENT_COMPLETED = "appointment_completed", "Appointment Completed"
         APPOINTMENT_CANCELLED = "appointment_cancelled", "Appointment Cancelled"
         APPOINTMENT_NO_SHOW = "appointment_no_show", "Appointment No Show"
+        PAYMENT_PROCESSED = "payment_processed", "Payment Processed"
+        PAYMENT_COLLECTED = "payment_collected", "Payment Collected"
+        PAYMENT_FAILED = "payment_failed", "Payment Failed"
+        REFUND_REQUESTED = "refund_requested", "Refund Requested"
+        REFUND_REVIEWED = "refund_reviewed", "Refund Reviewed"
+        REFUND_APPROVED = "refund_approved", "Refund Approved"
+        REFUND_REJECTED = "refund_rejected", "Refund Rejected"
+        REFUND_EXECUTED = "refund_executed", "Refund Executed"
+        SESSION_CANCELLED = "session_cancelled", "Session Cancelled"
+        COMPLAINT_FILED = "complaint_filed", "Complaint Filed"
+        COMPLAINT_REVIEWED = "complaint_reviewed", "Complaint Reviewed"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

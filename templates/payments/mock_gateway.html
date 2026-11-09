@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SSLCOMMERZ Sandbox Gateway (Mock Simulator) - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="content py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-7">
+                <div class="card shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-white"><i class="fas fa-shield-alt mr-2"></i>SSLCOMMERZ Secure Gateway Sandbox</h5>
+                        <span class="badge badge-warning text-dark font-weight-bold">Development Simulator</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            This is Green Hospital's safe local payment gateway sandbox. It verifies server-validated appointment fees, tests callbacks/IPNs, and enforces decimal-safe BDT financial transactions without contacting live payment rails.
+                        </div>
+
+                        <div class="bg-light p-3 rounded mb-4 border">
+                            <h6 class="font-weight-bold text-dark mb-3 border-bottom pb-2">Order & Payment Details</h6>
+                            <div class="row">
+                                <div class="col-6 mb-2">
+                                    <span class="text-muted small d-block">Transaction Reference</span>
+                                    <code>{{ transaction.transaction_reference }}</code>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <span class="text-muted small d-block">Appointment Ref</span>
+                                    <strong>{{ booking.appointment_reference }}</strong>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <span class="text-muted small d-block">Doctor</span>
+                                    <span>Dr. {{ doctor.get_full_name }}</span>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <span class="text-muted small d-block">Patient</span>
+                                    <span>{{ patient.get_full_name }}</span>
+                                </div>
+                                <div class="col-12 mt-2 pt-2 border-top">
+                                    <span class="text-muted small d-block">Server-Validated Fee (Locked Snapshot)</span>
+                                    <h3 class="text-success font-weight-bold mb-0">৳{{ transaction.billed_fee }} BDT</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h6 class="font-weight-bold text-dark mb-3">Simulate Gateway Response:</h6>
+                        <form method="post" action="{% url 'payments:mock-gateway' transaction.transaction_reference %}">
+                            {% csrf_token %}
+                            <div class="d-grid gap-2 mb-3">
+                                <button type="submit" name="action" value="success" class="btn btn-success btn-block btn-lg mb-2">
+                                    <i class="fas fa-check-circle mr-1"></i> Simulate Successful Payment (100% Valid BDT)
+                                </button>
+                                <button type="submit" name="action" value="fail" class="btn btn-danger btn-block mb-2">
+                                    <i class="fas fa-times-circle mr-1"></i> Simulate Payment Failure (Card Declined)
+                                </button>
+                                <button type="submit" name="action" value="cancel" class="btn btn-warning btn-block mb-2 text-dark font-weight-bold">
+                                    <i class="fas fa-ban mr-1"></i> Simulate Customer Cancellation (Abort Checkout)
+                                </button>
+                                <button type="submit" name="action" value="tamper" class="btn btn-outline-dark btn-block">
+                                    <i class="fas fa-bug mr-1"></i> Test Security: Simulate Amount Tampering (Altered Fee)
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="card-footer text-muted small text-center">
+                        Green Hospital Healthcare Financial Platform &bull; Currency: Bangladeshi Taka (BDT) &bull; PCI-DSS Secure Simulation
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

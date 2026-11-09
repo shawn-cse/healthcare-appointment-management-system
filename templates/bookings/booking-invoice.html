@@ -77,7 +77,7 @@
                                                 <td>Consultation Fee</td>
                                                 <td class="text-center">{{ booking.appointment_date }}</td>
                                                 <td class="text-center">{{ booking.appointment_time|time:"h:i A" }}</td>
-                                                <td class="text-right">৳{{ booking.doctor.profile.price_per_consultation }}</td>
+                                                <td class="text-right">৳{{ subtotal }}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -89,8 +89,25 @@
                                         <tbody>
                                             <tr>
                                                 <th>Total Amount:</th>
-                                                <td><span>৳{{ total }}</span></td>
+                                                <td><span>৳{{ total }} BDT</span></td>
                                             </tr>
+                                            <tr>
+                                                <th>Payment Status:</th>
+                                                <td>
+                                                    <span class="badge {% if booking.payment_status == 'paid' %}badge-success{% else %}badge-warning{% endif %}">
+                                                        {{ booking.get_payment_status_display }} ({{ booking.get_payment_method_display }})
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% if booking.receipts.exists %}
+                                            <tr>
+                                                <td colspan="2" class="text-right pt-2">
+                                                    <a href="{% url 'payments:receipt-detail' booking.receipts.first.receipt_number %}" class="btn btn-sm btn-success">
+                                                        <i class="fas fa-receipt"></i> View Official Receipt
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            {% endif %}
                                         </tbody>
                                     </table>
                                 </div>

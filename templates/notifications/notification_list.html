@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Notifications - Green Hospital{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div class="breadcrumb-bar bg-white border-bottom py-3">
+    <div class="container-fluid px-4">
+        <div class="row align-items-center">
+            <div class="col-md-8 col-12">
+                <nav aria-label="breadcrumb" class="page-breadcrumb">
+                    <ol class="breadcrumb mb-0 bg-transparent p-0">
+                        <li class="breadcrumb-item"><a href="/">Home</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">Notifications</li>
+                    </ol>
+                </nav>
+                <h3 class="breadcrumb-title font-weight-bold mb-0 text-success">
+                    <i class="fas fa-bell mr-2"></i>Notifications
+                </h3>
+            </div>
+            <div class="col-md-4 col-12 text-md-right mt-2 mt-md-0">
+                {% if unread_count > 0 %}
+                <form action="{% url 'notifications:mark-all-read' %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-success btn-sm">
+                        <i class="fas fa-check-double mr-1"></i> Mark All as Read
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /Breadcrumb -->
+
+<!-- Page Content -->
+<div class="content py-4">
+    <div class="container-fluid px-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-10 col-xl-9">
+                <!-- Filter Tabs -->
+                <div class="card shadow-sm mb-4 border-0">
+                    <div class="card-body p-2">
+                        <ul class="nav nav-pills nav-fill">
+                            <li class="nav-item">
+                                <a class="nav-link {% if active_filter == 'all' %}active bg-success text-white font-weight-bold{% else %}text-muted{% endif %}" href="{% url 'notifications:list' %}">
+                                    All Notifications
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if active_filter == 'unread' %}active bg-success text-white font-weight-bold{% else %}text-muted{% endif %}" href="{% url 'notifications:list' %}?filter=unread">
+                                    Unread 
+                                    {% if unread_count > 0 %}
+                                    <span class="badge badge-warning text-dark ml-1">{{ unread_count }}</span>
+                                    {% endif %}
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Notifications List Card -->
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-0">
+                        {% if notifications %}
+                        <div class="list-group list-group-flush">
+                            {% for notif in notifications %}
+                            <div class="list-group-item p-3 d-flex align-items-start justify-content-between {% if not notif.is_read %}bg-light border-left border-success border-4{% endif %}" style="{% if not notif.is_read %}border-left-width: 4px !important;{% endif %}">
+                                <div class="d-flex align-items-start mr-3">
+                                    <div class="rounded-circle p-2 mr-3 text-center {% if not notif.is_read %}bg-success text-white{% else %}bg-secondary text-light{% endif %}" style="width: 42px; height: 42px; min-width: 42px;">
+                                        {% if 'payment' in notif.notification_type %}
+                                            <i class="fas fa-credit-card mt-1"></i>
+                                        {% elif 'refund' in notif.notification_type %}
+                                            <i class="fas fa-undo-alt mt-1"></i>
+                                        {% elif 'booking' in notif.notification_type %}
+                                            <i class="fas fa-calendar-check mt-1"></i>
+                                        {% elif 'session' in notif.notification_type %}
+                                            <i class="fas fa-ban mt-1"></i>
+                                        {% elif 'complaint' in notif.notification_type %}
+                                            <i class="fas fa-exclamation-circle mt-1"></i>
+                                        {% elif 'doctor' in notif.notification_type %}
+                                            <i class="fas fa-user-md mt-1"></i>
+                                        {% else %}
+                                            <i class="fas fa-bell mt-1"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <div class="d-flex align-items-center mb-1">
+                                            <h6 class="mb-0 font-weight-bold {% if not notif.is_read %}text-dark{% else %}text-muted{% endif %}">
+                                                {{ notif.title }}
+                                            </h6>
+                                            {% if not notif.is_read %}
+                                            <span class="badge badge-success ml-2 font-weight-normal">New</span>
+                                            {% endif %}
+                                        </div>
+                                        <p class="text-secondary small mb-1">{{ notif.message }}</p>
+                                        <small class="text-muted">
+                                            <i class="far fa-clock mr-1"></i> {{ notif.created_at|date:"d M Y, h:i A" }}
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center text-nowrap ml-2">
+                                    {% if notif.related_link %}
+                                    <form action="{% url 'notifications:mark-read' notif.pk %}" method="post" class="d-inline mr-1">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="redirect_to_target" value="true">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                                            View <i class="fas fa-arrow-right ml-1"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% if not notif.is_read %}
+                                    <form action="{% url 'notifications:mark-read' notif.pk %}" method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-light border text-muted" title="Mark as Read">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if is_paginated %}
+                        <div class="card-footer bg-white border-0 py-3">
+                            <ul class="pagination justify-content-center mb-0">
+                                {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link text-success" href="?page={{ page_obj.previous_page_number }}{% if active_filter != 'all' %}&filter={{ active_filter }}{% endif %}">&laquo; Previous</a>
+                                </li>
+                                {% endif %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                                </li>
+                                {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link text-success" href="?page={{ page_obj.next_page_number }}{% if active_filter != 'all' %}&filter={{ active_filter }}{% endif %}">Next &raquo;</a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        {% else %}
+                        <!-- Empty State -->
+                        <div class="text-center py-5">
+                            <div class="mb-3">
+                                <i class="far fa-bell-slash text-muted" style="font-size: 3rem;"></i>
+                            </div>
+                            <h5 class="text-secondary font-weight-bold">No Notifications Found</h5>
+                            <p class="text-muted small">You are all caught up! New alerts and updates will appear here.</p>
+                            <a href="/" class="btn btn-success btn-sm mt-2">Return to Home</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /Page Content -->
+{% endblock %}

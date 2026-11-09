@@ -202,6 +202,22 @@
                                                     </span>
                                                 </td>
                                                 <td>
+                                                    {% if appt.payment_status == 'unpaid' and appt.status != 'cancelled' %}
+                                                        <form method="post" action="{% url 'payments:chamber-collect' appt.id %}" style="display:inline;">
+                                                            {% csrf_token %}
+                                                            <input type="hidden" name="amount" value="{{ appt.fee_amount }}">
+                                                            <input type="hidden" name="payment_method" value="cash">
+                                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Collect Cash (৳{{ appt.fee_amount }})" onclick="return confirm('Record cash payment collection of ৳{{ appt.fee_amount }} BDT for patient {{ appt.patient.get_full_name }}?');">
+                                                                <i class="fas fa-money-bill-wave"></i> Collect
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                    {% if appt.receipts.exists %}
+                                                        <a href="{% url 'payments:receipt-detail' appt.receipts.first.receipt_number %}" class="btn btn-sm btn-outline-primary" title="Official Receipt">
+                                                            <i class="fas fa-receipt"></i>
+                                                        </a>
+                                                    {% endif %}
+
                                                     {% if appt.status == 'confirmed' %}
                                                         <span class="badge badge-info">Confirmed (Waiting)</span>
                                                     {% elif appt.status == 'checked_in' %}
@@ -217,6 +233,22 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
+                                                    {% if appt.payment_status == 'unpaid' and appt.status != 'cancelled' %}
+                                                        <form method="post" action="{% url 'payments:chamber-collect' appt.id %}" style="display:inline;">
+                                                            {% csrf_token %}
+                                                            <input type="hidden" name="amount" value="{{ appt.fee_amount }}">
+                                                            <input type="hidden" name="payment_method" value="cash">
+                                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Collect Cash (৳{{ appt.fee_amount }})" onclick="return confirm('Record cash payment collection of ৳{{ appt.fee_amount }} BDT for patient {{ appt.patient.get_full_name }}?');">
+                                                                <i class="fas fa-money-bill-wave"></i> Collect
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                    {% if appt.receipts.exists %}
+                                                        <a href="{% url 'payments:receipt-detail' appt.receipts.first.receipt_number %}" class="btn btn-sm btn-outline-primary" title="Official Receipt">
+                                                            <i class="fas fa-receipt"></i>
+                                                        </a>
+                                                    {% endif %}
+
                                                     {% if appt.status == 'confirmed' %}
                                                         <form method="post" action="{% url 'accounts:receptionist-check-in' appt.id %}" style="display:inline;">
                                                             {% csrf_token %}

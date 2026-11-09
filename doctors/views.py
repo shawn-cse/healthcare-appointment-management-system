@@ -686,6 +686,23 @@ class AppointmentCancelView(LoginRequiredMixin, View):
         try:
             appointment.transition_to(Booking.StatusChoices.CANCELLED, actor=request.user, reason=reason)
             messages.warning(request, f"Appointment #{appointment.serial_number} cancelled.")
+
+            # Automatic 100% refund eligibility for doctor cancellation if paid
+            if appointment.payment_status in (Booking.PaymentStatus.PAID, Booking.PaymentStatus.PARTIALLY_REFUNDED):
+                from payments.services.refund_service import create_refund_request
+                refund_req = create_refund_request(
+                    booking=appointment,
+                    patient=appointment.patient,
+                    reason=f"Doctor cancelled appointment: {reason}",
+                    cancellation_type="doctor",
+                    current_time=timezone.now(),
+                    actor=request.user,
+                )
+                if refund_req:
+                    messages.info(
+                        request,
+                        f"100% refund request (#{refund_req.refund_reference}) of {refund_req.requested_amount} BDT created for patient {appointment.patient.get_full_name()}."
+                    )
         except ValidationError as e:
             messages.error(request, e.message if hasattr(e, "message") else str(e))
 

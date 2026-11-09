@@ -151,6 +151,9 @@ class BookingCreateView(LoginRequiredMixin, View):
                 admin_notes=notes,
                 actor=request.user,
             )
+            if booking.payment_method == Booking.PaymentMethod.ONLINE:
+                return redirect("payments:checkout-start", booking_id=booking.id)
+
             messages.success(
                 request,
                 f"Appointment booked successfully! Your Daily Serial Number is #{booking.serial_number} (Ref: {booking.appointment_reference})."

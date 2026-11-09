@@ -48,7 +48,26 @@ Green Hospital is a modern healthcare appointment booking and hospital managemen
 - Data isolation (patient-to-patient, doctor-to-doctor)
 - Responsive design
 - Secure data handling
-- Digital invoicing
+- Digital invoicing and printable receipts
+- Dual Payment Methods:
+  - **Online Payment**: SSLCOMMERZ gateway integration (V4 API) with sandbox/live switching and local Mock gateway for development.
+  - **Pay at Chamber**: Receptionist and Hospital Admin cash and POS collection with role assignment enforcement.
+- Financial Integrity:
+  - Decimal-safe BDT currency handling (`Decimal('0.00')`).
+  - Server-side amount and signature verification.
+  - 15-minute checkout session TTL with automatic capacity release on abandonment.
+  - Zero raw bank card or CVV storage.
+- Strict Cancellation & Refund Engine:
+  - Timezone-authoritative policy (`Asia/Dhaka`):
+    - $\ge 24$ hours before appointment: 100% refund.
+    - $< 24$ hours before appointment: 80% refund (20% cancellation fee deducted).
+    - At or after appointment start: 0% automatic refund.
+    - Doctor / Hospital cancellation: 100% refund eligibility.
+    - Unpaid bookings: 0 BDT refundable with no monetary refund records.
+  - 8-stage refund lifecycle (`REQUESTED` → `UNDER_REVIEW` → `APPROVED`/`REJECTED` → `PROCESSING` → `SUCCEEDED`/`FAILED`).
+  - Hospital Administrator review and forwarding; **Super Admin mandatory approval enforcement**.
+  - Online gateway refund API integration and documented chamber manual repayment workflows with voucher tracking.
+  - Doctor consultation session cancellation with multi-patient refund automation.
 - Rating and review system
 - Interactive charts and statistics
 - Real-time data visualization
@@ -89,7 +108,25 @@ source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Set up the database
+4. Configure Environment Variables
+Copy `.env.example` to `.env` and configure your payment gateway and application settings:
+```bash
+cp .env.example .env
+```
+For local development and testing, use the mock payment gateway:
+```ini
+PAYMENT_GATEWAY_PROVIDER=mock
+```
+For SSLCOMMERZ Sandbox or Live integration:
+```ini
+PAYMENT_GATEWAY_PROVIDER=sslcommerz
+SSLCOMMERZ_STORE_ID=your_store_id
+SSLCOMMERZ_STORE_PASSWORD=your_store_password
+SSLCOMMERZ_IS_SANDBOX=True # Set False in production
+SSLCOMMERZ_BASE_URL=https://sandbox.sslcommerz.com
+```
+
+5. Set up the database
 ```bash
 python manage.py migrate
 ```

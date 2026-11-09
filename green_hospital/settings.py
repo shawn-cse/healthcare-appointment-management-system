@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,6 +23,9 @@ INSTALLED_APPS = [
     "doctors",
     "patients",
     "bookings",
+    "payments",
+    "complaints",
+    "notifications",
     "ckeditor",
 ]
 
@@ -49,6 +53,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "notifications.context_processors.notifications_processor",
             ],
         },
     },
@@ -132,3 +137,18 @@ CKEDITOR_BASEPATH = "/static/ckeditor/ckeditor/"
 DEBUG_TOOLBAR_CONFIG = {
     "IS_RUNNING_TESTS": False,
 }
+
+# ==============================================================================
+# Payment Gateway & SSLCOMMERZ Configuration
+# ==============================================================================
+# Provider choices: 'sslcommerz' (production/sandbox) or 'mock' (local testing)
+PAYMENT_GATEWAY_PROVIDER = os.getenv(
+    "PAYMENT_GATEWAY_PROVIDER",
+    "sslcommerz" if os.getenv("SSLCOMMERZ_STORE_ID") else ("mock" if DEBUG else "sslcommerz")
+)
+ALLOW_MOCK_PAYMENTS = os.getenv("ALLOW_MOCK_PAYMENTS", str(DEBUG)).lower() in ("true", "1", "yes")
+
+SSLCOMMERZ_STORE_ID = os.getenv("SSLCOMMERZ_STORE_ID", "")
+SSLCOMMERZ_STORE_PASS = os.getenv("SSLCOMMERZ_STORE_PASS", "")
+SSLCOMMERZ_IS_SANDBOX = os.getenv("SSLCOMMERZ_IS_SANDBOX", "true").lower() in ("true", "1", "yes")
+

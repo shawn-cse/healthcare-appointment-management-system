@@ -163,6 +163,21 @@ class ReceptionistCancelView(ReceptionistRequiredMixin, View):
                 request,
                 f"Appointment #{booking.serial_number} has been cancelled."
             )
+            if booking.payment_status in (Booking.PaymentStatus.PAID, Booking.PaymentStatus.PARTIALLY_REFUNDED):
+                from payments.services.refund_service import create_refund_request
+                refund_req = create_refund_request(
+                    booking=booking,
+                    patient=booking.patient,
+                    reason=f"Clinic cancelled appointment: {reason}",
+                    cancellation_type="hospital",
+                    current_time=timezone.now(),
+                    actor=request.user,
+                )
+                if refund_req:
+                    messages.info(
+                        request,
+                        f"100% refund request (#{refund_req.refund_reference}) of {refund_req.requested_amount} BDT created for patient {booking.patient.get_full_name()}."
+                    )
         except ValidationError as e:
             messages.error(request, e.message if hasattr(e, "message") else str(e))
 

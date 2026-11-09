@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Payment Cancelled - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="content py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 text-center">
+                <div class="card shadow-sm border-warning">
+                    <div class="card-body p-5">
+                        <div class="mb-4">
+                            <span class="avatar avatar-xl bg-warning-light rounded-circle p-3 text-warning" style="font-size: 3rem;">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </span>
+                        </div>
+                        <h3 class="text-warning font-weight-bold mb-3">Payment Session Cancelled</h3>
+                        <p class="text-muted mb-4">
+                            You cancelled the online payment checkout session. No funds were deducted from your account.
+                        </p>
+                        {% if tran_id %}
+                        <div class="alert alert-light border small text-left mb-4">
+                            <strong>Transaction Reference:</strong> <code>{{ tran_id }}</code>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex justify-content-center">
+                            {% if transaction and transaction.booking %}
+                            <a href="{% url 'payments:checkout-start' transaction.booking.id %}" class="btn btn-primary mr-2">
+                                <i class="fas fa-redo mr-1"></i> Try Again
+                            </a>
+                            <a href="{% url 'patients:appointment-detail' transaction.booking.id %}" class="btn btn-outline-secondary">
+                                View Appointment
+                            </a>
+                            {% else %}
+                            <a href="{% url 'patients:dashboard' %}" class="btn btn-primary">
+                                Return to Dashboard
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

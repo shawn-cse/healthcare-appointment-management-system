@@ -27,9 +27,17 @@
                         <ul class="booking-date">
                             <li>Date <span>{{ appointment.appointment_date }}</span></li>
                             <li>Time <span>{{ appointment.appointment_time|time:"h:i A" }}</span></li>
+                            <li>Daily Serial <span>#{{ appointment.serial_number }}</span></li>
+                            <li>Reference <code>{{ appointment.appointment_reference }}</code></li>
                         </ul>
                         <ul class="booking-fee">
-                            <li>Consulting Fee <span>৳{{ appointment.doctor.profile.price_per_consultation }}</span></li>
+                            <li>Consulting Fee <span>৳{{ appointment.fee_amount }} BDT</span></li>
+                            <li>Payment Method <span>{{ appointment.get_payment_method_display }}</span></li>
+                            <li>Payment Status 
+                                <span class="badge {% if appointment.payment_status == 'paid' %}badge-success{% elif appointment.payment_status == 'refunded' %}badge-info{% elif appointment.payment_status == 'partially_refunded' %}badge-warning{% else %}badge-secondary{% endif %}">
+                                    {{ appointment.get_payment_status_display }}
+                                </span>
+                            </li>
                         </ul>
                         <div class="booking-total">
                             <ul class="booking-total-list">
@@ -51,6 +59,28 @@
                 </div>
                 
                 <div class="booking-actions text-right">
+                    {% if appointment.payment_status == 'unpaid' and appointment.status != 'cancelled' %}
+                    <a href="{% url 'payments:checkout-start' appointment.pk %}" class="btn btn-sm btn-success mr-1">
+                        <i class="fas fa-credit-card"></i> Pay Online Now
+                    </a>
+                    {% endif %}
+
+                    {% if appointment.receipts.exists %}
+                    <a href="{% url 'payments:receipt-detail' appointment.receipts.first.receipt_number %}" class="btn btn-sm btn-outline-success mr-1">
+                        <i class="fas fa-receipt"></i> Official Receipt
+                    </a>
+                    {% endif %}
+
+                    {% if appointment.status == 'cancelled' and appointment.refund_requests.exists %}
+                    <a href="{% url 'payments:refund-detail' appointment.refund_requests.first.refund_reference %}" class="btn btn-sm btn-warning text-dark font-weight-bold mr-1">
+                        <i class="fas fa-undo"></i> Track Refund (#{{ appointment.refund_requests.first.refund_reference }})
+                    </a>
+                    {% elif appointment.status == 'cancelled' and appointment.payment_status == 'paid' %}
+                    <a href="{% url 'payments:refund-request' appointment.pk %}" class="btn btn-sm btn-outline-warning mr-1">
+                        <i class="fas fa-undo"></i> Request Refund
+                    </a>
+                    {% endif %}
+
                     {% if appointment.status == 'pending' or appointment.status == 'confirmed' %}
                     <form method="post" action="{% url 'patients:appointment-cancel' appointment.pk %}" style="display: inline;">
                         {% csrf_token %}

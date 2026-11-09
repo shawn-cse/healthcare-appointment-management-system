@@ -102,6 +102,10 @@ class AppointmentDetailView(PatientRequiredMixin, DetailView):
         ).filter(patient=self.request.user)
 
 
+from django.utils import timezone
+from payments.services.refund_service import create_refund_request
+
+
 class AppointmentCancelView(PatientRequiredMixin, View):
     def post(self, request, pk):
         appointment = get_object_or_404(
@@ -111,10 +115,42 @@ class AppointmentCancelView(PatientRequiredMixin, View):
             status__in=["pending", "confirmed"],
         )
 
-        appointment.status = "cancelled"
-        appointment.save()
+        reason = request.POST.get("reason", "").strip() or "Cancelled by patient."
+        appointment.transition_to(Booking.StatusChoices.CANCELLED, actor=request.user, reason=reason)
 
-        messages.success(request, "Appointment cancelled successfully")
+        # Process refund eligibility under strict financial policy
+        if appointment.payment_status in (Booking.PaymentStatus.PAID, Booking.PaymentStatus.PARTIALLY_REFUNDED):
+            refund_req = create_refund_request(
+                booking=appointment,
+                patient=request.user,
+                reason=reason,
+                cancellation_type="patient",
+                current_time=timezone.now(),
+                actor=request.user,
+            )
+            if refund_req:
+                pct = refund_req.eligible_refund_percentage
+                if pct == 100:
+                    messages.success(
+                        request,
+                        f"Appointment cancelled. A 100% refund request (#{refund_req.refund_reference}) of {refund_req.requested_amount} BDT has been created."
+                    )
+                elif pct == 80:
+                    messages.warning(
+                        request,
+                        f"Appointment cancelled less than 24h before start. An 80% refund request (#{refund_req.refund_reference}) of {refund_req.requested_amount} BDT has been created (20% cancellation fee deducted)."
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        f"Appointment cancelled at or after start. Refund request (#{refund_req.refund_reference}) forwarded for administrative exception review."
+                    )
+                return redirect("payments:refund-detail", refund_reference=refund_req.refund_reference)
+            else:
+                messages.info(request, "Appointment cancelled. No monetary refund is applicable under policy.")
+        else:
+            messages.success(request, "Appointment cancelled successfully. Since no payment was made, no refund was required.")
+
         return redirect("patients:dashboard")
 
 

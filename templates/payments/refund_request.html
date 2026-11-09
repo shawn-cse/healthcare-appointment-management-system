@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Request Appointment Refund - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="content py-4">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h4 class="card-title mb-0 font-weight-bold text-dark">
+                            <i class="fas fa-undo-alt text-primary mr-2"></i>Appointment Cancellation & Refund Request
+                        </h4>
+                    </div>
+                    <div class="card-body p-4">
+                        {% if existing_refund %}
+                        <div class="alert alert-info">
+                            <h5><i class="fas fa-info-circle mr-1"></i> Refund Request Already Active</h5>
+                            <p class="mb-2">A refund request (<code>{{ existing_refund.refund_reference }}</code>) is currently <strong>{{ existing_refund.get_status_display }}</strong> for this appointment.</p>
+                            <a href="{% url 'payments:refund-detail' existing_refund.refund_reference %}" class="btn btn-primary btn-sm">View Refund Status</a>
+                        </div>
+                        {% else %}
+
+                        <!-- Policy Explanation Alert -->
+                        <div class="card bg-light border mb-4">
+                            <div class="card-body">
+                                <h6 class="font-weight-bold text-dark border-bottom pb-2 mb-3">Green Hospital Patient Refund Policy (Asia/Dhaka)</h6>
+                                <ul class="mb-0 text-muted small pl-3">
+                                    <li><strong>24 Hours or More Before Start:</strong> 100% full refund of amount paid. (At exactly 24h: 100%).</li>
+                                    <li><strong>Less than 24 Hours Before Start:</strong> 80% partial refund (20% cancellation deduction).</li>
+                                    <li><strong>At or After Scheduled Start:</strong> No automatic refund; submitted for administrative exception review.</li>
+                                    <li><strong>Doctor / Hospital Cancellation:</strong> 100% full refund guaranteed for paid patients.</li>
+                                    <li><strong>Unpaid Appointments:</strong> Incur no financial charges; no monetary refund is issued.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Calculation Breakdown -->
+                        <div class="card border-primary mb-4">
+                            <div class="card-header bg-primary text-white py-2">
+                                <h6 class="mb-0 text-white font-weight-bold"><i class="fas fa-calculator mr-1"></i> Authoritative Refund Calculation</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-sm-6 mb-2">
+                                        <small class="text-muted d-block">Scheduled Appointment</small>
+                                        <strong>{{ booking.appointment_date|date:"d M Y" }} at {{ booking.appointment_time|time:"h:i A" }}</strong>
+                                        <div class="small text-muted">Dr. {{ booking.doctor.get_full_name }} (Ref: {{ booking.appointment_reference }})</div>
+                                    </div>
+                                    <div class="col-sm-6 mb-2">
+                                        <small class="text-muted d-block">Authoritative Server Time (Dhaka)</small>
+                                        <strong>{{ dhaka_time|date:"d M Y, h:i:s A" }}</strong>
+                                        <div class="small text-muted">Time to Start: {{ eligibility.hours_before_start }} hours</div>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="row">
+                                    <div class="col-sm-4 text-center border-right">
+                                        <small class="text-muted d-block">Amount Actually Paid</small>
+                                        <h4 class="font-weight-bold mb-0 text-dark">৳{{ eligibility.original_paid_amount }} BDT</h4>
+                                    </div>
+                                    <div class="col-sm-4 text-center border-right">
+                                        <small class="text-muted d-block">Policy Refund Tier</small>
+                                        <h4 class="font-weight-bold mb-0 {% if eligibility.refund_percentage == 100 %}text-success{% elif eligibility.refund_percentage == 80 %}text-warning{% else %}text-danger{% endif %}">
+                                            {{ eligibility.refund_percentage }}%
+                                        </h4>
+                                    </div>
+                                    <div class="col-sm-4 text-center">
+                                        <small class="text-muted d-block">Eligible Refund Amount</small>
+                                        <h4 class="font-weight-bold mb-0 text-success">৳{{ eligibility.refundable_amount }} BDT</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submission Form -->
+                        <form method="post" action="{% url 'payments:refund-request' booking.id %}">
+                            {% csrf_token %}
+                            <div class="form-group mb-3">
+                                <label class="font-weight-bold">Cancellation / Refund Reason: <span class="text-danger">*</span></label>
+                                <textarea name="reason" class="form-control" rows="3" required placeholder="Please explain why you are cancelling this appointment..."></textarea>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <a href="{% url 'patients:appointment-detail' booking.id %}" class="btn btn-outline-secondary">Back to Appointment</a>
+                                <button type="submit" class="btn btn-danger font-weight-bold" onclick="return confirm('Confirm cancellation and submit refund request for ৳{{ eligibility.refundable_amount }} BDT?');">
+                                    <i class="fas fa-check mr-1"></i> Submit Refund Request (৳{{ eligibility.refundable_amount }} BDT)
+                                </button>
+                            </div>
+                        </form>
+
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

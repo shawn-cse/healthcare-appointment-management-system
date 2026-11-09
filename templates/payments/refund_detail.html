@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Refund Request #{{ refund.refund_reference }} - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="content py-4">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge badge-info text-uppercase font-weight-bold">Financial Refund Request</span>
+                            <h4 class="mb-0 text-dark font-weight-bold mt-1">Ref: {{ refund.refund_reference }}</h4>
+                        </div>
+                        <div>
+                            <span class="badge badge-pill px-3 py-2 font-weight-bold
+                                {% if refund.status == 'succeeded' %}badge-success
+                                {% elif refund.status == 'approved' %}badge-primary
+                                {% elif refund.status == 'rejected' %}badge-danger
+                                {% elif refund.status == 'under_review' %}badge-warning text-dark
+                                {% elif refund.status == 'failed' %}badge-danger
+                                {% else %}badge-secondary{% endif %}">
+                                {{ refund.get_status_display|upper }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <!-- Key Figures -->
+                        <div class="row mb-4">
+                            <div class="col-sm-3 text-center mb-3 mb-sm-0 border-right">
+                                <span class="text-muted small d-block">Original Paid</span>
+                                <h5 class="font-weight-bold mb-0 text-dark">৳{{ refund.original_paid_amount }} BDT</h5>
+                            </div>
+                            <div class="col-sm-3 text-center mb-3 mb-sm-0 border-right">
+                                <span class="text-muted small d-block">Eligible Tier</span>
+                                <h5 class="font-weight-bold mb-0 text-primary">{{ refund.eligible_refund_percentage }}%</h5>
+                            </div>
+                            <div class="col-sm-3 text-center mb-3 mb-sm-0 border-right">
+                                <span class="text-muted small d-block">Requested Amount</span>
+                                <h5 class="font-weight-bold mb-0 text-warning">৳{{ refund.requested_amount }} BDT</h5>
+                            </div>
+                            <div class="col-sm-3 text-center">
+                                <span class="text-muted small d-block">Disbursed Amount</span>
+                                <h5 class="font-weight-bold mb-0 {% if refund.refunded_amount > 0 %}text-success{% else %}text-muted{% endif %}">
+                                    ৳{{ refund.refunded_amount }} BDT
+                                </h5>
+                            </div>
+                        </div>
+
+                        <!-- Associated Appointment Info -->
+                        <div class="bg-light p-3 rounded mb-4 border">
+                            <h6 class="font-weight-bold text-dark border-bottom pb-2 mb-2">Appointment Details</h6>
+                            <div class="row">
+                                <div class="col-sm-6 mb-2">
+                                    <small class="text-muted d-block">Appointment Reference</small>
+                                    <code>{{ refund.booking.appointment_reference }}</code> (Serial #{{ refund.booking.serial_number }})
+                                </div>
+                                <div class="col-sm-6 mb-2">
+                                    <small class="text-muted d-block">Consulting Doctor</small>
+                                    <strong>Dr. {{ refund.doctor.get_full_name }}</strong> ({{ refund.doctor.profile.specialization|default:"General" }})
+                                </div>
+                                <div class="col-sm-6 mb-2">
+                                    <small class="text-muted d-block">Patient</small>
+                                    <span>{{ refund.patient.get_full_name }} ({{ refund.patient.username }})</span>
+                                </div>
+                                <div class="col-sm-6 mb-2">
+                                    <small class="text-muted d-block">Original Payment Method</small>
+                                    <span class="badge badge-light border">{{ refund.payment_transaction.get_payment_method_display }}</span>
+                                </div>
+                                <div class="col-12 mt-2 pt-2 border-top">
+                                    <small class="text-muted d-block">Reason for Cancellation</small>
+                                    <em>"{{ refund.reason }}"</em>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Workflow & Audit History -->
+                        <h6 class="font-weight-bold text-dark mb-3">Workflow Lifecycle & Approvals</h6>
+                        <ul class="list-group list-group-flush border rounded mb-4">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-file-alt text-primary mr-2"></i>
+                                    <strong>1. Submitted</strong>
+                                    <div class="small text-muted">Initiated by {{ refund.cancellation_actor.get_full_name|default:refund.patient.get_full_name }} ({{ refund.get_cancellation_type_display }})</div>
+                                </div>
+                                <small class="text-muted">{{ refund.created_at|date:"d M Y, h:i A" }}</small>
+                            </li>
+
+                            {% if refund.reviewed_by %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-search text-warning mr-2"></i>
+                                    <strong>2. Reviewed by Hospital Administration</strong>
+                                    <div class="small text-muted">Reviewed by: {{ refund.reviewed_by.get_full_name }} ({{ refund.reviewed_by.get_role_display }})</div>
+                                    {% if refund.review_notes %}<div class="small text-dark font-italic">Notes: {{ refund.review_notes }}</div>{% endif %}
+                                </div>
+                                <small class="text-muted">{{ refund.reviewed_at|date:"d M Y, h:i A" }}</small>
+                            </li>
+                            {% endif %}
+
+                            {% if refund.approved_by %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    {% if refund.status == 'rejected' %}
+                                    <i class="fas fa-times-circle text-danger mr-2"></i>
+                                    <strong class="text-danger">3. Rejected by Super Administrator</strong>
+                                    <div class="small text-muted">Decided by: {{ refund.approved_by.get_full_name }}</div>
+                                    <div class="small text-danger font-weight-bold">Reason: {{ refund.rejection_reason }}</div>
+                                    {% else %}
+                                    <i class="fas fa-check-circle text-success mr-2"></i>
+                                    <strong class="text-success">3. Super Admin Approval Confirmed</strong>
+                                    <div class="small text-muted">Approved by: {{ refund.approved_by.get_full_name }} (Super Administrator)</div>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ refund.approved_at|date:"d M Y, h:i A" }}</small>
+                            </li>
+                            {% endif %}
+
+                            {% if refund.status == 'succeeded' %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
+                                <div>
+                                    <i class="fas fa-money-check-alt text-success mr-2"></i>
+                                    <strong class="text-success">4. Repayment Disbursed & Reconciled</strong>
+                                    <div class="small text-muted">
+                                        Processed By: {{ refund.processed_by.get_full_name }}<br>
+                                        Payout Reference: <code>{{ refund.gateway_refund_reference|default:refund.manual_repayment_reference }}</code><br>
+                                        Method: {{ refund.repayment_method|default:refund.payment_transaction.payment_method }}
+                                    </div>
+                                </div>
+                                <small class="text-muted">{{ refund.processed_at|date:"d M Y, h:i A" }}</small>
+                            </li>
+                            {% elif refund.status == 'failed' %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center bg-light text-danger">
+                                <div>
+                                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                                    <strong>Gateway Payout Failed</strong>
+                                    <div class="small">{{ refund.processing_notes }}</div>
+                                </div>
+                            </li>
+                            {% endif %}
+                        </ul>
+
+                        <div class="d-flex justify-content-between">
+                            {% if request.user.is_patient %}
+                            <a href="{% url 'patients:dashboard' %}" class="btn btn-outline-secondary">Return to Dashboard</a>
+                            {% elif request.user.is_staff_admin %}
+                            <a href="{% url 'payments:admin-refund-list' %}" class="btn btn-outline-secondary">Back to Refund Requests</a>
+                            {% else %}
+                            <a href="{% url 'doctors:dashboard' %}" class="btn btn-outline-secondary">Return to Dashboard</a>
+                            {% endif %}
+
+                            {% if refund.payment_transaction.receipt %}
+                            <a href="{% url 'payments:receipt-detail' refund.payment_transaction.receipt.receipt_number %}" class="btn btn-outline-primary">
+                                <i class="fas fa-receipt mr-1"></i> Original Receipt
+                            </a>
+                            {% endif %}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

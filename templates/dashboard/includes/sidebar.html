@@ -12,6 +12,12 @@
                 <li {% if request.path == '/admin/appointments/' %}class="active"{% endif %}> 
                     <a href="{% url 'admin-appointments' %}"><i class="fe fe-layout"></i> <span>Appointments</span></a>
                 </li>
+                <li {% if '/payments/admin/transactions/' in request.path %}class="active"{% endif %}> 
+                    <a href="{% url 'payments:admin-transactions' %}"><i class="fe fe-credit-card"></i> <span>Payments</span></a>
+                </li>
+                <li {% if '/payments/admin/refunds/' in request.path %}class="active"{% endif %}> 
+                    <a href="{% url 'payments:admin-refund-list' %}"><i class="fe fe-refresh-cw"></i> <span>Refund Requests</span></a>
+                </li>
                 <li {% if request.path == '/admin/specialities/' %}class="active"{% endif %}> 
                     <a href="{% url 'admin-specialities' %}"><i class="fe fe-users"></i> <span>Specialities</span></a>
                 </li>

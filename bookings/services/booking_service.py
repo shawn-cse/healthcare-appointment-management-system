@@ -39,6 +39,13 @@ def create_appointment(
     if not chamber:
         chamber = getattr(doctor.profile, "chamber_number", "")
 
+    # Clean up expired abandoned online checkout sessions before generating slots and reserving
+    try:
+        from payments.services.payment_service import expire_abandoned_online_sessions
+        expire_abandoned_online_sessions()
+    except Exception:
+        pass
+
     # Validate slot availability and 48-hour window policy
     slot_info = generate_doctor_slots(
         doctor=doctor,
@@ -115,7 +122,11 @@ def create_appointment(
             fee_amount=pricing["fee_amount"],
             payment_method=payment_method,
             payment_status=Booking.PaymentStatus.UNPAID,
-            status=Booking.StatusChoices.CONFIRMED,
+            status=(
+                Booking.StatusChoices.PENDING
+                if payment_method == Booking.PaymentMethod.ONLINE
+                else Booking.StatusChoices.CONFIRMED
+            ),
             admin_notes=admin_notes,
         )
         booking.save()

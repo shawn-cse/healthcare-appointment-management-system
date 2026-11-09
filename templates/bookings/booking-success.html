@@ -52,9 +52,24 @@ Booking Success
                                         <span class="badge {% if booking.payment_status == 'paid' %}badge-success{% else %}badge-warning{% endif %}">
                                             {{ booking.get_payment_method_display }} - {{ booking.get_payment_status_display }}
                                         </span>
+                                        {% if booking.payment_status == 'unpaid' %}
+                                        <p class="small text-muted mt-2 mb-0">
+                                            For Pay at Chamber bookings, please present your Serial #{{ booking.serial_number }} (Ref: <code>{{ booking.appointment_reference }}</code>) to the reception desk upon arrival to record payment and check in.
+                                        </p>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
+                            {% if booking.payment_status == 'unpaid' %}
+                            <a href="{% url 'payments:checkout-start' booking.id %}" class="btn btn-success view-inv-btn mr-2">
+                                <i class="fas fa-credit-card"></i> Pay Online Now
+                            </a>
+                            {% endif %}
+                            {% if booking.receipts.exists %}
+                            <a href="{% url 'payments:receipt-detail' booking.receipts.first.receipt_number %}" class="btn btn-success view-inv-btn mr-2">
+                                <i class="fas fa-receipt"></i> Official Receipt
+                            </a>
+                            {% endif %}
                             <a href="{% url 'bookings:booking-invoice' booking.id %}" class="btn btn-primary view-inv-btn mr-2">View Invoice</a>
                             <a href="{% url 'bookings:booking-list' %}" class="btn btn-outline-secondary">My Bookings</a>
                         </div>
