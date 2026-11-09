@@ -1,4 +1,3 @@
-import debug_toolbar
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -30,6 +29,7 @@ from accounts.views.admin_views import (
     DoctorRejectActionView,
     DoctorSuspendReactivateView,
     DoctorBMDCVerifyActionView,
+    HospitalSettingsUpdateView,
 )
 
 admin.site.site_header = "Green Hospital Admin"
@@ -46,8 +46,8 @@ urlpatterns = (
         path("bookings/", include("bookings.urls")),
         path("payments/", include("payments.urls")),
         path("notifications/", include("notifications.urls")),
+        path("complaints/", include("complaints.urls")),
         path("", include("core.urls")),
-        path("__debug__/", include(debug_toolbar.urls)),
         path("ckeditor/", include("ckeditor_uploader.urls")),
         path(
             "admin/",
@@ -148,6 +148,11 @@ urlpatterns = (
                         AuditLogListView.as_view(),
                         name="admin-audit-logs",
                     ),
+                    path(
+                        "settings/booking-window/",
+                        HospitalSettingsUpdateView.as_view(),
+                        name="admin-settings-booking-window",
+                    ),
                     # Doctor Approvals & Moderation
                     path(
                         "doctor-approvals/",
@@ -186,3 +191,10 @@ urlpatterns = (
     + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 )
+
+if settings.DEBUG and "debug_toolbar" in settings.INSTALLED_APPS:
+    try:
+        import debug_toolbar
+        urlpatterns = [path("__debug__/", include(debug_toolbar.urls))] + urlpatterns
+    except ImportError:
+        pass

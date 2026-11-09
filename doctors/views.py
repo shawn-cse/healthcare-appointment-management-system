@@ -1085,3 +1085,160 @@ class PrescriptionDetailView(DoctorRequiredMixin, DetailView):
             "patient__profile",
             "booking",
         )
+
+
+class DoctorReportsView(DoctorRequiredMixin, View):
+    """
+    Role-specific operational and financial reporting for Doctors.
+    Strict data isolation: Doctors can only view aggregated metrics and consultations
+    for their own appointments.
+    """
+    template_name = "doctors/reports.html"
+
+    def get(self, request):
+        import csv
+        from decimal import Decimal
+        from payments.models import PaymentTransaction, RefundTransaction
+
+        doctor = request.user
+        now_dhaka = timezone.now().astimezone(DHAKA_TZ)
+        today = now_dhaka.date()
+
+        date_range_choice = request.GET.get("range", "this_month")
+        start_date_str = request.GET.get("start_date")
+        end_date_str = request.GET.get("end_date")
+
+        if date_range_choice == "today":
+            start_date = today
+            end_date = today
+        elif date_range_choice == "this_week":
+            start_date = today - timedelta(days=today.weekday())
+            end_date = start_date + timedelta(days=6)
+        elif date_range_choice == "this_month":
+            start_date = today.replace(day=1)
+            # Find last day of this month
+            if today.month == 12:
+                end_date = date(today.year, 12, 31)
+            else:
+                next_month = date(today.year, today.month + 1, 1)
+                end_date = next_month - timedelta(days=1)
+        elif date_range_choice == "custom" and start_date_str and end_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                start_date = today.replace(day=1)
+                end_date = today
+        else:
+            start_date = today.replace(day=1)
+            end_date = today
+
+        # Base queryset strictly scoped to this doctor
+        bookings_qs = Booking.objects.filter(
+            doctor=doctor,
+            appointment_date__gte=start_date,
+            appointment_date__lte=end_date,
+        ).select_related("patient", "patient__profile").order_by("-appointment_date", "-appointment_time")
+
+        # CSV Export
+        if request.GET.get("export") == "csv":
+            response = HttpResponse(content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="doctor_report_{start_date}_{end_date}.csv"'
+            writer = csv.writer(response)
+            writer.writerow([
+                "Reference",
+                "Serial Number",
+                "Patient Name",
+                "Appointment Date",
+                "Appointment Time",
+                "Visit Type",
+                "Payment Method",
+                "Payment Status",
+                "Status",
+                "Fee (BDT)",
+            ])
+            for b in bookings_qs:
+                writer.writerow([
+                    b.appointment_reference or "",
+                    b.serial_number,
+                    b.patient.get_full_name(),
+                    b.appointment_date.strftime("%Y-%m-%d"),
+                    b.appointment_time.strftime("%I:%M %p"),
+                    b.get_visit_type_display(),
+                    b.get_payment_method_display(),
+                    b.get_payment_status_display(),
+                    b.get_status_display(),
+                    str(b.fee_amount),
+                ])
+            return response
+
+        # Aggregated Metrics
+        total_appointments = bookings_qs.count()
+        completed_consultations = bookings_qs.filter(status=Booking.StatusChoices.COMPLETED).count()
+        upcoming_consultations = bookings_qs.filter(
+            appointment_date__gte=today,
+            status__in=[Booking.StatusChoices.CONFIRMED, Booking.StatusChoices.PENDING]
+        ).count()
+        cancellations_count = bookings_qs.filter(status=Booking.StatusChoices.CANCELLED).count()
+        no_show_count = bookings_qs.filter(status=Booking.StatusChoices.NO_SHOW).count()
+
+        # Capacity Utilization:
+        schedules = DoctorWeeklySchedule.objects.filter(doctor=doctor, is_active=True)
+        schedule_cap_by_weekday = {}
+        for s in schedules:
+            schedule_cap_by_weekday[s.weekday] = schedule_cap_by_weekday.get(s.weekday, 0) + s.max_capacity
+
+        total_slot_capacity = 0
+        cur = start_date
+        while cur <= end_date:
+            total_slot_capacity += schedule_cap_by_weekday.get(cur.weekday(), 0)
+            cur += timedelta(days=1)
+
+        active_booked_count = bookings_qs.exclude(status=Booking.StatusChoices.CANCELLED).count()
+        capacity_utilization = (
+            round((active_booked_count / total_slot_capacity) * 100, 1)
+            if total_slot_capacity > 0
+            else 0.0
+        )
+
+        # Financial summaries for this doctor
+        doctor_txs = PaymentTransaction.objects.filter(
+            doctor=doctor,
+            booking__appointment_date__gte=start_date,
+            booking__appointment_date__lte=end_date,
+            status__in=[
+                PaymentTransaction.Status.SUCCESS,
+                PaymentTransaction.Status.PARTIALLY_REFUNDED,
+                PaymentTransaction.Status.REFUNDED,
+            ],
+        )
+        total_collected = doctor_txs.aggregate(t=models.Sum("amount"))["t"] or Decimal("0.00")
+
+        doctor_refunds = RefundTransaction.objects.filter(
+            refund_request__doctor=doctor,
+            refund_request__booking__appointment_date__gte=start_date,
+            refund_request__booking__appointment_date__lte=end_date,
+        )
+        total_refunded = doctor_refunds.aggregate(t=models.Sum("amount"))["t"] or Decimal("0.00")
+        net_earnings = total_collected - total_refunded
+
+        context = {
+            "doctor": doctor,
+            "start_date": start_date,
+            "end_date": end_date,
+            "active_range": date_range_choice,
+            "total_appointments": total_appointments,
+            "completed_consultations": completed_consultations,
+            "upcoming_consultations": upcoming_consultations,
+            "cancellations_count": cancellations_count,
+            "no_show_count": no_show_count,
+            "total_slot_capacity": total_slot_capacity,
+            "active_booked_count": active_booked_count,
+            "capacity_utilization": capacity_utilization,
+            "total_collected": total_collected,
+            "total_refunded": total_refunded,
+            "net_earnings": net_earnings,
+            "consultations": bookings_qs[:50],
+        }
+        return render(request, self.template_name, context)
+

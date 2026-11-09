@@ -299,3 +299,100 @@ class ReceptionistWalkInBookingView(ReceptionistRequiredMixin, View):
         except ValidationError as e:
             messages.error(request, e.message if hasattr(e, "message") else str(e))
             return redirect("accounts:receptionist-walk-in", doctor_id=doctor.id)
+
+
+class ReceptionistReportsView(ReceptionistRequiredMixin, View):
+    """
+    Daily appointment, check-in, queue, and chamber-payment summaries for assigned doctors only.
+    Includes CSV export of daily patient queue.
+    """
+    template_name = "receptionist/reports.html"
+
+    def get(self, request):
+        import csv
+        from decimal import Decimal
+        from django.http import HttpResponse
+        from django.db.models import Sum
+
+        receptionist = request.user
+        assigned_doctors = receptionist.get_assigned_doctors().select_related("profile")
+
+        date_str = request.GET.get("date")
+        if date_str:
+            try:
+                selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                selected_date = timezone.now().date()
+        else:
+            selected_date = timezone.now().date()
+
+        doctor_id = request.GET.get("doctor_id")
+        doctors_qs = assigned_doctors
+        if doctor_id:
+            doctors_qs = doctors_qs.filter(id=doctor_id)
+
+        appointments_qs = Booking.objects.filter(
+            doctor__in=doctors_qs,
+            appointment_date=selected_date,
+        ).select_related("doctor", "patient", "patient__profile").order_by("doctor__first_name", "serial_number", "appointment_time")
+
+        if request.GET.get("export") == "csv":
+            response = HttpResponse(content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="receptionist_queue_{selected_date}.csv"'
+            writer = csv.writer(response)
+            writer.writerow([
+                "Serial #",
+                "Appointment Reference",
+                "Doctor",
+                "Patient Name",
+                "Contact Phone",
+                "Time",
+                "Visit Type",
+                "Payment Status",
+                "Consultation Status",
+                "Fee (BDT)",
+            ])
+            for app in appointments_qs:
+                phone = getattr(app.patient.profile, "phone", "") if hasattr(app.patient, "profile") else ""
+                writer.writerow([
+                    app.serial_number,
+                    app.appointment_reference or "",
+                    f"Dr. {app.doctor.get_full_name()}",
+                    app.patient.get_full_name(),
+                    phone,
+                    app.appointment_time.strftime("%I:%M %p"),
+                    app.get_visit_type_display(),
+                    app.get_payment_status_display(),
+                    app.get_status_display(),
+                    str(app.fee_amount),
+                ])
+            return response
+
+        total_count = appointments_qs.count()
+        checked_in_count = appointments_qs.filter(status=Booking.StatusChoices.CHECKED_IN).count()
+        completed_count = appointments_qs.filter(status=Booking.StatusChoices.COMPLETED).count()
+        unpaid_count = appointments_qs.filter(payment_status=Booking.PaymentStatus.UNPAID).count()
+        paid_count = appointments_qs.filter(payment_status=Booking.PaymentStatus.PAID).count()
+
+        # Chamber payment collection total for these appointments
+        from payments.models import PaymentTransaction
+        chamber_collected = PaymentTransaction.objects.filter(
+            booking__in=appointments_qs,
+            status=PaymentTransaction.Status.SUCCESS,
+            payment_method__in=[PaymentTransaction.PaymentMethod.CASH, PaymentTransaction.PaymentMethod.CHAMBER_POS],
+        ).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
+
+        context = {
+            "selected_date": selected_date,
+            "assigned_doctors": assigned_doctors,
+            "selected_doctor_id": int(doctor_id) if doctor_id and str(doctor_id).isdigit() else "",
+            "appointments": appointments_qs,
+            "total_count": total_count,
+            "checked_in_count": checked_in_count,
+            "completed_count": completed_count,
+            "unpaid_count": unpaid_count,
+            "paid_count": paid_count,
+            "chamber_collected": chamber_collected,
+        }
+        return render(request, self.template_name, context)
+

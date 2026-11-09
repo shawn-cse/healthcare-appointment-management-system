@@ -1,10 +1,16 @@
 import time
+import unittest
 
 from django.test import LiveServerTestCase
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+
+try:
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    SELENIUM_AVAILABLE = True
+except ImportError:
+    SELENIUM_AVAILABLE = False
 
 from tests.factories.doctor_factory import DoctorFactory
 from tests.factories.schedule_factory import ScheduleFactory
@@ -12,6 +18,7 @@ from tests.factories.user_factory import UserFactory
 from accounts.models import User
 
 
+@unittest.skipUnless(SELENIUM_AVAILABLE, "Selenium is not installed")
 class DoctorTest(LiveServerTestCase):
     @classmethod
     def setUpClass(cls):

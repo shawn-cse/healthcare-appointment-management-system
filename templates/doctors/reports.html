@@ -1,0 +1,150 @@
+{% extends "includes/doctor-sidebar.html" %}
+{% load static %}
+
+{% block page_name1 %}Reports{% endblock %}
+{% block page_name2 %}Clinical & Earnings Reports{% endblock %}
+
+{% block main %}
+<!-- Filter & Export Toolbar -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-3">
+        <form method="get" class="form-row align-items-center">
+            <div class="col-md-3 col-12 mb-2 mb-md-0">
+                <select name="range" class="form-control form-control-sm" onchange="if(this.value!='custom') this.form.submit();">
+                    <option value="today" {% if active_range == 'today' %}selected{% endif %}>Today</option>
+                    <option value="this_week" {% if active_range == 'this_week' %}selected{% endif %}>This Week</option>
+                    <option value="this_month" {% if active_range == 'this_month' %}selected{% endif %}>This Month</option>
+                    <option value="custom" {% if active_range == 'custom' %}selected{% endif %}>Custom Date Range</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-6 mb-2 mb-md-0">
+                <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-3 col-6 mb-2 mb-md-0">
+                <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-3 col-12 d-flex">
+                <button type="submit" class="btn btn-sm btn-success flex-fill mr-1 font-weight-bold">
+                    <i class="fas fa-filter mr-1"></i> Apply
+                </button>
+                <a href="?range={{ active_range }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&export=csv" class="btn btn-sm btn-outline-secondary font-weight-bold" title="Download CSV Report">
+                    <i class="fas fa-file-csv mr-1"></i> CSV
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Key Performance Indicators -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-sm-6 col-12 mb-3 mb-xl-0">
+        <div class="card shadow-sm border-0 border-left border-primary" style="border-left-width: 4px !important;">
+            <div class="card-body p-3">
+                <small class="text-muted text-uppercase font-weight-bold d-block">Total Appointments</small>
+                <h3 class="font-weight-bold text-dark mb-0">{{ total_appointments }}</h3>
+                <small class="text-muted">{{ upcoming_consultations }} upcoming, {{ completed_consultations }} completed</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-sm-6 col-12 mb-3 mb-xl-0">
+        <div class="card shadow-sm border-0 border-left border-success" style="border-left-width: 4px !important;">
+            <div class="card-body p-3">
+                <small class="text-muted text-uppercase font-weight-bold d-block">Capacity Utilization</small>
+                <h3 class="font-weight-bold text-success mb-0">{{ capacity_utilization }}%</h3>
+                <small class="text-muted">{{ active_booked_count }} of {{ total_slot_capacity }} available slots</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-sm-6 col-12 mb-3 mb-xl-0">
+        <div class="card shadow-sm border-0 border-left border-danger" style="border-left-width: 4px !important;">
+            <div class="card-body p-3">
+                <small class="text-muted text-uppercase font-weight-bold d-block">Cancellations & No-Show</small>
+                <h3 class="font-weight-bold text-danger mb-0">{{ cancellations_count|add:no_show_count }}</h3>
+                <small class="text-muted">{{ cancellations_count }} cancelled, {{ no_show_count }} no-shows</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-sm-6 col-12">
+        <div class="card shadow-sm border-0 border-left border-warning" style="border-left-width: 4px !important;">
+            <div class="card-body p-3">
+                <small class="text-muted text-uppercase font-weight-bold d-block">Net Consultation Revenue</small>
+                <h3 class="font-weight-bold text-warning mb-0">৳{{ net_earnings|floatformat:2 }}</h3>
+                <small class="text-muted">Collected: ৳{{ total_collected|floatformat:2 }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Consultations Activity Table -->
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0 font-weight-bold text-dark">
+            <i class="fas fa-stethoscope mr-2 text-success"></i>Consultations ({{ start_date|date:"d M Y" }} to {{ end_date|date:"d M Y" }})
+        </h5>
+        <span class="badge badge-light border text-muted">Showing up to 50 entries</span>
+    </div>
+    <div class="card-body p-0">
+        {% if consultations %}
+        <div class="table-responsive">
+            <table class="table table-hover table-center mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th>Serial / Ref</th>
+                        <th>Patient</th>
+                        <th>Date & Time</th>
+                        <th>Visit Type</th>
+                        <th>Payment Status</th>
+                        <th>Status</th>
+                        <th class="text-right">Fee (BDT)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in consultations %}
+                    <tr>
+                        <td>
+                            <span class="badge badge-light border font-weight-bold">#{{ c.serial_number }}</span>
+                            <div class="small text-muted">{{ c.appointment_reference }}</div>
+                        </td>
+                        <td>
+                            <div class="font-weight-bold">{{ c.patient.get_full_name }}</div>
+                            <small class="text-muted">Contact: {{ c.patient.profile.phone|default:"N/A" }}</small>
+                        </td>
+                        <td>
+                            {{ c.appointment_date|date:"d M Y" }}
+                            <div class="small text-primary font-weight-bold">{{ c.appointment_time|time:"h:i A" }}</div>
+                        </td>
+                        <td>
+                            <span class="badge badge-light border text-dark">{{ c.get_visit_type_display }}</span>
+                        </td>
+                        <td>
+                            {% if c.payment_status == 'paid' %}
+                                <span class="badge badge-success">Paid</span>
+                            {% elif c.payment_status == 'refunded' %}
+                                <span class="badge badge-danger">Refunded</span>
+                            {% elif c.payment_status == 'partially_refunded' %}
+                                <span class="badge badge-warning text-dark">Partially Refunded</span>
+                            {% else %}
+                                <span class="badge badge-warning text-dark">Unpaid</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge badge-pill badge-light border">{{ c.get_status_display }}</span>
+                        </td>
+                        <td class="text-right font-weight-bold text-dark">
+                            ৳{{ c.fee_amount }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="far fa-calendar-times mb-2 text-secondary" style="font-size: 2.5rem;"></i>
+            <h5>No Consultations in Selected Period</h5>
+            <p class="small mb-0">Select another date range or filter to view activity.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

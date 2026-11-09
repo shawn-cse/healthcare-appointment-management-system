@@ -16,6 +16,7 @@ from .views.receptionist_views import (
     ReceptionistCancelView,
     ReceptionistAddNotesView,
     ReceptionistWalkInBookingView,
+    ReceptionistReportsView,
 )
 
 app_name = "accounts"
@@ -107,6 +108,11 @@ urlpatterns = [
         "receptionist/walk-in/<int:doctor_id>/",
         ReceptionistWalkInBookingView.as_view(),
         name="receptionist-walk-in-doctor",
+    ),
+    path(
+        "receptionist/reports/",
+        ReceptionistReportsView.as_view(),
+        name="receptionist-reports",
     ),
     # Profile & API
     path(

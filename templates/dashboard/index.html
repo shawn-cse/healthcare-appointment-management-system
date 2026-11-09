@@ -1,286 +1,482 @@
 {% extends "dashboard/base.html" %}
+{% load static %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}Operational Dashboard - Green Hospital Admin{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
-<div class="page-header">
-    <div class="row">
-        <div class="col-sm-12">
-            <h3 class="page-title">Dashboard</h3>
-            <ul class="breadcrumb">
-                <li class="breadcrumb-item active">Dashboard</li>
+<div class="page-header mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <h3 class="page-title font-weight-bold">
+                {% if user.is_super_admin %}
+                    <i class="fe fe-shield text-danger mr-2"></i>Super Administrator Portal
+                {% else %}
+                    <i class="fe fe-activity text-success mr-2"></i>Hospital Administrator Operations
+                {% endif %}
+            </h3>
+            <ul class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'admin-dashboard' %}">Home</a></li>
+                <li class="breadcrumb-item active">Operational Dashboard</li>
             </ul>
+        </div>
+        <div class="col-auto">
+            {% if user.is_super_admin %}
+                <span class="badge badge-danger px-3 py-2 font-weight-bold" style="font-size: 0.9rem;">
+                    <i class="fe fe-lock mr-1"></i> Full Administrative & Financial Authority
+                </span>
+            {% else %}
+                <span class="badge badge-success px-3 py-2 font-weight-bold" style="font-size: 0.9rem;">
+                    <i class="fe fe-user-check mr-1"></i> Operational Administration
+                </span>
+            {% endif %}
         </div>
     </div>
 </div>
 <!-- /Page Header -->
-<div class="row">
-    <div class="col-xl-3 col-sm-6 col-12">
-        <div class="card">
+
+<!-- 1. Primary Staff & User Metrics -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-sm-6 col-12 mb-3 mb-xl-0">
+        <div class="card shadow-sm border-0 border-left border-primary" style="border-left-width: 4px !important;">
             <div class="card-body">
                 <div class="dash-widget-header">
                     <span class="dash-widget-icon text-primary border-primary">
+                        <i class="fe fe-user-plus"></i>
+                    </span>
+                    <div class="dash-count">
+                        <h3 class="font-weight-bold mb-0">{{ doctors_count }}</h3>
+                    </div>
+                </div>
+                <div class="dash-widget-info mt-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="text-muted mb-0 font-weight-bold">Doctors</h6>
+                        <span class="badge badge-light border text-primary">{{ approved_doctors_count }} Active</span>
+                    </div>
+                    {% if pending_doctors_count > 0 %}
+                    <small class="text-warning font-weight-bold d-block mt-1">
+                        <i class="fe fe-alert-circle"></i> {{ pending_doctors_count }} Pending Verification
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-sm-6 col-12 mb-3 mb-xl-0">
+        <div class="card shadow-sm border-0 border-left border-success" style="border-left-width: 4px !important;">
+            <div class="card-body">
+                <div class="dash-widget-header">
+                    <span class="dash-widget-icon text-success border-success">
                         <i class="fe fe-users"></i>
                     </span>
                     <div class="dash-count">
-                        <h3>{{ doctors_count }}</h3>
+                        <h3 class="font-weight-bold mb-0">{{ patients_count }}</h3>
                     </div>
                 </div>
-                <div class="dash-widget-info">
-                    <h6 class="text-muted">Doctors</h6>
-                    <div class="progress progress-sm">
-                        <div class="progress-bar bg-primary w-50"></div>
+                <div class="dash-widget-info mt-2">
+                    <h6 class="text-muted mb-0 font-weight-bold">Registered Patients</h6>
+                    <small class="text-muted">Clinical service recipients</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-sm-6 col-12 mb-3 mb-xl-0">
+        <div class="card shadow-sm border-0 border-left border-info" style="border-left-width: 4px !important;">
+            <div class="card-body">
+                <div class="dash-widget-header">
+                    <span class="dash-widget-icon text-info border-info">
+                        <i class="fe fe-user-check"></i>
+                    </span>
+                    <div class="dash-count">
+                        <h3 class="font-weight-bold mb-0">{{ receptionists_count }}</h3>
                     </div>
+                </div>
+                <div class="dash-widget-info mt-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="text-muted mb-0 font-weight-bold">Receptionists</h6>
+                        <a href="{% url 'admin-receptionist-assignments' %}" class="small text-info font-weight-bold">Assignments &raquo;</a>
+                    </div>
+                    <small class="text-muted">Chamber desks & queues</small>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-xl-3 col-sm-6 col-12">
-        <div class="card">
+        <div class="card shadow-sm border-0 border-left border-secondary" style="border-left-width: 4px !important;">
             <div class="card-body">
                 <div class="dash-widget-header">
-                    <span class="dash-widget-icon text-success">
-                        <i class="fe fe-credit-card"></i>
+                    <span class="dash-widget-icon text-secondary border-secondary">
+                        <i class="fe fe-shield"></i>
                     </span>
                     <div class="dash-count">
-                        <h3>{{ patients_count }}</h3>
+                        <h3 class="font-weight-bold mb-0">{{ hospital_admins_count|add:super_admins_count }}</h3>
                     </div>
                 </div>
-                <div class="dash-widget-info">
-                    <h6 class="text-muted">Patients</h6>
-                    <div class="progress progress-sm">
-                        <div class="progress-bar bg-success w-50"></div>
-                    </div>
+                <div class="dash-widget-info mt-2">
+                    <h6 class="text-muted mb-0 font-weight-bold">Administrators</h6>
+                    <small class="text-muted">{{ super_admins_count }} Super Admins, {{ hospital_admins_count }} Hospital Admins</small>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="col-xl-3 col-sm-6 col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="dash-widget-header">
-                    <span class="dash-widget-icon text-danger border-danger">
-                        <i class="fe fe-money"></i>
-                    </span>
-                    <div class="dash-count">
-                        <h3>{{ appointments_count }}</h3>
-                    </div>
-                </div>
-                <div class="dash-widget-info">
-                    <h6 class="text-muted">Appointment</h6>
-                    <div class="progress progress-sm">
-                        <div class="progress-bar bg-danger w-50"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-3 col-sm-6 col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="dash-widget-header">
-                    <span class="dash-widget-icon text-warning border-warning">
-                        <i class="fe fe-folder"></i>
-                    </span>
-                    <div class="dash-count">
-                        <h3>৳{{ total_revenue }}</h3>
-                    </div>
-                </div>
-                <div class="dash-widget-info">
-                    <h6 class="text-muted">Revenue</h6>
-                    <div class="progress progress-sm">
-                        <div class="progress-bar bg-warning w-50"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="row">
-    <div class="col-md-12 col-lg-6">
-    
-        <!-- Sales Chart -->
-        <div class="card card-chart">
-            <div class="card-header">
-                <h4 class="card-title">Revenue</h4>
-            </div>
-            <div class="card-body">
-                <div id="morrisArea"></div>
-            </div>
-        </div>
-        <!-- /Sales Chart -->
-        
-    </div>
-    <div class="col-md-12 col-lg-6">
-    
-        <!-- Invoice Chart -->
-        <div class="card card-chart">
-            <div class="card-header">
-                <h4 class="card-title">Status</h4>
-            </div>
-            <div class="card-body">
-                <div id="morrisLine"></div>
-            </div>
-        </div>
-        <!-- /Invoice Chart -->
-        
-    </div>	
-</div>
-<div class="row">
-    <div class="col-md-6 d-flex">
-    
-        <!-- Recent Orders -->
-        <div class="card card-table flex-fill">
-            <div class="card-header">
-                <h4 class="card-title">Doctors List</h4>
-                <a href="{% url 'admin-doctors' %}" class="btn btn-primary">View All</a>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover table-center mb-0">
-                        <thead>
-                            <tr>
-                                <th>Doctor Name</th>
-                                <th>Speciality</th>
-                                <th>Earned</th>
-                                <th>Reviews</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for doctor in recent_doctors %}
-                            <tr>
-                                <td>
-                                    <h2 class="table-avatar">
-                                        <a href="#" class="avatar avatar-sm mr-2">
-                                            <img class="avatar-img rounded-circle" src="{{ doctor.profile.image }}" alt="User Image">
-                                        </a>
-                                        <a href="#">Dr. {{ doctor.get_full_name }}</a>
-                                    </h2>
-                                </td>
-                                <td>{{ doctor.profile.specialization }}</td>
-                                <td>৳{{ doctor.earned }}</td>
-                                <td>
-                                    <i class="fe fe-star text-warning"></i>
-                                    <span>({{ doctor.reviews_count }})</span>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        <!-- /Recent Orders -->
-        
-    </div>
-    <div class="col-md-6 d-flex">
-    
-        <!-- Feed Activity -->
-        <div class="card  card-table flex-fill">
-            <div class="card-header">
-                <h4 class="card-title">Patients List</h4>
-                <a href="{% url 'admin-patients' %}" class="btn btn-primary">View All</a>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover table-center mb-0">
-                        <thead>
-                            <tr>													
-                                <th>Patient Name</th>
-                                <th>Phone</th>
-                                <th>Last Visit</th>
-                                <th>Paid</th>													
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for patient in recent_patients %}
-                            <tr>
-                                <td>
-                                    <h2 class="table-avatar">
-                                        <a href="#" class="avatar avatar-sm mr-2">
-                                            <img class="avatar-img rounded-circle" src="{{ patient.profile.image }}" alt="User Image">
-                                        </a>
-                                        <a href="#">{{ patient.get_full_name }}</a>
-                                    </h2>
-                                </td>
-                                <td>{{ patient.profile.phone|default:"N/A" }}</td>
-                                <td>{{ patient.last_visit|date:"d M Y"|default:"No visits" }}</td>
-                                <td class="text-right">৳{{ patient.total_paid }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        <!-- /Feed Activity -->
-        
-    </div>
-</div>
-<div class="row">
-    <div class="col-md-12">
-    
-        <!-- Recent Orders -->
-        <div class="card card-table">
-            <div class="card-header">
-                <h4 class="card-title">Appointment List</h4>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover table-center mb-0">
-                        <thead>
-                            <tr>
-                                <th>Doctor Name</th>
-                                <th>Speciality</th>
-                                <th>Patient Name</th>
-                                <th>Apointment Time</th>
-                                <th>Status</th>
-                                <th class="text-right">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for appointment in recent_appointments %}
-                            <tr>
-                                <td>
-                                    <h2 class="table-avatar">
-                                        <a href="#" class="avatar avatar-sm mr-2">
-                                            <img class="avatar-img rounded-circle" src="{{ appointment.doctor.profile.image }}" alt="Doctor Image">
-                                        </a>
-                                        <a href="#">Dr. {{ appointment.doctor.get_full_name }}</a>
-                                    </h2>
-                                </td>
-                                <td>{{ appointment.doctor.profile.specialization }}</td>
-                                <td>
-                                    <h2 class="table-avatar">
-                                        <a href="#" class="avatar avatar-sm mr-2">
-                                            <img class="avatar-img rounded-circle" src="{{ appointment.patient.profile.image }}" alt="Patient Image">
-                                        </a>
-                                        <a href="#">{{ appointment.patient.get_full_name }}</a>
-                                    </h2>
-                                </td>
-                                <td>
-                                    {{ appointment.appointment_date|date:"d M Y" }}
-                                    <span class="text-primary d-block">{{ appointment.appointment_time|time:"h:i A" }}</span>
-                                </td>
-                                <td>
-                                    <span class="badge badge-pill bg-{{ appointment.status }}-light">
-                                        {{ appointment.status|title }}
-                                    </span>
-                                </td>
-                                <td class="text-right">
-                                    ৳{{ appointment.doctor.profile.price_per_consultation }}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        <!-- /Recent Orders -->
-        
     </div>
 </div>
 
+<!-- 2. Financial Overview Cards (Decimal-Safe BDT, Zero Double Counting) -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0 font-weight-bold text-dark">
+            <i class="fe fe-dollar-sign text-success mr-2"></i>Financial & Revenue Summary (BDT)
+        </h5>
+        <a href="{% url 'payments:admin-transactions' %}" class="btn btn-outline-success btn-sm">
+            View All Transactions &raquo;
+        </a>
+    </div>
+    <div class="card-body p-4">
+        <div class="row">
+            <div class="col-lg-3 col-sm-6 col-12 mb-3 mb-lg-0">
+                <div class="p-3 bg-light rounded border-left border-success border-4">
+                    <small class="text-muted text-uppercase font-weight-bold d-block">Net Collected Revenue</small>
+                    <h3 class="font-weight-bold text-success mb-1">৳{{ net_revenue|floatformat:2 }}</h3>
+                    <small class="text-secondary">Gross Collections minus Payouts</small>
+                </div>
+            </div>
+            <div class="col-lg-3 col-sm-6 col-12 mb-3 mb-lg-0">
+                <div class="p-3 bg-light rounded border-left border-primary border-4">
+                    <small class="text-muted text-uppercase font-weight-bold d-block">Gross Collections</small>
+                    <h3 class="font-weight-bold text-dark mb-1">৳{{ total_collected|floatformat:2 }}</h3>
+                    <small class="text-muted">Online: ৳{{ online_collected|floatformat:2 }} | Chamber: ৳{{ chamber_collected|floatformat:2 }}</small>
+                </div>
+            </div>
+            <div class="col-lg-3 col-sm-6 col-12 mb-3 mb-lg-0">
+                <div class="p-3 bg-light rounded border-left border-danger border-4">
+                    <small class="text-muted text-uppercase font-weight-bold d-block">Refunded Payouts</small>
+                    <h3 class="font-weight-bold text-danger mb-1">৳{{ total_refunded|floatformat:2 }}</h3>
+                    <small class="text-muted">{{ refund_counts.succeeded }} Completed Payouts</small>
+                </div>
+            </div>
+            <div class="col-lg-3 col-sm-6 col-12">
+                <div class="p-3 bg-light rounded border-left border-warning border-4">
+                    <small class="text-muted text-uppercase font-weight-bold d-block">Outstanding Unpaid</small>
+                    <h3 class="font-weight-bold text-warning mb-1">৳{{ unpaid_bookings_amount|floatformat:2 }}</h3>
+                    <small class="text-muted">{{ unpaid_bookings_count }} Pay at Chamber Bookings</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Operational Appointment Overview & Global Settings -->
+<div class="row mb-4">
+    <!-- Appointments Status Breakdown -->
+    <div class="col-lg-8 col-12 mb-4 mb-lg-0">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 font-weight-bold text-dark">
+                    <i class="fe fe-calendar text-primary mr-2"></i>Appointment Operations
+                </h5>
+                <a href="{% url 'admin-appointments' %}" class="btn btn-sm btn-outline-primary">
+                    Manage Appointments
+                </a>
+            </div>
+            <div class="card-body p-4">
+                <div class="row text-center">
+                    <div class="col-md-4 col-6 mb-3">
+                        <div class="p-3 border rounded">
+                            <span class="text-muted small font-weight-bold">TODAY'S APPOINTMENTS</span>
+                            <h2 class="font-weight-bold text-dark mb-0 mt-1">{{ today_appointments_count }}</h2>
+                            <small class="text-muted">Scheduled for today</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-6 mb-3">
+                        <div class="p-3 border rounded">
+                            <span class="text-muted small font-weight-bold">UPCOMING</span>
+                            <h2 class="font-weight-bold text-primary mb-0 mt-1">{{ upcoming_appointments_count }}</h2>
+                            <small class="text-muted">Future confirmed slots</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-6 mb-3">
+                        <div class="p-3 border rounded">
+                            <span class="text-muted small font-weight-bold">COMPLETED</span>
+                            <h2 class="font-weight-bold text-success mb-0 mt-1">{{ completed_appointments_count }}</h2>
+                            <small class="text-muted">Consultations completed</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-6">
+                        <div class="p-3 border rounded">
+                            <span class="text-muted small font-weight-bold">CANCELLED</span>
+                            <h2 class="font-weight-bold text-danger mb-0 mt-1">{{ cancelled_appointments_count }}</h2>
+                            <small class="text-muted">Patient / Doctor cancellations</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-6">
+                        <div class="p-3 border rounded">
+                            <span class="text-muted small font-weight-bold">NO SHOW</span>
+                            <h2 class="font-weight-bold text-secondary mb-0 mt-1">{{ no_show_appointments_count }}</h2>
+                            <small class="text-muted">Patient missed consultations</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Hospital Policies & Booking Window -->
+    <div class="col-lg-4 col-12">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white py-3 border-bottom">
+                <h5 class="card-title mb-0 font-weight-bold text-dark">
+                    <i class="fe fe-sliders text-success mr-2"></i>Hospital Policy Config
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-3">
+                    <label class="font-weight-bold text-dark mb-1">Advance Booking Window Policy</label>
+                    <p class="text-secondary small mb-3">
+                        Patients may only book appointment slots within this active rolling window (default is 48 hours).
+                    </p>
+                    <div class="alert alert-light border py-2 px-3 mb-3">
+                        <span class="text-muted small">Current Window:</span>
+                        <div class="h5 font-weight-bold text-success mb-0">{{ booking_window_hours }} Hours ({{ booking_window_hours|floatformat:0 }}h)</div>
+                    </div>
+                </div>
+
+                {% if user.is_super_admin %}
+                <form action="{% url 'admin-settings-booking-window' %}" method="post">
+                    {% csrf_token %}
+                    <div class="form-group mb-3">
+                        <label class="font-weight-bold small text-dark">Modify Booking Window (Hours)</label>
+                        <div class="input-group">
+                            <input type="number" name="booking_window_hours" class="form-control" value="{{ booking_window_hours }}" min="1" max="720" required>
+                            <div class="input-group-append">
+                                <button type="submit" class="btn btn-success font-weight-bold">
+                                    <i class="fe fe-save mr-1"></i> Update
+                                </button>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">Range: 1 to 720 hours (up to 30 days).</small>
+                    </div>
+                </form>
+                {% else %}
+                <div class="alert alert-info py-2 px-3 small mb-0">
+                    <i class="fe fe-info mr-1"></i> Hospital policy configuration is managed exclusively by Super Administrators.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4. Operational Queues: Refund Approvals & Patient Complaints -->
+<div class="row mb-4">
+    <!-- Refund Approval Queue -->
+    <div class="col-lg-6 col-12 mb-4 mb-lg-0">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title mb-0 font-weight-bold text-dark">
+                        <i class="fe fe-refresh-cw text-warning mr-1"></i> Refund Requests Queue
+                    </h5>
+                    <small class="text-muted">{{ refund_counts.requested }} Requested | {{ refund_counts.under_review }} Under Review</small>
+                </div>
+                <a href="{% url 'payments:admin-refund-list' %}" class="btn btn-sm btn-outline-warning text-dark font-weight-bold">
+                    View All Refunds &raquo;
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if not user.is_super_admin %}
+                <div class="alert alert-warning py-2 px-3 m-3 small mb-0">
+                    <i class="fe fe-shield mr-1"></i> <strong>Role Restriction:</strong> Hospital Administrators can review and forward refund requests. Final approval or rejection authority is strictly reserved for Super Administrators.
+                </div>
+                {% endif %}
+
+                {% if pending_refund_queue %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Reference</th>
+                                <th>Patient</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th class="text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in pending_refund_queue %}
+                            <tr>
+                                <td class="font-weight-bold">
+                                    <a href="{% url 'payments:refund-detail' r.refund_reference %}">{{ r.refund_reference }}</a>
+                                </td>
+                                <td>{{ r.patient.get_full_name }}</td>
+                                <td class="font-weight-bold text-danger">৳{{ r.requested_amount }}</td>
+                                <td>
+                                    <span class="badge badge-warning text-dark">{{ r.get_status_display }}</span>
+                                </td>
+                                <td class="text-right">
+                                    {% if user.is_super_admin %}
+                                        <a href="{% url 'payments:admin-refund-approve' r.pk %}" class="btn btn-sm btn-success py-1 px-2 font-weight-bold" title="Approve Refund">
+                                            <i class="fe fe-check"></i>
+                                        </a>
+                                        <a href="{% url 'payments:admin-refund-reject' r.pk %}" class="btn btn-sm btn-outline-danger py-1 px-2" title="Reject Refund">
+                                            <i class="fe fe-x"></i>
+                                        </a>
+                                    {% else %}
+                                        <a href="{% url 'payments:admin-refund-review' r.pk %}" class="btn btn-sm btn-outline-info py-1 px-2">
+                                            Review
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted small">
+                    <i class="fe fe-check-circle text-success mb-2" style="font-size: 2rem;"></i>
+                    <p class="mb-0">No pending refund requests awaiting action.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Complaints Overview -->
+    <div class="col-lg-6 col-12">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title mb-0 font-weight-bold text-dark">
+                        <i class="fe fe-alert-circle text-danger mr-1"></i> Patient Complaints
+                    </h5>
+                    <small class="text-muted">{{ complaint_counts.submitted }} New | {{ complaint_counts.under_review }} Under Investigation</small>
+                </div>
+                <a href="{% url 'complaints:admin-list' %}" class="btn btn-sm btn-outline-danger font-weight-bold">
+                    View All Complaints &raquo;
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_complaints %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Reference</th>
+                                <th>Patient</th>
+                                <th>Doctor</th>
+                                <th>Status</th>
+                                <th class="text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in recent_complaints %}
+                            <tr>
+                                <td class="font-weight-bold">
+                                    <a href="{% url 'complaints:admin-review' c.pk %}">{{ c.reference }}</a>
+                                </td>
+                                <td>{{ c.patient.get_full_name }}</td>
+                                <td>Dr. {{ c.doctor.get_full_name }}</td>
+                                <td>
+                                    {% if c.status == 'submitted' %}
+                                        <span class="badge badge-primary">Submitted</span>
+                                    {% elif c.status == 'under_review' %}
+                                        <span class="badge badge-warning text-dark">Under Review</span>
+                                    {% elif c.status == 'resolved' %}
+                                        <span class="badge badge-success">Resolved</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">{{ c.get_status_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-right">
+                                    <a href="{% url 'complaints:admin-review' c.pk %}" class="btn btn-sm btn-outline-primary py-1 px-2">
+                                        Investigate
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted small">
+                    <i class="fe fe-smile text-success mb-2" style="font-size: 2rem;"></i>
+                    <p class="mb-0">No patient complaints currently reported.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 5. Recent Appointments Table -->
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <h5 class="card-title font-weight-bold mb-0 text-dark">
+            <i class="fe fe-list mr-2 text-primary"></i>Recent Appointment Activity
+        </h5>
+        <a href="{% url 'admin-appointments' %}" class="btn btn-outline-primary btn-sm">View All Appointments</a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-center mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Serial / Ref</th>
+                        <th>Doctor</th>
+                        <th>Patient</th>
+                        <th>Date & Time</th>
+                        <th>Payment Status</th>
+                        <th>Status</th>
+                        <th class="text-right">Fee</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for app in recent_appointments %}
+                    <tr>
+                        <td class="font-weight-bold">
+                            <span class="badge badge-light border">#{{ app.serial_number }}</span>
+                            <div class="small text-muted">{{ app.appointment_reference }}</div>
+                        </td>
+                        <td>
+                            <div class="font-weight-bold">Dr. {{ app.doctor.get_full_name }}</div>
+                            <small class="text-muted">{{ app.doctor.profile.specialization|default:"Specialist" }}</small>
+                        </td>
+                        <td>
+                            <div class="font-weight-bold">{{ app.patient.get_full_name }}</div>
+                            <small class="text-muted">{{ app.patient.profile.phone|default:"N/A" }}</small>
+                        </td>
+                        <td>
+                            {{ app.appointment_date|date:"d M Y" }}
+                            <span class="text-primary d-block small font-weight-bold">{{ app.appointment_time|time:"h:i A" }}</span>
+                        </td>
+                        <td>
+                            {% if app.payment_status == 'paid' %}
+                                <span class="badge badge-success">Paid</span>
+                            {% elif app.payment_status == 'refunded' %}
+                                <span class="badge badge-danger">Refunded</span>
+                            {% elif app.payment_status == 'partially_refunded' %}
+                                <span class="badge badge-warning text-dark">Partially Refunded</span>
+                            {% else %}
+                                <span class="badge badge-warning text-dark">Unpaid</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge badge-pill badge-light border">
+                                {{ app.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="text-right font-weight-bold text-dark">
+                            ৳{{ app.fee_amount }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">No appointments found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 {% endblock %}

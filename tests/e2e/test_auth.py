@@ -1,12 +1,20 @@
+import unittest
 from django.contrib.auth import get_user_model
 from django.test import LiveServerTestCase
-from selenium import webdriver
-from selenium.webdriver.common.by import By
+
+try:
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    SELENIUM_AVAILABLE = True
+except ImportError:
+    SELENIUM_AVAILABLE = False
+
 import time
 
 User = get_user_model()
 
 
+@unittest.skipUnless(SELENIUM_AVAILABLE, "Selenium is not installed")
 class HomePageTest(LiveServerTestCase):
     def setUp(self):
         """Initialize WebDriver and create test user"""
@@ -23,6 +31,7 @@ class HomePageTest(LiveServerTestCase):
         self.assertIn("Home", self.driver.title)
 
 
+@unittest.skipUnless(SELENIUM_AVAILABLE, "Selenium is not installed")
 class UserLoginTest(LiveServerTestCase):
     def setUp(self):
         """Initialize WebDriver and create test user"""
@@ -88,6 +97,7 @@ class UserLoginTest(LiveServerTestCase):
         self.assertIn("You are now logged out", self.driver.page_source)
 
 
+@unittest.skipUnless(SELENIUM_AVAILABLE, "Selenium is not installed")
 class PatientRegisterTest(LiveServerTestCase):
     def setUp(self):
         """Initialize WebDriver and create test user"""
@@ -150,6 +160,7 @@ class PatientRegisterTest(LiveServerTestCase):
         self.assertIn("Username already exists", self.driver.page_source)
 
 
+@unittest.skipUnless(SELENIUM_AVAILABLE, "Selenium is not installed")
 class DoctorRegisterTest(LiveServerTestCase):
     def setUp(self):
         """Initialize WebDriver and create test user"""

@@ -17,6 +17,7 @@ def cancel_doctor_consultation_session(
     target_date: date,
     start_time: Optional[time] = None,
     end_time: Optional[time] = None,
+    session_name: str = "",
     reason: str = "Doctor unavailable / session cancelled.",
     actor: Optional[User] = None,
 ) -> Dict[str, Any]:
@@ -111,6 +112,18 @@ def cancel_doctor_consultation_session(
                 "total_refundable_amount": str(total_refundable_amount),
             },
         )
+
+        # Notify affected patients
+        try:
+            from notifications.services import notify_session_cancelled
+            notify_session_cancelled(
+                doctor=doctor,
+                target_date=target_date,
+                session_name=session_name,
+                affected_bookings=affected_bookings,
+            )
+        except Exception:
+            pass
 
         return {
             "doctor": doctor,

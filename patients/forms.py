@@ -70,11 +70,8 @@ class PatientProfileForm(forms.ModelForm):
     def clean_phone(self):
         phone = self.cleaned_data.get("phone")
         if phone:
-            # Add phone number validation if needed
-            if not phone.isdigit():
-                raise forms.ValidationError(
-                    "Phone number should contain only digits"
-                )
+            from utils.validators import validate_bangladesh_phone
+            return validate_bangladesh_phone(phone)
         return phone
 
     def clean_postal_code(self):

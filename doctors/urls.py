@@ -25,6 +25,7 @@ from .views import (
     DoctorScheduleManageView,
     DoctorAvailabilityExceptionView,
     DoctorSlotsJsonView,
+    DoctorReportsView,
 )
 
 app_name = "doctors"
@@ -122,4 +123,5 @@ urlpatterns = [
         PrescriptionDetailView.as_view(),
         name="prescription-detail",
     ),
+    path("reports/", DoctorReportsView.as_view(), name="reports"),
 ]

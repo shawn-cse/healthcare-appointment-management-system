@@ -54,12 +54,18 @@ class HospitalAdminRequiredMixin(AdminRequiredMixin):
 
 
 class DoctorRequiredMixin(LoginRequiredMixin):
-    """Permits only doctors."""
+    """Permits only active approved doctors."""
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return super().dispatch(request, *args, **kwargs)
         if not request.user.is_doctor:
             messages.error(request, "Doctor access required.")
+            return redirect("core:home")
+        if request.user.status != request.user.StatusChoices.ACTIVE:
+            messages.error(
+                request,
+                "Your doctor account is not active. It may be pending administrative review or suspended."
+            )
             return redirect("core:home")
         return super().dispatch(request, *args, **kwargs)
 

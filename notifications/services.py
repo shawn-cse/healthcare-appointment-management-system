@@ -134,7 +134,7 @@ def notify_booking_confirmed(booking):
         f"{booking.appointment_date.strftime('%d %b %Y')} at {booking.appointment_time.strftime('%I:%M %p')}. "
         f"Your Serial Number is #{booking.serial_number}. Chamber: {booking.chamber or 'Chamber Desk'}."
     )
-    patient_link = reverse("bookings:booking-invoice", kwargs={"pk": booking.pk})
+    patient_link = reverse("bookings:booking-invoice", kwargs={"booking_id": booking.pk})
     send_notification(
         recipient=booking.patient,
         title=patient_title,
@@ -230,7 +230,7 @@ def notify_payment_success(payment_transaction):
     if hasattr(payment_transaction, "receipt"):
         receipt_link = reverse("payments:receipt-detail", kwargs={"receipt_number": payment_transaction.receipt.receipt_number})
     else:
-        receipt_link = reverse("bookings:booking-invoice", kwargs={"pk": booking.pk})
+        receipt_link = reverse("bookings:booking-invoice", kwargs={"booking_id": booking.pk})
 
     send_notification(
         recipient=booking.patient,
@@ -289,7 +289,7 @@ def notify_refund_requested(refund_request):
             title=f"New Refund Request: {refund_request.refund_reference} (৳{refund_request.requested_amount})",
             message=f"Patient {refund_request.patient.get_full_name()} submitted a refund request of ৳{refund_request.requested_amount}.",
             notification_type=Notification.NotificationType.REFUND_REQUESTED,
-            related_link=reverse("payments:admin-refunds"),
+            related_link=reverse("payments:admin-refund-list"),
             deduplication_key=f"refund_req_admin_{refund_request.refund_reference}_{a.id}",
         )
 
@@ -297,8 +297,9 @@ def notify_refund_requested(refund_request):
 def notify_refund_approved(refund_request):
     """Notifies patient that their refund has been approved by Super Admin."""
     title = f"Refund Approved: {refund_request.refund_reference}"
+    amt = getattr(refund_request, "requested_amount", getattr(refund_request, "eligible_refund_amount", "0.00"))
     msg = (
-        f"Good news! Your refund request of ৳{refund_request.approved_amount} has been approved by "
+        f"Good news! Your refund request of ৳{amt} has been approved by "
         f"Green Hospital administration and is currently being processed for payout."
     )
     send_notification(
@@ -328,13 +329,16 @@ def notify_refund_rejected(refund_request, reason: str = ""):
     )
 
 
-def notify_refund_completed(refund_transaction):
+def notify_refund_completed(refund_obj):
     """Notifies patient of completed refund payout."""
-    refund_request = refund_transaction.refund_request
-    title = f"Refund Completed: ৳{refund_transaction.amount}"
+    refund_request = getattr(refund_obj, "refund_request", refund_obj)
+    amount = getattr(refund_obj, "amount", getattr(refund_obj, "approved_amount", getattr(refund_request, "requested_amount", "0.00")))
+    ref = getattr(refund_obj, "gateway_refund_ref", None) or getattr(refund_obj, "refund_reference", getattr(refund_request, "refund_reference", ""))
+
+    title = f"Refund Completed: ৳{amount}"
     msg = (
-        f"Your refund of ৳{refund_transaction.amount} has been successfully completed. "
-        f"Reference / Voucher: {refund_transaction.gateway_refund_ref or refund_transaction.refund_reference}."
+        f"Your refund of ৳{amount} has been successfully completed. "
+        f"Reference / Voucher: {ref}."
     )
     send_notification(
         recipient=refund_request.patient,

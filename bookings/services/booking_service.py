@@ -70,6 +70,9 @@ def create_appointment(
 
     # Concurrency-safe reservation block
     with transaction.atomic():
+        # Exclusively lock the doctor record to serialize serial allocation and capacity checks
+        User.objects.select_for_update().filter(id=doctor.id).first()
+
         # Lock active bookings for this doctor & date to prevent race conditions on double booking & serials
         locked_doctor_bookings = list(
             Booking.objects.select_for_update()
@@ -149,5 +152,12 @@ def create_appointment(
                 "payment_method": booking.payment_method,
             },
         )
+
+        if booking.status == Booking.StatusChoices.CONFIRMED:
+            try:
+                from notifications.services import notify_booking_confirmed
+                notify_booking_confirmed(booking)
+            except Exception:
+                pass
 
         return booking

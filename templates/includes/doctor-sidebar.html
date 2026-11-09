@@ -103,6 +103,12 @@
                                             <span>Bookings</span>
                                         </a>
                                     </li>
+                                    <li class="{% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
+                                        <a href="{% url 'doctors:reports' %}">
+                                            <i class="fas fa-chart-line"></i>
+                                            <span>Reports & Analytics</span>
+                                        </a>
+                                    </li>
                                     <li class="{% if request.resolver_match.url_name == 'profile-setting' %}active{% endif %}">
                                         <a href="{% url 'doctors:profile-setting' %}">
                                             <i class="fas fa-user-cog"></i>

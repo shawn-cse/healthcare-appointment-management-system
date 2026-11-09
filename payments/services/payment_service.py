@@ -165,6 +165,12 @@ def process_gateway_callback(
                 },
                 ip_address=request.META.get("REMOTE_ADDR") if request else None,
             )
+            # Notify payment failed
+            try:
+                from notifications.services import notify_payment_failed
+                notify_payment_failed(tx, reason=verification.error_message)
+            except Exception:
+                pass
             return False, tx, None, verification.error_message
 
         # Financial integrity & amount tampering check
@@ -252,6 +258,13 @@ def process_gateway_callback(
             },
             ip_address=request.META.get("REMOTE_ADDR") if request else None,
         )
+
+        # Notify payment success
+        try:
+            from notifications.services import notify_payment_success
+            notify_payment_success(tx)
+        except Exception:
+            pass
 
         return True, tx, receipt, "Payment successfully verified and recorded."
 
@@ -349,6 +362,13 @@ def record_chamber_payment_collection(
             },
             ip_address=request.META.get("REMOTE_ADDR") if request else None,
         )
+
+        # Notify payment success
+        try:
+            from notifications.services import notify_payment_success
+            notify_payment_success(tx)
+        except Exception:
+            pass
 
         return tx, receipt
 

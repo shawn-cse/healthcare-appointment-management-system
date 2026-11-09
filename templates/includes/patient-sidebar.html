@@ -68,6 +68,21 @@
                                             <span>Bookings</span>
                                         </a>
                                     </li>
+                                    <li class="{% if '/complaints/' in request.path %}active{% endif %}">
+                                        <a href="{% url 'complaints:patient-list' %}">
+                                            <i class="fas fa-exclamation-circle"></i>
+                                            <span>My Complaints</span>
+                                        </a>
+                                    </li>
+                                    <li class="{% if '/notifications/' in request.path %}active{% endif %}">
+                                        <a href="{% url 'notifications:list' %}">
+                                            <i class="fas fa-bell"></i>
+                                            <span>Notifications</span>
+                                            {% if unread_notifications_count > 0 %}
+                                            <span class="badge badge-danger ml-1">{{ unread_notifications_count }}</span>
+                                            {% endif %}
+                                        </a>
+                                    </li>
                                     <li class="{% if request.resolver_match.url_name == 'profile-setting' %}active{% endif %}">
                                         <a href="{% url 'patients:profile-setting' %}">
                                             <i class="fas fa-user-cog"></i>

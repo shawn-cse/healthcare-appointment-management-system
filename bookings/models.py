@@ -213,6 +213,16 @@ class Booking(models.Model):
             },
         )
 
+        # Trigger notifications
+        try:
+            from notifications.services import notify_booking_cancelled, notify_booking_confirmed
+            if target_status == self.StatusChoices.CANCELLED:
+                notify_booking_cancelled(self, reason=reason, actor=actor)
+            elif target_status == self.StatusChoices.CONFIRMED and old_status == self.StatusChoices.PENDING:
+                notify_booking_confirmed(self)
+        except Exception:
+            pass
+
 
 class Prescription(models.Model):
     booking = models.OneToOneField(

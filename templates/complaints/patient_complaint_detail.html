@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Complaint Status: {{ complaint.reference }} - Green Hospital{% endblock %}
+
+{% block content %}
+<div class="breadcrumb-bar bg-white border-bottom py-3">
+    <div class="container-fluid px-4">
+        <div class="row align-items-center">
+            <div class="col-md-8 col-12">
+                <nav aria-label="breadcrumb" class="page-breadcrumb">
+                    <ol class="breadcrumb mb-0 bg-transparent p-0">
+                        <li class="breadcrumb-item"><a href="/">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'patients:dashboard' %}">Patient Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'complaints:patient-list' %}">Complaints</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">{{ complaint.reference }}</li>
+                    </ol>
+                </nav>
+                <h3 class="breadcrumb-title font-weight-bold mb-0 text-success">
+                    Complaint Status: {{ complaint.reference }}
+                </h3>
+            </div>
+            <div class="col-md-4 col-12 text-md-right mt-2 mt-md-0">
+                <a href="{% url 'complaints:patient-list' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left mr-1"></i> Back to Complaints
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="content py-4">
+    <div class="container-fluid px-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-xl-7">
+                <!-- Status Banner -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div>
+                                <span class="text-muted small">Status</span>
+                                <h4 class="mb-0 font-weight-bold mt-1">
+                                    {% if complaint.status == 'submitted' %}
+                                        <span class="badge badge-primary px-3 py-2">Submitted</span>
+                                    {% elif complaint.status == 'under_review' %}
+                                        <span class="badge badge-warning px-3 py-2 text-dark">Under Review</span>
+                                    {% elif complaint.status == 'resolved' %}
+                                        <span class="badge badge-success px-3 py-2">Resolved</span>
+                                    {% elif complaint.status == 'rejected' %}
+                                        <span class="badge badge-danger px-3 py-2">Rejected</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary px-3 py-2">{{ complaint.get_status_display }}</span>
+                                    {% endif %}
+                                </h4>
+                            </div>
+                            <div class="text-md-right mt-2 mt-md-0">
+                                <span class="text-muted small">Submitted On</span>
+                                <div class="font-weight-bold text-dark">{{ complaint.created_at|date:"d M Y, h:i A" }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Complaint Details Card -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h5 class="card-title font-weight-bold mb-0 text-dark">
+                            <i class="fas fa-file-alt mr-2 text-success"></i>Complaint Details
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row mb-3">
+                            <div class="col-sm-4 text-muted">Reported Doctor:</div>
+                            <div class="col-sm-8 font-weight-bold text-dark">
+                                Dr. {{ complaint.doctor.get_full_name }}
+                                <div class="small text-muted font-weight-normal">{{ complaint.doctor.profile.specialization|default:"Specialist" }}</div>
+                            </div>
+                        </div>
+
+                        {% if complaint.booking %}
+                        <div class="row mb-3">
+                            <div class="col-sm-4 text-muted">Related Appointment:</div>
+                            <div class="col-sm-8">
+                                <span class="font-weight-bold">Serial #{{ complaint.booking.serial_number }}</span>
+                                on {{ complaint.booking.appointment_date|date:"d M Y" }} ({{ complaint.booking.appointment_time|time:"h:i A" }})
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="row mb-3">
+                            <div class="col-sm-4 text-muted">Category:</div>
+                            <div class="col-sm-8">
+                                <span class="badge badge-light border text-dark">{{ complaint.get_category_display }}</span>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-sm-4 text-muted">Subject:</div>
+                            <div class="col-sm-8 font-weight-bold text-dark">{{ complaint.subject }}</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-sm-4 text-muted">Description:</div>
+                            <div class="col-sm-8">
+                                <div class="p-3 bg-light rounded text-secondary" style="white-space: pre-wrap;">{{ complaint.description }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Administrative Response Card -->
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white py-3 border-bottom">
+                        <h5 class="card-title font-weight-bold mb-0 text-dark">
+                            <i class="fas fa-reply mr-2 text-success"></i>Hospital Administration Feedback
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        {% if complaint.admin_response %}
+                        <div class="alert alert-success border-success">
+                            <h6 class="font-weight-bold mb-2">Resolution / Administrative Response:</h6>
+                            <p class="mb-0 text-dark" style="white-space: pre-wrap;">{{ complaint.admin_response }}</p>
+                        </div>
+                        {% if complaint.reviewed_at %}
+                        <small class="text-muted d-block text-right">
+                            Reviewed on: {{ complaint.reviewed_at|date:"d M Y, h:i A" }}
+                        </small>
+                        {% endif %}
+                        {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-hourglass-half mb-2 text-secondary" style="font-size: 2rem;"></i>
+                            <p class="mb-0">Your complaint is currently under review by Hospital Administration.</p>
+                            <small>You will be notified once an administrator has investigated and responded.</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

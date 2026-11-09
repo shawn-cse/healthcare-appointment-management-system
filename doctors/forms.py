@@ -76,6 +76,13 @@ class DoctorProfileForm(forms.ModelForm):
                 existing_class = field.widget.attrs.get("class", "")
                 field.widget.attrs["class"] = f"{existing_class} form-control".strip()
 
+    def clean_phone(self):
+        phone = self.cleaned_data.get("phone")
+        if phone:
+            from utils.validators import validate_bangladesh_phone
+            return validate_bangladesh_phone(phone)
+        return phone
+
     def clean_bmdc_number(self):
         new_bmdc = self.cleaned_data.get("bmdc_number", "").strip()
         if not new_bmdc:

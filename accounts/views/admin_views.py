@@ -19,6 +19,11 @@ from decimal import Decimal
 from core.models import Review, Speciality
 from accounts.models import User
 from bookings.models import Booking, Prescription
+from payments.models import PaymentTransaction, RefundRequest, RefundTransaction
+from complaints.models import Complaint
+from doctors.services.availability import DHAKA_TZ
+from doctors.models.schedules import HospitalSetting
+from accounts.decorators import SuperAdminRequiredMixin
 
 
 class AdminDashboardView(AdminRequiredMixin, TemplateView):
@@ -26,62 +31,155 @@ class AdminDashboardView(AdminRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        now_dhaka = timezone.now().astimezone(DHAKA_TZ)
+        today = now_dhaka.date()
 
-        # Count statistics
-        context["doctors_count"] = User.objects.filter(role="doctor").count()
-        context["patients_count"] = User.objects.filter(role="patient").count()
+        # 1. Staff and User Counts
+        context["doctors_count"] = User.objects.filter(role=User.RoleChoices.DOCTOR).count()
+        context["approved_doctors_count"] = User.objects.filter(
+            role=User.RoleChoices.DOCTOR, status=User.StatusChoices.ACTIVE
+        ).count()
+        context["pending_doctors_count"] = User.objects.filter(
+            role=User.RoleChoices.DOCTOR, status=User.StatusChoices.PENDING_APPROVAL
+        ).count()
+        context["rejected_doctors_count"] = User.objects.filter(
+            role=User.RoleChoices.DOCTOR, status=User.StatusChoices.REJECTED
+        ).count()
+        context["suspended_doctors_count"] = User.objects.filter(
+            role=User.RoleChoices.DOCTOR, status=User.StatusChoices.SUSPENDED
+        ).count()
+
+        context["patients_count"] = User.objects.filter(role=User.RoleChoices.PATIENT).count()
+        context["receptionists_count"] = User.objects.filter(role=User.RoleChoices.RECEPTIONIST).count()
+        context["hospital_admins_count"] = User.objects.filter(role=User.RoleChoices.HOSPITAL_ADMIN).count()
+        context["super_admins_count"] = User.objects.filter(role=User.RoleChoices.SUPER_ADMIN).count()
+
+        # 2. Appointment Statistics (Asia/Dhaka time boundaries)
         context["appointments_count"] = Booking.objects.count()
+        context["today_appointments_count"] = Booking.objects.filter(appointment_date=today).count()
+        context["upcoming_appointments_count"] = Booking.objects.filter(
+            appointment_date__gte=today,
+            status__in=[Booking.StatusChoices.CONFIRMED, Booking.StatusChoices.PENDING]
+        ).count()
+        context["completed_appointments_count"] = Booking.objects.filter(
+            status=Booking.StatusChoices.COMPLETED
+        ).count()
+        context["cancelled_appointments_count"] = Booking.objects.filter(
+            status=Booking.StatusChoices.CANCELLED
+        ).count()
+        context["no_show_appointments_count"] = Booking.objects.filter(
+            status=Booking.StatusChoices.NO_SHOW
+        ).count()
 
-        # Calculate total revenue
-        context["total_revenue"] = (
-            Booking.objects.filter(status="completed").aggregate(
-                total=Sum("doctor__profile__price_per_consultation")
-            )["total"]
-            or 0
-        )
+        # 3. Financial Collections & Revenue (Decimal-Safe BDT, zero double-counting)
+        total_collected = PaymentTransaction.objects.filter(
+            status__in=[
+                PaymentTransaction.Status.SUCCESS,
+                PaymentTransaction.Status.PARTIALLY_REFUNDED,
+                PaymentTransaction.Status.REFUNDED,
+            ]
+        ).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
 
-        # Get recent doctors with their stats
-        doctors = User.objects.filter(role="doctor").select_related("profile")[:5]
-        for doctor in doctors:
-            doctor.earned = (
-                Booking.objects.filter(doctor=doctor, status="completed").aggregate(
-                    total=Sum("doctor__profile__price_per_consultation")
-                )["total"]
-                or 0
-            )
-            doctor.reviews_count = 0  # Add review logic when implemented
-        context["recent_doctors"] = doctors
+        online_collected = PaymentTransaction.objects.filter(
+            payment_method=PaymentTransaction.PaymentMethod.ONLINE,
+            status__in=[
+                PaymentTransaction.Status.SUCCESS,
+                PaymentTransaction.Status.PARTIALLY_REFUNDED,
+                PaymentTransaction.Status.REFUNDED,
+            ]
+        ).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
 
-        # Get recent patients with their appointments
-        patients = User.objects.filter(role="patient").select_related("profile")[:5]
-        for patient in patients:
-            latest_appointment = (
-                Booking.objects.filter(patient=patient)
-                .order_by("-appointment_date")
-                .first()
-            )
-            patient.last_visit = (
-                latest_appointment.appointment_date if latest_appointment else None
-            )
-            patient.total_paid = (
-                Booking.objects.filter(patient=patient, status="completed").aggregate(
-                    total=Sum("doctor__profile__price_per_consultation")
-                )["total"]
-                or 0
-            )
-        context["recent_patients"] = patients
+        chamber_collected = PaymentTransaction.objects.filter(
+            payment_method__in=[
+                PaymentTransaction.PaymentMethod.CASH,
+                PaymentTransaction.PaymentMethod.CHAMBER_POS,
+            ],
+            status__in=[
+                PaymentTransaction.Status.SUCCESS,
+                PaymentTransaction.Status.PARTIALLY_REFUNDED,
+                PaymentTransaction.Status.REFUNDED,
+            ]
+        ).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
 
-        # Get recent appointments
+        total_refunded = RefundTransaction.objects.aggregate(
+            t=Sum("amount")
+        )["t"] or Decimal("0.00")
+
+        net_revenue = total_collected - total_refunded
+
+        context["total_collected"] = total_collected
+        context["online_collected"] = online_collected
+        context["chamber_collected"] = chamber_collected
+        context["total_refunded"] = total_refunded
+        context["net_revenue"] = net_revenue
+        context["total_revenue"] = net_revenue  # Backwards compatibility
+
+        # Outstanding Unpaid Bookings
+        unpaid_qs = Booking.objects.filter(
+            payment_status=Booking.PaymentStatus.UNPAID
+        ).exclude(status=Booking.StatusChoices.CANCELLED)
+        context["unpaid_bookings_count"] = unpaid_qs.count()
+        context["unpaid_bookings_amount"] = unpaid_qs.aggregate(
+            t=Sum("fee_amount")
+        )["t"] or Decimal("0.00")
+
+        # 4. Refund Requests Breakdown
+        context["refund_counts"] = {
+            "requested": RefundRequest.objects.filter(status=RefundRequest.Status.REQUESTED).count(),
+            "under_review": RefundRequest.objects.filter(status=RefundRequest.Status.UNDER_REVIEW).count(),
+            "approved": RefundRequest.objects.filter(status=RefundRequest.Status.APPROVED).count(),
+            "rejected": RefundRequest.objects.filter(status=RefundRequest.Status.REJECTED).count(),
+            "succeeded": RefundRequest.objects.filter(status=RefundRequest.Status.SUCCEEDED).count(),
+        }
+        context["pending_refund_queue"] = RefundRequest.objects.filter(
+            status__in=[RefundRequest.Status.REQUESTED, RefundRequest.Status.UNDER_REVIEW]
+        ).select_related("booking", "patient", "doctor", "payment_transaction")[:5]
+
+        # 5. Patient Complaint Summaries
+        context["complaint_counts"] = {
+            "total": Complaint.objects.count(),
+            "submitted": Complaint.objects.filter(status=Complaint.StatusChoices.SUBMITTED).count(),
+            "under_review": Complaint.objects.filter(status=Complaint.StatusChoices.UNDER_REVIEW).count(),
+            "resolved": Complaint.objects.filter(status=Complaint.StatusChoices.RESOLVED).count(),
+        }
+        context["recent_complaints"] = Complaint.objects.select_related(
+            "patient", "doctor"
+        ).order_by("-created_at")[:5]
+
+        # 6. Global Hospital Policy
+        context["booking_window_hours"] = HospitalSetting.get_booking_window_hours()
+
+        # Recent Doctors, Patients, Appointments
+        context["recent_doctors"] = User.objects.filter(
+            role=User.RoleChoices.DOCTOR
+        ).select_related("profile")[:5]
+        context["recent_patients"] = User.objects.filter(
+            role=User.RoleChoices.PATIENT
+        ).select_related("profile")[:5]
         context["recent_appointments"] = Booking.objects.select_related(
             "doctor", "doctor__profile", "patient", "patient__profile"
-        ).order_by("-appointment_date")[:5]
-
-        # Add recent prescriptions
-        context["recent_prescriptions"] = Prescription.objects.select_related(
-            "doctor", "patient", "booking"
-        ).order_by("-created_at")[:10]
+        ).order_by("-appointment_date", "-appointment_time")[:6]
 
         return context
+
+
+class HospitalSettingsUpdateView(SuperAdminRequiredMixin, View):
+    """
+    Super Admin configuration of global hospital policies (e.g. 48-hour booking window).
+    """
+    def post(self, request):
+        hours = request.POST.get("booking_window_hours")
+        try:
+            val = int(hours)
+            if val < 1 or val > 720:
+                raise ValueError()
+            setting, _ = HospitalSetting.objects.get_or_create(id=1)
+            setting.booking_window_hours = val
+            setting.save()
+            messages.success(request, f"Hospital advance booking window updated to {val} hours.")
+        except Exception:
+            messages.error(request, "Please enter a valid positive number of hours (1 to 720).")
+        return redirect("admin-dashboard")
 
 
 class AdminPatientsView(AdminRequiredMixin, ListView):
@@ -251,6 +349,35 @@ class AdminReviewListView(AdminRequiredMixin, ListView):
 class AppointmentReportView(AdminRequiredMixin, TemplateView):
     template_name = "dashboard/reports/appointments.html"
 
+    def get(self, request, *args, **kwargs):
+        if request.GET.get("export") == "csv":
+            import csv
+            from django.http import HttpResponse
+            end_date = timezone.now().date()
+            start_date = end_date - timedelta(days=30)
+            appointments = Booking.objects.filter(
+                appointment_date__range=[start_date, end_date]
+            ).select_related("doctor", "patient").order_by("-appointment_date", "-appointment_time")
+            response = HttpResponse(content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="appointment_report_{start_date}_{end_date}.csv"'
+            writer = csv.writer(response)
+            writer.writerow(["Reference", "Serial", "Doctor", "Patient", "Date", "Time", "Visit Type", "Payment Status", "Status", "Fee (BDT)"])
+            for a in appointments:
+                writer.writerow([
+                    a.appointment_reference or "",
+                    a.serial_number,
+                    f"Dr. {a.doctor.get_full_name()}",
+                    a.patient.get_full_name(),
+                    a.appointment_date.strftime("%Y-%m-%d"),
+                    a.appointment_time.strftime("%I:%M %p"),
+                    a.get_visit_type_display(),
+                    a.get_payment_status_display(),
+                    a.get_status_display(),
+                    str(a.fee_amount),
+                ])
+            return response
+        return super().get(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
@@ -310,6 +437,36 @@ class AppointmentReportView(AdminRequiredMixin, TemplateView):
 
 class RevenueReportView(AdminRequiredMixin, TemplateView):
     template_name = "dashboard/reports/revenue.html"
+
+    def get(self, request, *args, **kwargs):
+        if request.GET.get("export") == "csv":
+            import csv
+            from django.http import HttpResponse
+            txs = PaymentTransaction.objects.filter(
+                status__in=[
+                    PaymentTransaction.Status.SUCCESS,
+                    PaymentTransaction.Status.PARTIALLY_REFUNDED,
+                    PaymentTransaction.Status.REFUNDED,
+                ]
+            ).select_related("booking", "patient", "doctor").order_by("-created_at")
+            response = HttpResponse(content_type="text/csv")
+            response["Content-Disposition"] = 'attachment; filename="revenue_report.csv"'
+            writer = csv.writer(response)
+            writer.writerow(["Transaction Ref", "Receipt #", "Doctor", "Patient", "Method", "Status", "Amount (BDT)", "Date"])
+            for t in txs:
+                rec_num = t.receipt.receipt_number if hasattr(t, "receipt") else ""
+                writer.writerow([
+                    t.transaction_reference,
+                    rec_num,
+                    f"Dr. {t.doctor.get_full_name()}",
+                    t.patient.get_full_name(),
+                    t.get_payment_method_display(),
+                    t.get_status_display(),
+                    str(t.amount),
+                    t.created_at.strftime("%Y-%m-%d %H:%M"),
+                ])
+            return response
+        return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -440,6 +597,15 @@ class StaffRoleChangeView(SuperAdminRequiredMixin, View):
         target_user = get_object_or_404(User, pk=pk)
         new_role = request.POST.get("role")
         new_status = request.POST.get("status")
+
+        # Security: Prevent self-lockout / self-demotion by Super Admin
+        if target_user == request.user:
+            if new_role and new_role != User.RoleChoices.SUPER_ADMIN:
+                messages.error(request, "Security violation: Super Administrators cannot demote their own account.")
+                return redirect("admin-staff-management")
+            if new_status and new_status == User.StatusChoices.SUSPENDED:
+                messages.error(request, "Security violation: Super Administrators cannot suspend their own account.")
+                return redirect("admin-staff-management")
 
         old_role = target_user.role
         old_status = target_user.status
@@ -686,6 +852,12 @@ class DoctorApproveActionView(HospitalAdminRequiredMixin, View):
         doctor.rejection_reason = ""
         doctor.save()
 
+        try:
+            from notifications.services import notify_doctor_approved
+            notify_doctor_approved(doctor)
+        except Exception:
+            pass
+
         log_audit_event(
             actor=request.user,
             action=AuditLog.ActionChoices.DOCTOR_APPROVED,
@@ -716,6 +888,12 @@ class DoctorRejectActionView(HospitalAdminRequiredMixin, View):
         doctor.status = User.StatusChoices.REJECTED
         doctor.rejection_reason = reason
         doctor.save()
+
+        try:
+            from notifications.services import notify_doctor_rejected
+            notify_doctor_rejected(doctor, reason)
+        except Exception:
+            pass
 
         log_audit_event(
             actor=request.user,

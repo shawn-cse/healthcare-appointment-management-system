@@ -110,6 +110,12 @@ def create_refund_request(
             },
         )
 
+        try:
+            from notifications.services import notify_refund_requested
+            notify_refund_requested(refund_req)
+        except Exception:
+            pass
+
         return refund_req
 
 
@@ -196,6 +202,12 @@ def approve_refund_request(
         },
     )
 
+    try:
+        from notifications.services import notify_refund_approved
+        notify_refund_approved(refund_request)
+    except Exception:
+        pass
+
     return refund_request
 
 
@@ -237,6 +249,12 @@ def reject_refund_request(
             "rejected_by": rejected_by.username,
         },
     )
+
+    try:
+        from notifications.services import notify_refund_rejected
+        notify_refund_rejected(refund_request, reason=refund_request.rejection_reason)
+    except Exception:
+        pass
 
     return refund_request
 
@@ -386,5 +404,11 @@ def process_approved_refund(
                 "processed_by": processed_by.username,
             },
         )
+
+        try:
+            from notifications.services import notify_refund_completed
+            notify_refund_completed(refund_tx)
+        except Exception:
+            pass
 
         return True, refund_request, f"Refund of {refund_request.refunded_amount} BDT completed successfully."

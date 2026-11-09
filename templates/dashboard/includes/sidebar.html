@@ -18,6 +18,9 @@
                 <li {% if '/payments/admin/refunds/' in request.path %}class="active"{% endif %}> 
                     <a href="{% url 'payments:admin-refund-list' %}"><i class="fe fe-refresh-cw"></i> <span>Refund Requests</span></a>
                 </li>
+                <li {% if '/complaints/admin/' in request.path %}class="active"{% endif %}> 
+                    <a href="{% url 'complaints:admin-list' %}"><i class="fe fe-alert-circle"></i> <span>Patient Complaints</span></a>
+                </li>
                 <li {% if request.path == '/admin/specialities/' %}class="active"{% endif %}> 
                     <a href="{% url 'admin-specialities' %}"><i class="fe fe-users"></i> <span>Specialities</span></a>
                 </li>

@@ -3,6 +3,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponseRedirect
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import CreateView, FormView, RedirectView, UpdateView
 from rest_framework.generics import UpdateAPIView
 
@@ -33,6 +34,11 @@ class RegisterDoctorView(CreateView):
         form = self.form_class(data=request.POST)
         if form.is_valid():
             user = form.save()
+            try:
+                from notifications.services import notify_doctor_registration
+                notify_doctor_registration(user)
+            except Exception:
+                pass
             messages.success(
                 request,
                 "Registration submitted successfully! Your account is pending administrative approval by Green Hospital."
@@ -58,6 +64,11 @@ class RegisterPatientView(CreateView):
         form = self.form_class(data=request.POST)
         if form.is_valid():
             user = form.save()
+            try:
+                from notifications.services import notify_doctor_registration
+                notify_doctor_registration(user)
+            except Exception:
+                pass
             messages.success(
                 request,
                 "Registration submitted successfully! Your account is pending administrative approval by Green Hospital."
@@ -84,10 +95,14 @@ class LoginView(FormView):
         return super().dispatch(self.request, *args, **kwargs)
 
     def get_success_url(self):
-        if "next" in self.request.GET and self.request.GET["next"] != "":
-            return self.request.GET["next"]
-        else:
-            return self.success_url
+        next_url = self.request.GET.get("next") or self.request.POST.get("next")
+        if next_url and url_has_allowed_host_and_scheme(
+            url=next_url,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            return next_url
+        return self.success_url
 
     def get_form_class(self):
         return self.form_class

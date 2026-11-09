@@ -20,11 +20,21 @@ class PatientDashboardView(PatientRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        user = self.request.user
+        from payments.models import RefundRequest
+        from complaints.models import Complaint
+
         context["appointments"] = (
             Booking.objects.select_related("doctor", "doctor__profile")
-            .filter(patient=self.request.user)
+            .filter(patient=user)
             .order_by("-appointment_date", "-appointment_time")
         )
+        context["refund_requests"] = RefundRequest.objects.filter(
+            patient=user
+        ).select_related("booking", "doctor").order_by("-created_at")
+        context["complaints"] = Complaint.objects.filter(
+            patient=user
+        ).select_related("doctor").order_by("-created_at")
         return context
 
 

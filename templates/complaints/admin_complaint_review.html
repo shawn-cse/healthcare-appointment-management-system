@@ -1,0 +1,161 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Review Complaint: {{ complaint.reference }} - Green Hospital Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <h3 class="page-title font-weight-bold">Review Complaint: {{ complaint.reference }}</h3>
+            <ul class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'admin-dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'complaints:admin-list' %}">Complaints</a></li>
+                <li class="breadcrumb-item active">{{ complaint.reference }}</li>
+            </ul>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'complaints:admin-list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fe fe-arrow-left"></i> Back to Complaints
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Complaint Information Column -->
+    <div class="col-lg-6 col-12 mb-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white py-3 border-bottom">
+                <h5 class="card-title mb-0 font-weight-bold text-dark">
+                    <i class="fe fe-file-text text-primary mr-1"></i> Complaint Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                    <div>
+                        <span class="text-muted small">Current Status</span>
+                        <h4 class="mb-0 mt-1">
+                            {% if complaint.status == 'submitted' %}
+                                <span class="badge badge-primary px-3 py-1">Submitted</span>
+                            {% elif complaint.status == 'under_review' %}
+                                <span class="badge badge-warning px-3 py-1 text-dark">Under Review</span>
+                            {% elif complaint.status == 'resolved' %}
+                                <span class="badge badge-success px-3 py-1">Resolved</span>
+                            {% elif complaint.status == 'rejected' %}
+                                <span class="badge badge-danger px-3 py-1">Rejected</span>
+                            {% else %}
+                                <span class="badge badge-secondary px-3 py-1">{{ complaint.get_status_display }}</span>
+                            {% endif %}
+                        </h4>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-muted small">Submitted On</span>
+                        <div class="font-weight-bold">{{ complaint.created_at|date:"d M Y, h:i A" }}</div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-sm-4 text-muted font-weight-bold">Patient:</div>
+                    <div class="col-sm-8 font-weight-bold">
+                        {{ complaint.patient.get_full_name }}
+                        <div class="small text-muted font-weight-normal">{{ complaint.patient.email|default:"No email" }} | Phone: {{ complaint.patient.profile.phone|default:"N/A" }}</div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-sm-4 text-muted font-weight-bold">Reported Doctor:</div>
+                    <div class="col-sm-8 font-weight-bold">
+                        Dr. {{ complaint.doctor.get_full_name }}
+                        <div class="small text-muted font-weight-normal">{{ complaint.doctor.profile.specialization|default:"Specialist" }} | Chamber: {{ complaint.doctor.profile.chamber_number|default:"N/A" }}</div>
+                    </div>
+                </div>
+
+                {% if complaint.booking %}
+                <div class="row mb-3">
+                    <div class="col-sm-4 text-muted font-weight-bold">Related Appointment:</div>
+                    <div class="col-sm-8">
+                        <span class="badge badge-info">Serial #{{ complaint.booking.serial_number }}</span>
+                        on {{ complaint.booking.appointment_date|date:"d M Y" }} at {{ complaint.booking.appointment_time|time:"h:i A" }}
+                        <div class="small text-muted">Visit Type: {{ complaint.booking.get_visit_type_display }} | Fee: ৳{{ complaint.booking.fee_amount }}</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="row mb-3">
+                    <div class="col-sm-4 text-muted font-weight-bold">Category:</div>
+                    <div class="col-sm-8">
+                        <span class="badge badge-light border text-dark">{{ complaint.get_category_display }}</span>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-sm-4 text-muted font-weight-bold">Subject:</div>
+                    <div class="col-sm-8 font-weight-bold text-dark">{{ complaint.subject }}</div>
+                </div>
+
+                <div class="row">
+                    <div class="col-sm-4 text-muted font-weight-bold">Patient Description:</div>
+                    <div class="col-sm-8">
+                        <div class="p-3 bg-light rounded text-secondary" style="white-space: pre-wrap;">{{ complaint.description }}</div>
+                    </div>
+                </div>
+
+                {% if complaint.reviewed_by %}
+                <div class="mt-4 pt-3 border-top small text-muted">
+                    Last reviewed by <strong>{{ complaint.reviewed_by.get_full_name }}</strong> on {{ complaint.reviewed_at|date:"d M Y, h:i A" }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Administrative Review & Response Form Column -->
+    <div class="col-lg-6 col-12 mb-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white py-3 border-bottom">
+                <h5 class="card-title mb-0 font-weight-bold text-dark">
+                    <i class="fe fe-check-square text-success mr-1"></i> Administrative Action & Response
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="form-group mb-3">
+                        <label class="font-weight-bold text-dark">Update Complaint Status <span class="text-danger">*</span></label>
+                        {{ form.status }}
+                        <small class="form-text text-muted">Transitioning status automatically dispatches a notification to the patient.</small>
+                        {% if form.status.errors %}
+                            <div class="text-danger small mt-1">{{ form.status.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="font-weight-bold text-dark">Official Response to Patient</label>
+                        {{ form.admin_response }}
+                        <small class="form-text text-muted">This response will be visible to the patient on their dashboard and sent via notification.</small>
+                        {% if form.admin_response.errors %}
+                            <div class="text-danger small mt-1">{{ form.admin_response.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group mb-4">
+                        <label class="font-weight-bold text-dark">Internal Investigation Notes</label>
+                        {{ form.admin_notes }}
+                        <small class="form-text text-muted">Confidential notes for hospital administrators and super admins only (never exposed to patients or doctors).</small>
+                        {% if form.admin_notes.errors %}
+                            <div class="text-danger small mt-1">{{ form.admin_notes.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-success px-4 font-weight-bold">
+                            <i class="fe fe-save mr-1"></i> Save Status & Send Response
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

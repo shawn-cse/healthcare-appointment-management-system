@@ -1,25 +1,35 @@
 {% extends 'includes/patient-sidebar.html' %}
+{% load static %}
 
 {% block page_name1 %}Dashboard{% endblock %}
-{% block page_name2 %}Dashboard{% endblock %}
+{% block page_name2 %}Patient Portal & Bookings{% endblock %}
 
 {% block main %}
-    <div class="card">
+    <div class="card shadow-sm border-0">
         <div class="card-body pt-0">
             <!-- Tab Menu -->
             <nav class="user-tabs mb-4">
                 <ul class="nav nav-tabs nav-tabs-bottom nav-justified">
                     <li class="nav-item">
-                        <a class="nav-link active" href="#pat_appointments" data-toggle="tab">Appointments</a>
+                        <a class="nav-link active font-weight-bold" href="#pat_appointments" data-toggle="tab">
+                            <i class="fas fa-calendar-alt mr-1"></i> Appointments
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#pat_prescriptions" data-toggle="tab">Prescriptions</a>
+                        <a class="nav-link font-weight-bold" href="#pat_refunds" data-toggle="tab">
+                            <i class="fas fa-undo-alt mr-1"></i> Refund Progress
+                            {% if refund_requests %}
+                            <span class="badge badge-warning text-dark ml-1">{{ refund_requests.count }}</span>
+                            {% endif %}
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#pat_medical_records" data-toggle="tab">Medical Records</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#pat_billing" data-toggle="tab">Billing</a>
+                        <a class="nav-link font-weight-bold" href="#pat_complaints" data-toggle="tab">
+                            <i class="fas fa-exclamation-circle mr-1"></i> Complaints
+                            {% if complaints %}
+                            <span class="badge badge-info ml-1">{{ complaints.count }}</span>
+                            {% endif %}
+                        </a>
                     </li>
                 </ul>
             </nav>
@@ -27,101 +37,113 @@
 
             <!-- Tab Content -->
             <div class="tab-content pt-0">
-                <!-- Appointment Tab -->
+                <!-- 1. Appointment Tab -->
                 <div id="pat_appointments" class="tab-pane fade show active">
-                    <div class="card card-table mb-0">
-                        <div class="card-body">
+                    <div class="card card-table mb-0 border-0">
+                        <div class="card-body p-0">
                             <div class="table-responsive">
                                 <table class="table table-hover table-center mb-0">
-                                    <thead>
-                                    <tr>
-                                        <th>Doctor</th>
-                                            <th>Appointment Date</th>
-                                        <th>Booking Date</th>
-                                        <th>Status</th>
-                                            <th>Actions</th>
-                                    </tr>
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th>Serial / Ref</th>
+                                            <th>Doctor</th>
+                                            <th>Appointment Time</th>
+                                            <th>Payment</th>
+                                            <th>Status</th>
+                                            <th class="text-right">Actions</th>
+                                        </tr>
                                     </thead>
                                     <tbody>
                                         {% for appointment in appointments %}
-                                    <tr>
-                                        <td>
-                                            <h2 class="table-avatar">
+                                        <tr>
+                                            <td>
+                                                <span class="badge badge-success font-weight-bold">#{{ appointment.serial_number }}</span>
+                                                <div class="small text-muted">{{ appointment.appointment_reference }}</div>
+                                            </td>
+                                            <td>
+                                                <h2 class="table-avatar">
                                                     <a href="{% url 'doctors:doctor-profile' appointment.doctor.username %}" class="avatar avatar-sm mr-2">
                                                         <img class="avatar-img rounded-circle" src="{{ appointment.doctor.profile.image }}" alt="Doctor Image">
                                                     </a>
                                                     <a href="{% url 'doctors:doctor-profile' appointment.doctor.username %}">
                                                         Dr. {{ appointment.doctor.get_full_name }}
-                                                        {% if appointment.doctor.profile.specialization %}
-                                                            <span>{{ appointment.doctor.profile.specialization }}</span>
-                                                        {% endif %}
+                                                        <span class="d-block small text-muted">{{ appointment.doctor.profile.specialization|default:"Specialist" }}</span>
                                                     </a>
-                                            </h2>
-                                        </td>
+                                                </h2>
+                                            </td>
                                             <td>
-                                                {{ appointment.appointment_date }}
-                                                <span class="d-block text-info">
+                                                {{ appointment.appointment_date|date:"d M Y" }}
+                                                <span class="d-block text-primary font-weight-bold">
                                                     {{ appointment.appointment_time|time:"h:i A" }}
                                                 </span>
+                                                <small class="text-muted">Chamber: {{ appointment.chamber|default:appointment.doctor.profile.chamber_number|default:"Chamber Desk" }}</small>
                                             </td>
-                                            <td>{{ appointment.booking_date|date:"d M Y" }}</td>
                                             <td>
                                                 <span class="badge badge-pill 
-                                                    {% if appointment.status == 'confirmed' %}bg-success-light{% endif %}
-                                                    {% if appointment.status == 'pending' %}bg-warning-light{% endif %}
-                                                    {% if appointment.status == 'cancelled' %}bg-danger-light{% endif %}
-                                                    {% if appointment.status == 'completed' %}bg-info-light{% endif %}">
-                                                    {{ appointment.status|title }}
-                                                </span>
-                                                <span class="badge badge-pill d-block mt-1
                                                     {% if appointment.payment_status == 'paid' %}badge-success
-                                                    {% elif appointment.payment_status == 'refunded' %}badge-info
-                                                    {% elif appointment.payment_status == 'partially_refunded' %}badge-warning
+                                                    {% elif appointment.payment_status == 'refunded' %}badge-danger
+                                                    {% elif appointment.payment_status == 'partially_refunded' %}badge-warning text-dark
                                                     {% else %}badge-secondary{% endif %}">
                                                     ৳{{ appointment.fee_amount }} ({{ appointment.get_payment_status_display }})
                                                 </span>
+                                                <div class="small text-muted mt-1">{{ appointment.get_payment_method_display }}</div>
                                             </td>
                                             <td>
-                                            <div class="table-action">
+                                                <span class="badge badge-pill 
+                                                    {% if appointment.status == 'confirmed' %}badge-success
+                                                    {% elif appointment.status == 'checked_in' %}badge-info
+                                                    {% elif appointment.status == 'pending' %}badge-warning text-dark
+                                                    {% elif appointment.status == 'cancelled' %}badge-danger
+                                                    {% elif appointment.status == 'completed' %}badge-primary
+                                                    {% else %}badge-secondary{% endif %}">
+                                                    {{ appointment.get_status_display }}
+                                                </span>
+                                            </td>
+                                            <td class="text-right">
+                                                <div class="table-action">
                                                     {% if appointment.payment_status == 'unpaid' and appointment.status != 'cancelled' %}
-                                                        <a href="{% url 'payments:checkout-start' appointment.pk %}" class="btn btn-sm bg-success-light" title="Pay Online Now">
+                                                        <a href="{% url 'payments:checkout-start' appointment.pk %}" class="btn btn-sm btn-outline-success mr-1" title="Pay Online Now">
                                                             <i class="fas fa-credit-card"></i> Pay
                                                         </a>
                                                     {% endif %}
                                                     {% if appointment.receipts.exists %}
-                                                        <a href="{% url 'payments:receipt-detail' appointment.receipts.first.receipt_number %}" class="btn btn-sm bg-success-light" title="Official Receipt">
+                                                        <a href="{% url 'payments:receipt-detail' appointment.receipts.first.receipt_number %}" class="btn btn-sm btn-outline-success mr-1" title="Official Receipt">
                                                             <i class="fas fa-receipt"></i> Receipt
                                                         </a>
                                                     {% endif %}
                                                     {% if appointment.status == 'cancelled' and appointment.refund_requests.exists %}
-                                                        <a href="{% url 'payments:refund-detail' appointment.refund_requests.first.refund_reference %}" class="btn btn-sm bg-warning-light" title="Track Refund">
+                                                        <a href="{% url 'payments:refund-detail' appointment.refund_requests.first.refund_reference %}" class="btn btn-sm btn-outline-warning text-dark mr-1" title="Track Refund">
                                                             <i class="fas fa-undo"></i> Refund
                                                         </a>
                                                     {% elif appointment.status == 'cancelled' and appointment.payment_status == 'paid' %}
-                                                        <a href="{% url 'payments:refund-request' appointment.pk %}" class="btn btn-sm bg-warning-light" title="Request Refund">
+                                                        <a href="{% url 'payments:refund-request' appointment.pk %}" class="btn btn-sm btn-outline-warning text-dark mr-1" title="Request Refund">
                                                             <i class="fas fa-undo"></i> Refund
                                                         </a>
                                                     {% endif %}
                                                     {% if appointment.status == 'pending' or appointment.status == 'confirmed' %}
                                                         <form method="post" action="{% url 'patients:appointment-cancel' appointment.pk %}" style="display: inline;">
                                                             {% csrf_token %}
-                                                            <button type="submit" class="btn btn-sm bg-danger-light" onclick="return confirm('Are you sure you want to cancel this appointment?')">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger mr-1" onclick="return confirm('Are you sure you want to cancel this appointment?')">
                                                                 <i class="fas fa-times"></i> Cancel
                                                             </button>
                                                         </form>
                                                     {% endif %}
-                                                    <a href="{% url 'patients:appointment-detail' appointment.pk %}" class="btn btn-sm bg-info-light">
+                                                    <a href="{% url 'patients:appointment-detail' appointment.pk %}" class="btn btn-sm btn-outline-info mr-1">
                                                         <i class="far fa-eye"></i> View
                                                     </a>
-                                                    <a href="{% url 'patients:appointment-print' appointment.pk %}" target="_blank" class="btn btn-sm bg-primary-light">
-                                                    <i class="fas fa-print"></i> Print
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                                    <a href="{% url 'patients:appointment-print' appointment.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                                        <i class="fas fa-print"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="5" class="text-center">No appointments found</td>
+                                            <td colspan="6" class="text-center py-5 text-muted">
+                                                <i class="far fa-calendar-times mb-2 text-secondary" style="font-size: 2.5rem;"></i>
+                                                <h5>No appointments found</h5>
+                                                <a href="{% url 'doctors:list' %}" class="btn btn-success btn-sm mt-2 font-weight-bold">Find a Doctor & Book</a>
+                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -132,16 +154,148 @@
                 </div>
                 <!-- /Appointment Tab -->
 
-                <!-- Other tabs remain unchanged -->
-                <div class="tab-pane fade" id="pat_prescriptions">
-                    <!-- Prescription content -->
+                <!-- 2. Refund Progress Tab -->
+                <div class="tab-pane fade" id="pat_refunds">
+                    <div class="card card-table mb-0 border-0">
+                        <div class="card-body p-0">
+                            {% if refund_requests %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-center mb-0">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th>Refund Ref</th>
+                                            <th>Doctor</th>
+                                            <th>Requested Amount</th>
+                                            <th>Status</th>
+                                            <th>Date</th>
+                                            <th class="text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for ref in refund_requests %}
+                                        <tr>
+                                            <td class="font-weight-bold">
+                                                <a href="{% url 'payments:refund-detail' ref.refund_reference %}" class="text-success">
+                                                    {{ ref.refund_reference }}
+                                                </a>
+                                            </td>
+                                            <td>Dr. {{ ref.doctor.get_full_name }}</td>
+                                            <td class="font-weight-bold text-danger">৳{{ ref.requested_amount }}</td>
+                                            <td>
+                                                {% if ref.status == 'requested' %}
+                                                    <span class="badge badge-primary px-2 py-1">Requested</span>
+                                                {% elif ref.status == 'under_review' %}
+                                                    <span class="badge badge-warning text-dark px-2 py-1">Under Review</span>
+                                                {% elif ref.status == 'approved' %}
+                                                    <span class="badge badge-info px-2 py-1">Approved</span>
+                                                {% elif ref.status == 'succeeded' %}
+                                                    <span class="badge badge-success px-2 py-1">Completed</span>
+                                                {% elif ref.status == 'rejected' %}
+                                                    <span class="badge badge-danger px-2 py-1">Rejected</span>
+                                                {% else %}
+                                                    <span class="badge badge-secondary px-2 py-1">{{ ref.get_status_display }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td><small class="text-muted">{{ ref.created_at|date:"d M Y" }}</small></td>
+                                            <td class="text-right">
+                                                <a href="{% url 'payments:refund-detail' ref.refund_reference %}" class="btn btn-sm btn-outline-info">
+                                                    View Details &raquo;
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-5 text-muted">
+                                <i class="fas fa-undo-alt mb-2 text-secondary" style="font-size: 2.5rem;"></i>
+                                <h5>No refund requests found</h5>
+                                <p class="small mb-0">Refund requests for cancelled appointments will appear here.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-                <div class="tab-pane fade" id="pat_medical_records">
-                    <!-- Medical Records content -->
+                <!-- /Refund Progress Tab -->
+
+                <!-- 3. Complaints Tab -->
+                <div class="tab-pane fade" id="pat_complaints">
+                    <div class="card card-table mb-0 border-0">
+                        <div class="card-body p-0">
+                            <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="font-weight-bold mb-0 text-dark">Patient Complaint History</h6>
+                                    <small class="text-muted">Direct confidential reports to Hospital Administration</small>
+                                </div>
+                                <a href="{% url 'complaints:patient-create' %}" class="btn btn-sm btn-success font-weight-bold">
+                                    <i class="fas fa-plus mr-1"></i> Report an Issue
+                                </a>
+                            </div>
+
+                            {% if complaints %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-center mb-0">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th>Complaint Ref</th>
+                                            <th>Doctor</th>
+                                            <th>Category</th>
+                                            <th>Status</th>
+                                            <th>Date</th>
+                                            <th class="text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for c in complaints %}
+                                        <tr>
+                                            <td class="font-weight-bold">
+                                                <a href="{% url 'complaints:patient-detail' c.pk %}" class="text-success">
+                                                    {{ c.reference }}
+                                                </a>
+                                            </td>
+                                            <td>Dr. {{ c.doctor.get_full_name }}</td>
+                                            <td>
+                                                <span class="badge badge-light border">{{ c.get_category_display }}</span>
+                                            </td>
+                                            <td>
+                                                {% if c.status == 'submitted' %}
+                                                    <span class="badge badge-primary px-2 py-1">Submitted</span>
+                                                {% elif c.status == 'under_review' %}
+                                                    <span class="badge badge-warning text-dark px-2 py-1">Under Review</span>
+                                                {% elif c.status == 'resolved' %}
+                                                    <span class="badge badge-success px-2 py-1">Resolved</span>
+                                                {% elif c.status == 'rejected' %}
+                                                    <span class="badge badge-danger px-2 py-1">Rejected</span>
+                                                {% else %}
+                                                    <span class="badge badge-secondary px-2 py-1">{{ c.get_status_display }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td><small class="text-muted">{{ c.created_at|date:"d M Y" }}</small></td>
+                                            <td class="text-right">
+                                                <a href="{% url 'complaints:patient-detail' c.pk %}" class="btn btn-sm btn-outline-info">
+                                                    Status & Feedback &raquo;
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-5 text-muted">
+                                <i class="far fa-smile text-success mb-2" style="font-size: 2.5rem;"></i>
+                                <h5>No complaints reported</h5>
+                                <p class="small mb-3">If you experience any clinical or service issues, let our administration know.</p>
+                                <a href="{% url 'complaints:patient-create' %}" class="btn btn-outline-success btn-sm font-weight-bold">
+                                    <i class="fas fa-plus mr-1"></i> File a Complaint
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-                <div class="tab-pane fade" id="pat_billing">
-                    <!-- Billing content -->
-                </div>
+                <!-- /Complaints Tab -->
             </div>
             <!-- /Tab Content -->
         </div>

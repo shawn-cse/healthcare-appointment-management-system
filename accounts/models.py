@@ -8,6 +8,7 @@ from django.db.models import Avg
 from accounts.managers import CustomUserManager
 from utils.file_utils import (
     profile_photo_directory_path,
+    validate_image_file,
 )
 
 
@@ -312,7 +313,9 @@ class Profile(models.Model):
         User, on_delete=models.CASCADE, related_name="profile"
     )
     avatar = models.ImageField(
-        default="defaults/user.png", upload_to=profile_photo_directory_path
+        default="defaults/user.png",
+        upload_to=profile_photo_directory_path,
+        validators=[validate_image_file],
     )
     phone = models.CharField(max_length=20, blank=True, null=True)
     dob = models.DateField(blank=True, null=True)

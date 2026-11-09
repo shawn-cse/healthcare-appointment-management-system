@@ -1,6 +1,8 @@
+from datetime import timedelta
 from django import forms
 from django.contrib.auth import authenticate
 from django.contrib.auth.forms import UserCreationForm
+from django.utils import timezone
 
 from .models import User, ReceptionistDoctorAssignment, AuditLog, log_audit_event
 
@@ -101,6 +103,11 @@ class DoctorRegistrationForm(UserCreationForm):
             "password1",
             "password2",
         ]
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get("phone")
+        from utils.validators import validate_bangladesh_phone
+        return validate_bangladesh_phone(phone)
 
     def clean_bmdc_number(self):
         bmdc = self.cleaned_data.get("bmdc_number", "").strip()
@@ -223,11 +230,22 @@ class UserLoginForm(forms.Form):
         password = self.cleaned_data.get("password")
 
         if username and password:
+            existing = User.objects.filter(username=username).first()
+            if existing:
+                recent_failures = AuditLog.objects.filter(
+                    target_user=existing,
+                    action=AuditLog.ActionChoices.LOGIN_FAILED,
+                    created_at__gte=timezone.now() - timedelta(minutes=15),
+                ).count()
+                if recent_failures >= 5:
+                    raise forms.ValidationError(
+                        "Account temporarily locked due to 5 consecutive failed login attempts. Please wait 15 minutes or reset your password."
+                    )
+
             self.user = authenticate(username=username, password=password)
 
             if self.user is None:
                 # Check if username exists to log failed login attempt
-                existing = User.objects.filter(username=username).first()
                 if existing:
                     log_audit_event(
                         actor=None,

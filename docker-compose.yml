@@ -1,0 +1,73 @@
+version: '3.8'
+
+# ==============================================================================
+# Green Hospital Doctor Appointment Management System
+# Production / Staging Multi-Container Orchestration (docker-compose.yml)
+# ==============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: green_hospital_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-green_hospital_db}
+      POSTGRES_USER: ${POSTGRES_USER:-green_hospital_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_postgres_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-green_hospital_user} -d ${POSTGRES_DB:-green_hospital_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - green_net
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: green_hospital_web
+    restart: unless-stopped
+    command: gunicorn --bind 0.0.0.0:8000 --workers 3 --threads 2 --timeout 60 green_hospital.wsgi:application
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-green_hospital_db}
+      - POSTGRES_USER=${POSTGRES_USER:-green_hospital_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_postgres_pass}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - logs_volume:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - green_net
+
+volumes:
+  postgres_data:
+    driver: local
+  static_volume:
+    driver: local
+  media_volume:
+    driver: local
+  logs_volume:
+    driver: local
+
+networks:
+  green_net:
+    driver: bridge
