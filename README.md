@@ -4,7 +4,7 @@
 Doctor Appointment System for Green Hospital is a web-based healthcare management platform designed to streamline patient appointments and doctor consultations. It provides role-based access for administrators, doctors, receptionists, and patients with scheduling, queue tracking, and payment processing. The application is built for reliable hospital operations with high security and data isolation.
 
 ## Technology Stack
-- **Backend:** Python 3.11+, Django 5.0, Django REST Framework
+- **Backend:** Python 3.11+, Django 5.0+, Django REST Framework
 - **Frontend:** HTML5, CSS3, JavaScript, Bootstrap 4, jQuery, HTMX, Chart.js
 - **Database:** SQLite 3 (Default local), PostgreSQL 16 (Production/Docker)
 - **Deployment & Server:** Gunicorn, Nginx, Docker, Docker Compose
@@ -29,12 +29,18 @@ All demo user accounts are pre-configured with the default password `abc123`:
    ```powershell
    cd D:\001_LO\Coding\healthcare_appointment_management_system
    ```
-2. Create and activate a Python virtual environment:
+2. Activate or create the Python virtual environment:
    ```powershell
+   # If .venv does not exist yet, create it:
    python -m venv .venv
+
+   # Allow running scripts in this session (if prompted):
+   Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+
+   # Activate the virtual environment:
    .\.venv\Scripts\Activate.ps1
    ```
-3. Install the required dependencies:
+3. Install the updated dependencies:
    ```powershell
    python -m pip install --upgrade pip
    pip install -r requirements.txt
@@ -87,11 +93,11 @@ All demo user accounts are pre-configured with the default password `abc123`:
    ```powershell
    .\.venv\Scripts\Activate.ps1
    ```
-2. If new packages were added to `requirements.txt`:
+2. If new packages were added or updated:
    ```powershell
    pip install -r requirements.txt
    ```
-3. If models were modified, create and apply database migrations:
+3. If database models were modified, create and apply migrations:
    ```powershell
    python manage.py makemigrations
    python manage.py migrate

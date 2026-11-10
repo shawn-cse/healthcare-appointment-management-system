@@ -25,6 +25,8 @@ FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    HOME="/home/appuser" \
+    PYTHONUSERBASE="/home/appuser/.local" \
     PATH="/home/appuser/.local/bin:${PATH}"
 
 WORKDIR /app
@@ -35,8 +37,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
-# Create unprivileged system user and group
-RUN addgroup --system appgroup && adduser --system --group appuser
+# Create unprivileged system user with valid home directory
+RUN addgroup --system appgroup && \
+    adduser --system --group --home /home/appuser appuser && \
+    mkdir -p /home/appuser && \
+    chown -R appuser:appgroup /home/appuser
 
 # Copy installed python dependencies from builder
 COPY --from=builder --chown=appuser:appgroup /root/.local /home/appuser/.local
@@ -44,9 +49,9 @@ COPY --from=builder --chown=appuser:appgroup /root/.local /home/appuser/.local
 # Copy application source code
 COPY --chown=appuser:appgroup . .
 
-# Copy entrypoint script and set executable permissions
+# Copy entrypoint script, strip CRLF endings, and set executable permissions
 COPY --chown=appuser:appgroup entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Ensure storage directories exist with correct permissions
 RUN mkdir -p /app/staticfiles /app/media /app/logs && \
@@ -57,7 +62,7 @@ USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
+    CMD curl -f -L http://localhost:8000/ || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--threads", "2", "--timeout", "60", "green_hospital.wsgi:application"]

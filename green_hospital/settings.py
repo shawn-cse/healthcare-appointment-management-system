@@ -4,6 +4,23 @@ from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Automatically read .env file if present
+_env_path = BASE_DIR / ".env"
+if _env_path.is_file():
+    try:
+        with open(_env_path, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if not _line or _line.startswith("#") or "=" not in _line:
+                    continue
+                _k, _v = _line.split("=", 1)
+                _k = _k.strip()
+                _v = _v.strip().strip("'\"")
+                if _k not in os.environ:
+                    os.environ[_k] = _v
+    except Exception:
+        pass
+
 # ==============================================================================
 # Security & Environment Settings
 # ==============================================================================
@@ -110,14 +127,17 @@ if DATABASE_URL:
                 "NAME": BASE_DIR / "db.sqlite3",
             }
         }
-elif os.getenv("POSTGRES_DB"):
+elif (
+    os.getenv("USE_POSTGRES", "").lower() in ("true", "1", "yes")
+    or os.getenv("POSTGRES_HOST") == "db"
+):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("POSTGRES_DB"),
-            "USER": os.getenv("POSTGRES_USER", "postgres"),
-            "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
-            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
+            "NAME": os.getenv("POSTGRES_DB", "green_hospital_db"),
+            "USER": os.getenv("POSTGRES_USER", "green_hospital_user"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "secure_postgres_pass"),
+            "HOST": os.getenv("POSTGRES_HOST", "db"),
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
         }
     }

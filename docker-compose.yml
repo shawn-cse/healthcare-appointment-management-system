@@ -1,5 +1,3 @@
-version: '3.8'
-
 # ==============================================================================
 # Green Hospital Doctor Appointment Management System
 # Production / Staging Multi-Container Orchestration (docker-compose.yml)
@@ -32,7 +30,8 @@ services:
     restart: unless-stopped
     command: gunicorn --bind 0.0.0.0:8000 --workers 3 --threads 2 --timeout 60 green_hospital.wsgi:application
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
@@ -40,6 +39,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-green_hospital_user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_postgres_pass}
       - PYTHONUNBUFFERED=1
+      - USE_POSTGRES=True
+      - ALLOWED_HOSTS=localhost,127.0.0.1,web,0.0.0.0
     ports:
       - "8000:8000"
     depends_on:
@@ -50,11 +51,11 @@ services:
       - media_volume:/app/media
       - logs_volume:/app/logs
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ["CMD", "curl", "-f", "-L", "http://localhost:8000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - green_net
 
