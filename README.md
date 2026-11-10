@@ -82,6 +82,44 @@ All demo user accounts are pre-configured with the default password `abc123`:
    deactivate
    ```
 
+### How to Rebuild After Code Changes
+1. Activate the virtual environment (if not already activated):
+   ```powershell
+   .\.venv\Scripts\Activate.ps1
+   ```
+2. If new packages were added to `requirements.txt`:
+   ```powershell
+   pip install -r requirements.txt
+   ```
+3. If models were modified, create and apply database migrations:
+   ```powershell
+   python manage.py makemigrations
+   python manage.py migrate
+   ```
+4. Start the server:
+   ```powershell
+   python manage.py runserver
+   ```
+
+### How to Reset and Fresh Start (Wipe and Re-seed Database)
+1. Stop the running server (`Ctrl + C`).
+2. Delete the existing SQLite database:
+   ```powershell
+   Remove-Item db.sqlite3 -Force
+   ```
+3. Run migrations to recreate clean database tables:
+   ```powershell
+   python manage.py migrate
+   ```
+4. Re-seed all fresh demo accounts and departments:
+   ```powershell
+   python manage.py seed_demo_data
+   ```
+5. Start the server:
+   ```powershell
+   python manage.py runserver
+   ```
+
 ---
 
 ## With Docker — Windows
@@ -122,4 +160,28 @@ All demo user accounts are pre-configured with the default password `abc123`:
 2. Stop the running containers:
    ```powershell
    docker compose down
+   ```
+
+### How to Rebuild After Code Changes
+1. Rebuild and restart the Docker containers:
+   ```powershell
+   docker compose up -d --build
+   ```
+2. Apply any new database migrations inside the container:
+   ```powershell
+   docker compose exec web python manage.py migrate
+   ```
+
+### How to Reset and Fresh Start (Wipe and Re-seed Database)
+1. Stop containers and completely wipe all persistent database volumes:
+   ```powershell
+   docker compose down -v
+   ```
+2. Rebuild and start clean containers:
+   ```powershell
+   docker compose up -d --build
+   ```
+3. Seed the fresh demo data into the clean database:
+   ```powershell
+   docker compose exec web python manage.py seed_demo_data
    ```
