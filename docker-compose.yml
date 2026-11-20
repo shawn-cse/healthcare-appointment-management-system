@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: Green_Hospital_DB
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-green_hospital}
+      POSTGRES_USER: ${DATABASE_USER:-green_user}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-change_this_database_password}
+    volumes:
+      - green_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  Green_Hospital:
+    build: .
+    container_name: Green_Hospital
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - green_media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
+  scheduler:
+    build: .
+    container_name: Green_Hospital_Scheduler
+    restart: unless-stopped
+    env_file: .env
+    command: ["python", "manage.py", "run_maintenance"]
+    depends_on:
+      Green_Hospital:
+        condition: service_healthy
+volumes:
+  green_postgres:
+  green_media:

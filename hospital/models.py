@@ -1,0 +1,276 @@
+import uuid
+from decimal import Decimal
+from datetime import timedelta
+from django.contrib.auth.models import AbstractUser, UserManager
+from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
+from django.db import models
+from django.db.models.functions import Lower
+from django.utils import timezone
+
+money_min = MinValueValidator(Decimal('0'))
+phone_validator = RegexValidator(r'^\+?[0-9]{10,15}$', 'Enter a valid phone number (10–15 digits).')
+
+
+class HospitalUserManager(UserManager):
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields['role'] = 'admin'
+        return super().create_superuser(username, email, password, **extra_fields)
+
+
+class User(AbstractUser):
+    class Roles(models.TextChoices):
+        PATIENT = 'patient', 'Patient'
+        DOCTOR = 'doctor', 'Doctor'
+        RECEPTIONIST = 'receptionist', 'Receptionist'
+        ADMIN = 'admin', 'Administrator'
+    objects = HospitalUserManager()
+    role = models.CharField(max_length=16, choices=Roles.choices, default=Roles.PATIENT, db_index=True)
+    phone = models.CharField(max_length=16, unique=True, null=True, blank=True, validators=[phone_validator])
+    dob = models.DateField('date of birth', null=True, blank=True)
+    nid = models.CharField(max_length=30, blank=True)
+    address = models.TextField(blank=True)
+    avatar = models.ImageField(upload_to='profiles/', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(Lower('email'),
+                      condition=~models.Q(email=''), name='unique_user_email_case_insensitive')]
+
+    def __str__(self):
+        return self.get_full_name() or self.username
+
+    @property
+    def display_name(self):
+        return self.get_full_name() or self.username
+
+
+class Department(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(unique=True)
+    description = models.CharField(max_length=255, blank=True)
+    icon = models.CharField(max_length=32, default='heart-pulse')
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class HospitalPolicy(models.Model):
+    """Global defaults for NEW doctors. Existing doctor rules remain explicit."""
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    default_notice_hours = models.PositiveIntegerField(default=24)
+    default_advance_days = models.PositiveIntegerField(default=60)
+    default_payment_hours = models.PositiveIntegerField(default=4)
+    default_cancel_mode = models.CharField(max_length=10, choices=[('percent','Percentage'), ('fixed','Fixed amount')], default='percent')
+    default_cancel_value = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal('10.00'), validators=[money_min])
+    default_hospital_mode = models.CharField(max_length=10, choices=[('percent','Percentage'), ('fixed','Fixed amount')], default='percent')
+    default_hospital_value = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal('10.00'), validators=[money_min])
+    updated_at = models.DateTimeField(auto_now=True)
+    @classmethod
+    def current(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+class DoctorProfile(models.Model):
+    class Policy(models.TextChoices):
+        PAY_ON_DAY = 'on_day', 'Pay on appointment day'
+        PAY_WITHIN = 'within', 'Pay within deadline'
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='doctor_profile')
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, related_name='doctors')
+    gender = models.CharField(max_length=10, choices=[('male','Male'), ('female','Female'), ('other','Other')], default='male')
+    qualifications = models.CharField(max_length=180, blank=True)
+    designation = models.CharField(max_length=150, default='Consultant')
+    registration_number = models.CharField(max_length=100, blank=True)
+    experience_years = models.PositiveSmallIntegerField(default=0)
+    biography = models.TextField(blank=True)
+    initial_fee = models.DecimalField(max_digits=9, decimal_places=2, default=1000, validators=[money_min])
+    followup_fee = models.DecimalField(max_digits=9, decimal_places=2, default=800, validators=[money_min])
+    followup_within_days = models.PositiveIntegerField(default=30, validators=[MinValueValidator(1)])
+    report_fee = models.DecimalField(max_digits=9, decimal_places=2, default=500, validators=[money_min])
+    hospital_share_mode = models.CharField(max_length=10, choices=[('percent','Percentage'), ('fixed','Fixed amount')], default='percent')
+    hospital_share_value = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal('10.00'), validators=[money_min])
+    booking_notice_hours = models.PositiveIntegerField(default=24)
+    booking_advance_days = models.PositiveIntegerField(default=60, validators=[MinValueValidator(1)])
+    payment_policy = models.CharField(max_length=10, choices=Policy.choices, default=Policy.PAY_ON_DAY)
+    payment_deadline_hours = models.PositiveIntegerField(default=4, validators=[MinValueValidator(1)])
+    cancel_fee_mode = models.CharField(max_length=10, choices=[('percent','Percentage'), ('fixed','Fixed amount')], default='percent')
+    cancel_fee_value = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal('10.00'), validators=[money_min])
+    receptionists = models.ManyToManyField(User, blank=True, related_name='assigned_doctors')
+    is_available = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['user__first_name', 'user__last_name']
+
+    def __str__(self):
+        return f'Dr. {self.user.display_name}'
+
+    def hospital_cut(self, fee):
+        fee = Decimal(fee)
+        if self.hospital_share_mode == 'fixed':
+            return min(fee, self.hospital_share_value)
+        return min(fee, (fee * self.hospital_share_value / 100).quantize(Decimal('0.01')))
+
+
+class WeeklyAvailability(models.Model):
+    doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name='weekly')
+    weekday = models.PositiveSmallIntegerField(choices=[(i, d) for i, d in enumerate(['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'])])
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    duration_minutes = models.PositiveSmallIntegerField(default=30, validators=[MinValueValidator(5), MaxValueValidator(240)])
+    capacity = models.PositiveSmallIntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(100)])
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['weekday', 'start_time']
+
+    def __str__(self):
+        return f'{self.doctor} · {self.get_weekday_display()} · {self.start_time}–{self.end_time}'
+
+
+class AppointmentSlot(models.Model):
+    doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name='slots')
+    template = models.ForeignKey(WeeklyAvailability, on_delete=models.SET_NULL, null=True, blank=True, related_name='slots')
+    date = models.DateField(db_index=True)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    capacity = models.PositiveSmallIntegerField(default=1, validators=[MinValueValidator(1)])
+    is_open = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['date', 'start_time']
+        constraints = [models.UniqueConstraint(fields=['doctor','date','start_time'], name='unique_doctor_slot')]
+
+    @property
+    def reserved(self):
+        return self.appointments.exclude(status__in=['cancelled','expired']).count()
+
+    @property
+    def remaining(self):
+        return max(0, self.capacity - self.reserved)
+
+    def __str__(self):
+        return f'{self.doctor} · {self.date} {self.start_time:%H:%M}'
+
+
+class Appointment(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Awaiting payment'
+        CONFIRMED = 'confirmed', 'Confirmed'
+        COMPLETED = 'completed', 'Completed'
+        CANCELLED = 'cancelled', 'Cancelled'
+        EXPIRED = 'expired', 'Payment deadline passed'
+        NO_SHOW = 'no_show', 'Did not attend'
+    class Visit(models.TextChoices):
+        FIRST = 'first', 'New consultation'
+        FOLLOWUP = 'followup', 'Follow-up consultation'
+        REPORT = 'report', 'Report review'
+    reference = models.CharField(max_length=20, unique=True, editable=False, db_index=True)
+    slot = models.ForeignKey(AppointmentSlot, on_delete=models.PROTECT, related_name='appointments')
+    patient = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name='appointments')
+    guest_name = models.CharField(max_length=150)
+    guest_phone = models.CharField(max_length=16, validators=[phone_validator], db_index=True)
+    guest_dob = models.DateField(null=True, blank=True)
+    visit_type = models.CharField(max_length=10, choices=Visit.choices, default=Visit.FIRST)
+    status = models.CharField(max_length=14, choices=Status.choices, default=Status.CONFIRMED, db_index=True)
+    payment_status = models.CharField(max_length=20, choices=[('unpaid','Unpaid'),('paid','Paid'),('refund_pending','Refund pending'),('partially_refunded','Partly refunded'),('refunded','Refunded')], default='unpaid', db_index=True)
+    payment_method = models.CharField(max_length=10, choices=[('cash','Cash / at reception'),('online','Online')], default='cash')
+    source = models.CharField(max_length=10, choices=[('web','Patient portal'),('phone','Telephone'),('desk','Reception desk')], default='web')
+    fee = models.DecimalField(max_digits=9, decimal_places=2, validators=[money_min])
+    cancel_mode_snapshot = models.CharField(max_length=10, choices=[('percent','Percentage'),('fixed','Fixed amount')], default='percent')
+    cancel_value_snapshot = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal('0.00'), validators=[money_min])
+    hospital_cut = models.DecimalField(max_digits=9, decimal_places=2, default=0)
+    doctor_cut = models.DecimalField(max_digits=9, decimal_places=2, default=0)
+    payment_due_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    cancellation_reason = models.TextField(blank=True)
+    cancelled_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='cancelled_appointments')
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='booked_appointments')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.reference:
+            self.reference = 'GH-' + uuid.uuid4().hex[:12].upper()
+        super().save(*args, **kwargs)
+
+    @property
+    def doctor(self):
+        return self.slot.doctor
+
+    @property
+    def patient_name(self):
+        return self.patient.display_name if self.patient_id else self.guest_name
+
+    def __str__(self):
+        return self.reference
+
+
+class PaymentTransaction(models.Model):
+    appointment = models.ForeignKey(Appointment, on_delete=models.PROTECT, related_name='payments')
+    kind = models.CharField(max_length=8, choices=[('charge','Charge'),('refund','Refund')], default='charge')
+    method = models.CharField(max_length=12, choices=[('cash','Cash'),('online','SSLCOMMERZ'),('bank','Bank transfer')])
+    status = models.CharField(max_length=14, choices=[('initiated','Initiated'),('verified','Verified'),('failed','Failed'),('processing','Processing'),('refunded','Refunded')], default='initiated')
+    amount = models.DecimalField(max_digits=9, decimal_places=2, validators=[money_min])
+    external_id = models.CharField(max_length=40, unique=True, null=True, blank=True)
+    validation_id = models.CharField(max_length=90, blank=True)
+    bank_transaction_id = models.CharField(max_length=90, blank=True)
+    refund_reference = models.CharField(max_length=90, blank=True)
+    handled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    note = models.CharField(max_length=255, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class RefundRequest(models.Model):
+    appointment = models.OneToOneField(Appointment, on_delete=models.PROTECT, related_name='refund')
+    amount = models.DecimalField(max_digits=9, decimal_places=2, validators=[money_min])
+    mode = models.CharField(max_length=10, choices=[('cash','Cash'),('online','Online gateway')])
+    status = models.CharField(max_length=12, choices=[('pending','Pending approval'),('approved','Approved'),('processing','Processing'),('completed','Completed'),('rejected','Rejected')], default='pending')
+    requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='requested_refunds')
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_refunds')
+    reason = models.TextField(blank=True)
+    internal_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f'{self.appointment.reference}: {self.amount}'
+
+
+class Complaint(models.Model):
+    patient = models.ForeignKey(User, on_delete=models.PROTECT, related_name='complaints')
+    appointment = models.ForeignKey(Appointment, on_delete=models.SET_NULL, null=True, blank=True)
+    subject = models.CharField(max_length=150)
+    category = models.CharField(max_length=15, choices=[('appointment','Appointment'),('billing','Billing'),('service','Service'),('other','Other')], default='service')
+    message = models.TextField()
+    status = models.CharField(max_length=14, choices=[('submitted','Submitted'),('reviewing','Under review'),('in_progress','In progress'),('resolved','Resolved')], default='submitted')
+    response = models.TextField(blank=True)
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='handled_complaints')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class AuditEvent(models.Model):
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=100)
+    target = models.CharField(max_length=160)
+    detail = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
