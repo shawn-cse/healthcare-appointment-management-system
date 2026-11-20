@@ -42,7 +42,7 @@ docker compose up --build
 - 🏷️ **Docker Container:** `Green_Hospital` | **Port:** `8000`
 - 👤 *(Optional)* **Create Admin Superuser (in a new terminal):**
   ```powershell
-  docker compose exec Green_Hospital python manage.py createsuperuser
+  docker compose exec web python manage.py createsuperuser
   ```
 
 #### 🛑 How to Close / Stop the Project:

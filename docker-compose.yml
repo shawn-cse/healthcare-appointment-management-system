@@ -15,8 +15,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 15
-  Green_Hospital:
+  web:
     build: .
+    image: green_hospital_web:latest
     container_name: Green_Hospital
     restart: unless-stopped
     env_file: .env
@@ -35,12 +36,13 @@ services:
       retries: 5
   scheduler:
     build: .
+    image: green_hospital_scheduler:latest
     container_name: Green_Hospital_Scheduler
     restart: unless-stopped
     env_file: .env
     command: ["python", "manage.py", "run_maintenance"]
     depends_on:
-      Green_Hospital:
+      web:
         condition: service_healthy
 volumes:
   green_postgres:
