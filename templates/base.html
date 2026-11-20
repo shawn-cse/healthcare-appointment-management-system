@@ -1,13 +1,16 @@
 {% load static %}<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#104d43">
-  <meta name="description" content="Green Hospital appointment scheduling, patient services and clinical operations in Dhaka.">
-  <title>{% block title %}Green Hospital{% endblock %} | Green Hospital</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d4c3f">
+  <meta name="description" content="Green Hospital - Leading multi-specialty healthcare, doctor consultation and diagnostic center in Dhaka, Bangladesh.">
+  <title>{% block title %}Green Hospital{% endblock %} | Green Hospital Dhaka</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link href="{% static 'css/app.css' %}" rel="stylesheet">
+  <link href="{% static 'css/calendar.css' %}" rel="stylesheet">
 </head>
 <body class="{% if user.is_authenticated %}app-layout{% else %}public-layout{% endif %}">
 <svg xmlns="http://www.w3.org/2000/svg" class="svg-sprite" aria-hidden="true">
@@ -34,70 +37,270 @@
 <symbol id="ic-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8L3 5Z"/></symbol>
 <symbol id="ic-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 18v3h16v-3"/></symbol>
 <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="ic-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
 </svg>
+
 {% if user.is_authenticated %}
+<!-- Authenticated Application Layout with Sidebar -->
 <div class="sidebar-scrim" data-close-nav></div>
 <aside class="sidebar" id="sidebar">
-  <a class="brand sidebar-brand" href="{% url 'dashboard' %}"><span class="brand-mark"><svg class="icon"><use href="#ic-activity"/></svg></span><span><strong>Green Hospital</strong><small>Clinical management</small></span></a>
+  <a class="brand sidebar-brand" href="{% url 'dashboard' %}">
+    <span class="brand-mark"><svg class="icon"><use href="#ic-activity"/></svg></span>
+    <span><strong>Green Hospital</strong><small>Clinical Management</small></span>
+  </a>
   <div class="sidebar-scroll">
     <div class="nav-eyebrow">WORKSPACE</div>
     <nav class="nav-list" aria-label="Main navigation">
       <a href="{% url 'dashboard' %}" data-nav="dashboard"><svg class="icon"><use href="#ic-grid"/></svg> Overview</a>
+      <a href="{% url 'doctor_directory' %}" data-nav="doctor_directory"><svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors</a>
+      <a href="{% url 'public_departments' %}" data-nav="public_departments"><svg class="icon"><use href="#ic-building"/></svg> Departments</a>
       {% if user.role == 'patient' %}
-        <a href="{% url 'doctor_directory' %}" data-nav="doctor_directory"><svg class="icon"><use href="#ic-stethoscope"/></svg> Find a doctor</a>
-        <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> My appointments</a>
-        <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Support & concerns</a>
+        <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> My Appointments</a>
+        <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Support & Concerns</a>
       {% else %}
         <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> Appointments</a>
-        <a href="{% url 'staff_book' %}" data-nav="staff_book"><svg class="icon"><use href="#ic-plus"/></svg> Register booking</a>
-        <a href="{% url 'schedule' %}" data-nav="schedule"><svg class="icon"><use href="#ic-clock"/></svg> Schedules & slots</a>
+        <a href="{% url 'staff_book' %}" data-nav="staff_book"><svg class="icon"><use href="#ic-plus"/></svg> Register Booking</a>
+        <a href="{% url 'schedule' %}" data-nav="schedule"><svg class="icon"><use href="#ic-clock"/></svg> Schedules & Slots</a>
         {% if user.role == 'doctor' %}
-          <a href="{% url 'doctor_rules' user.doctor_profile.pk %}" data-nav="doctor_rules"><svg class="icon"><use href="#ic-settings"/></svg> Fees & booking rules</a>
+          <a href="{% url 'doctor_rules' user.doctor_profile.pk %}" data-nav="doctor_rules"><svg class="icon"><use href="#ic-settings"/></svg> Fees & Booking Rules</a>
         {% endif %}
         {% if user.role == 'admin' or user.role == 'receptionist' %}
-          <a href="{% url 'refunds' %}" data-nav="refunds"><svg class="icon"><use href="#ic-wallet"/></svg> Refund management</a>
+          <a href="{% url 'refunds' %}" data-nav="refunds"><svg class="icon"><use href="#ic-wallet"/></svg> Refund Management</a>
         {% endif %}
-        <a href="{% url 'complaint_queue' %}" data-nav="complaint_queue"><svg class="icon"><use href="#ic-help"/></svg> Patient concerns</a>
+        <a href="{% url 'complaint_queue' %}" data-nav="complaint_queue"><svg class="icon"><use href="#ic-help"/></svg> Patient Concerns</a>
         {% if user.role == 'admin' or user.role == 'doctor' %}
-          <a href="{% url 'reports' %}" data-nav="reports"><svg class="icon"><use href="#ic-chart"/></svg> Reports & analytics</a>
+          <a href="{% url 'reports' %}" data-nav="reports"><svg class="icon"><use href="#ic-chart"/></svg> Reports & Analytics</a>
         {% endif %}
         {% if user.role == 'admin' %}
           <div class="nav-eyebrow nav-section">ADMINISTRATION</div>
-          <a href="{% url 'staff_list' %}" data-nav="staff_list"><svg class="icon"><use href="#ic-users"/></svg> Staff & doctors</a>
-          <a href="{% url 'departments' %}" data-nav="departments"><svg class="icon"><use href="#ic-building"/></svg> Departments</a>
-          <a href="{% url 'policy' %}" data-nav="policy"><svg class="icon"><use href="#ic-settings"/></svg> Hospital policies</a>
-          <a href="{% url 'audit_log' %}" data-nav="audit_log"><svg class="icon"><use href="#ic-clipboard"/></svg> Activity log</a>
-          <a href="{% url 'admin:index' %}" data-nav="admin"><svg class="icon"><use href="#ic-settings"/></svg> Advanced management</a>
+          <a href="{% url 'staff_list' %}" data-nav="staff_list"><svg class="icon"><use href="#ic-users"/></svg> Staff & Doctors</a>
+          <a href="{% url 'chamber_list' %}" data-nav="chamber_list"><svg class="icon"><use href="#ic-building"/></svg> Chambers & Rooms</a>
+          <a href="{% url 'departments' %}" data-nav="departments"><svg class="icon"><use href="#ic-building"/></svg> Manage Departments</a>
+          <a href="{% url 'policy' %}" data-nav="policy"><svg class="icon"><use href="#ic-settings"/></svg> Hospital Policies</a>
+          <a href="{% url 'audit_log' %}" data-nav="audit_log"><svg class="icon"><use href="#ic-clipboard"/></svg> Activity Log</a>
+          <a href="{% url 'admin:index' %}" data-nav="admin"><svg class="icon"><use href="#ic-settings"/></svg> Advanced Admin</a>
         {% endif %}
       {% endif %}
     </nav>
     <div class="nav-eyebrow nav-section">ACCOUNT</div>
     <nav class="nav-list" aria-label="Account navigation">
-      <a href="{% url 'profile' %}" data-nav="profile"><svg class="icon"><use href="#ic-user"/></svg> My profile</a>
-      <a href="{% url 'password_change' %}" data-nav="password_change"><svg class="icon"><use href="#ic-settings"/></svg> Security</a>
+      <a href="{% url 'profile' %}" data-nav="profile"><svg class="icon"><use href="#ic-user"/></svg> My Profile</a>
+      <a href="{% url 'password_change' %}" data-nav="password_change"><svg class="icon"><use href="#ic-settings"/></svg> Password & Security</a>
     </nav>
   </div>
   <div class="sidebar-footer">
-    <div class="contact-line"><svg class="icon"><use href="#ic-building"/></svg><span>Dhaka, Bangladesh<br><b>{{ hospital_phone }}</b></span></div>
-    <form action="{% url 'logout' %}" method="post">{% csrf_token %}<button class="sidebar-logout" type="submit"><svg class="icon"><use href="#ic-log-out"/></svg> Sign out</button></form>
+    <div class="contact-line">
+      <svg class="icon"><use href="#ic-building"/></svg>
+      <span>Section 10, Mirpur, Dhaka-1216<br><b>24/7 Hotline: +88096100016211, +16211</b></span>
+    </div>
+    <form action="{% url 'logout' %}" method="post">
+      {% csrf_token %}
+      <button class="sidebar-logout" type="submit"><svg class="icon"><use href="#ic-log-out"/></svg> Sign out</button>
+    </form>
   </div>
 </aside>
 <div class="app-shell">
   <header class="topbar">
-    <div class="topbar-left"><button type="button" class="icon-button mobile-toggle" data-toggle-nav aria-label="Open navigation"><svg class="icon"><use href="#ic-menu"/></svg></button><div class="topbar-breadcrumb">Green Hospital <span>/</span> {% if user.role == 'admin' %}Administration{% elif user.role == 'doctor' %}Doctor workspace{% elif user.role == 'receptionist' %}Front desk{% else %}Patient portal{% endif %}</div></div>
-    <div class="topbar-right"><span class="today-chip"><svg class="icon"><use href="#ic-clock"/></svg>{% now "D, d M Y" %}</span><a href="{% url 'profile' %}" class="profile-chip"><span class="avatar avatar-small">{% if user.avatar %}<img src="{{ user.avatar.url }}" alt="Profile photo">{% else %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% endif %}</span><span class="profile-chip-text"><b>{{ user.display_name }}</b><small>{{ user.get_role_display }}</small></span></a></div>
+    <div class="topbar-left">
+      <button type="button" class="icon-button mobile-toggle" data-toggle-nav aria-label="Open navigation">
+        <svg class="icon"><use href="#ic-menu"/></svg>
+      </button>
+      <div class="topbar-breadcrumb">
+        Green Hospital <span>/</span> {% if user.role == 'admin' %}Administration{% elif user.role == 'doctor' %}Doctor Workspace{% elif user.role == 'receptionist' %}Front Desk{% else %}Patient Portal{% endif %}
+      </div>
+    </div>
+    <div class="topbar-right">
+      <a href="{% url 'doctor_directory' %}" class="button button-outline button-sm">
+        <svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors
+      </a>
+      <span class="today-chip"><svg class="icon"><use href="#ic-clock"/></svg>{% now "D, d M Y" %}</span>
+      <a href="{% url 'profile' %}" class="profile-chip">
+        <span class="avatar avatar-small">
+          {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="Profile photo">{% else %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% endif %}
+        </span>
+        <span class="profile-chip-text">
+          <b>{{ user.display_name }}</b>
+          <small>{{ user.get_role_display }}</small>
+        </span>
+      </a>
+    </div>
   </header>
   <main class="main-content" id="main-content">
-    {% if messages %}<div class="flash-stack" aria-live="polite">{% for message in messages %}<div class="flash flash-{{ message.tags|default:'info' }}"><svg class="icon"><use href="#ic-alert"/></svg><span>{{ message }}</span><button type="button" aria-label="Dismiss" data-dismiss><svg class="icon"><use href="#ic-x"/></svg></button></div>{% endfor %}</div>{% endif %}
-    {% block content %}{% endblock %}
-    <footer class="app-footer"><span>© {% now 'Y' %} Green Hospital</span><span>Patient care, thoughtfully organized.</span></footer>
+    {% if messages %}
+    <div class="flash-stack" aria-live="polite">
+      {% for message in messages %}
+      <div class="flash flash-{{ message.tags|default:'info' }}">
+        <svg class="icon"><use href="#ic-alert"/></svg>
+        <span>{{ message }}</span>
+        <button type="button" aria-label="Dismiss" data-dismiss><svg class="icon"><use href="#ic-x"/></svg></button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+{% else %}
+<!-- Public Header with Top Announcement Bar -->
+<div class="header-top-bar">
+  <div class="container header-top-inner">
+    <div class="top-info-item">
+      <svg class="icon"><use href="#ic-phone"/></svg>
+      <span>24/7 Hotline: <a href="tel:+88096100016211" style="color:inherit;text-decoration:none;"><b>+88096100016211</b></a>, <a href="tel:16211" style="color:inherit;text-decoration:none;"><b>+16211</b></a></span>
+    </div>
+    <div class="top-info-item hidden-mobile">
+      <svg class="icon"><use href="#ic-building"/></svg>
+      <span>Plot 1, Section 10, Mirpur, Dhaka-1216</span>
+    </div>
+    <div class="top-info-item hidden-mobile">
+      <svg class="icon"><use href="#ic-clock"/></svg>
+      <span>OPD: 8:00 AM – 10:00 PM | Emergency 24/7</span>
+    </div>
+  </div>
+</div>
+
+<header class="public-header">
+  <div class="container public-header-inner">
+    <a class="brand" href="{% url 'home' %}">
+      <span class="brand-mark"><svg class="icon"><use href="#ic-activity"/></svg></span>
+      <span><strong>Green Hospital</strong><small>Mirpur, Dhaka, Bangladesh</small></span>
+    </a>
+    
+    <nav class="public-links" id="public-navigation">
+      <a href="{% url 'home' %}">Home</a>
+      <a href="{% url 'doctor_directory' %}">Find Doctors</a>
+      <a href="{% url 'public_departments' %}">Departments</a>
+      <a href="{% url 'home' %}#care">Clinical Care</a>
+      <a href="tel:+88096100016211" class="hotline-nav-link">
+        <svg class="icon"><use href="#ic-phone"/></svg> +88096100016211
+      </a>
+    </nav>
+
+    <div class="public-header-actions">
+      <a class="button button-outline button-sm hidden-mobile" href="{% url 'doctor_directory' %}">
+        <svg class="icon"><use href="#ic-calendar"/></svg> Make Appointment
+      </a>
+      <a class="button button-primary button-sm" href="{% url 'login_choice' %}">
+        Sign In <svg class="icon"><use href="#ic-arrow"/></svg>
+      </a>
+      <button type="button" class="icon-button mobile-toggle public-mobile-toggle" data-toggle-public-nav aria-label="Toggle navigation">
+        <svg class="icon"><use href="#ic-menu"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+{% if messages %}
+<div class="container public-flashes flash-stack" aria-live="polite">
+  {% for message in messages %}
+  <div class="flash flash-{{ message.tags|default:'info' }}">
+    <span>{{ message }}</span>
+    <button data-dismiss type="button">✕</button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<main class="public-main-content">
+{% endif %}
+
+    {% block content %}
+      {% block public_content %}{% endblock %}
+    {% endblock %}
+
+{% if user.is_authenticated %}
+    <footer class="app-footer">
+      <span>© {% now 'Y' %} Green Hospital, Mirpur, Dhaka. All rights reserved.</span>
+      <span>24/7 Hotline: +88096100016211, +16211 · Chamber: Section 10, Mirpur, Dhaka</span>
+    </footer>
   </main>
 </div>
 {% else %}
-<header class="public-header"><div class="container public-header-inner"><a class="brand" href="{% url 'home' %}"><span class="brand-mark"><svg class="icon"><use href="#ic-activity"/></svg></span><span><strong>Green Hospital</strong><small>Dhaka, Bangladesh</small></span></a><nav class="public-links"><a href="{% url 'home' %}#care">Our care</a><a href="{% url 'home' %}#specialists">Specialists</a><a href="tel:{{ hospital_phone }}">{{ hospital_phone }}</a></nav><a class="button button-primary button-sm" href="{% url 'login_choice' %}">Sign in <svg class="icon"><use href="#ic-arrow"/></svg></a></div></header>
-{% if messages %}<div class="container public-flashes flash-stack" aria-live="polite">{% for message in messages %}<div class="flash flash-{{ message.tags|default:'info' }}"><span>{{ message }}</span><button data-dismiss type="button">✕</button></div>{% endfor %}</div>{% endif %}
-<main>{% block public_content %}{% endblock %}</main>
-<footer class="public-footer"><div class="container footer-inner"><div class="brand"><span class="brand-mark"><svg class="icon"><use href="#ic-activity"/></svg></span><span><strong>Green Hospital</strong><small>Care with clarity.</small></span></div><span>Dhaka, Bangladesh · {{ hospital_phone }} · © {% now 'Y' %}</span></div></footer>
+</main>
+
+<!-- Comprehensive Medical Footer -->
+<footer class="public-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <!-- Col 1: About Green Hospital -->
+      <div class="footer-col">
+        <div class="brand footer-brand">
+          <span class="brand-mark"><svg class="icon"><use href="#ic-activity"/></svg></span>
+          <span><strong>Green Hospital</strong><small>Care with clarity & excellence</small></span>
+        </div>
+        <p class="footer-desc">
+          Green Hospital is a modern multi-specialty healthcare and diagnostic institution in Mirpur, Dhaka. We provide advanced consultations, ethical clinical standards, and hassle-free appointment scheduling.
+        </p>
+        <div class="footer-badge-wrap">
+          <span class="status status-confirmed">✓ DGHS Approved Hospital</span>
+          <span class="status status-paid">24/7 Emergency Wing</span>
+        </div>
+      </div>
+
+      <!-- Col 2: Quick Links -->
+      <div class="footer-col">
+        <h4 class="footer-heading">Patient Services</h4>
+        <ul class="footer-link-list">
+          <li><a href="{% url 'doctor_directory' %}">Find a Specialist Doctor</a></li>
+          <li><a href="{% url 'public_departments' %}">Medical Departments</a></li>
+          <li><a href="{% url 'login_screen' 'patient' %}">Patient Portal Sign In</a></li>
+          <li><a href="{% url 'register' %}">Create Patient Account</a></li>
+          <li><a href="{% url 'login_screen' 'staff' %}">Doctor & Staff Workspace</a></li>
+        </ul>
+      </div>
+
+      <!-- Col 3: Key Specialties -->
+      <div class="footer-col">
+        <h4 class="footer-heading">Key Specialties</h4>
+        <ul class="footer-link-list">
+          <li><a href="{% url 'doctor_directory' %}">Gynaecological Oncology</a></li>
+          <li><a href="{% url 'doctor_directory' %}">Cardiology & Vascular Care</a></li>
+          <li><a href="{% url 'doctor_directory' %}">Neurology & Brain Sciences</a></li>
+          <li><a href="{% url 'doctor_directory' %}">Orthopedics & Joint Care</a></li>
+          <li><a href="{% url 'doctor_directory' %}">Pediatrics & Neonatology</a></li>
+          <li><a href="{% url 'doctor_directory' %}">General & Internal Medicine</a></li>
+        </ul>
+      </div>
+
+      <!-- Col 4: Contact & Chamber Info -->
+      <div class="footer-col">
+        <h4 class="footer-heading">Contact & Location</h4>
+        <div class="footer-contact-item">
+          <svg class="icon"><use href="#ic-building"/></svg>
+          <div>
+            <b>Main Hospital & Chambers</b>
+            <p>Plot 1, Section 10, Mirpur, Dhaka - 1216</p>
+          </div>
+        </div>
+        <div class="footer-contact-item">
+          <svg class="icon"><use href="#ic-phone"/></svg>
+          <div>
+            <b>24/7 Hotlines & Appointments</b>
+            <p><b>+88096100016211</b>, <b>+16211</b>, {{ hospital_phone }}</p>
+          </div>
+        </div>
+        <div class="footer-contact-item">
+          <svg class="icon"><use href="#ic-clock"/></svg>
+          <div>
+            <b>Visiting Hours</b>
+            <p>Morning & Evening Outpatient Clinics (8 AM – 10 PM)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom-bar">
+      <span>© {% now 'Y' %} Green Hospital, Mirpur, Dhaka, Bangladesh. All rights reserved.</span>
+      <div class="footer-bottom-links">
+        <span>Confidential Medical Records</span>
+        <span>·</span>
+        <span>Transparent Pricing</span>
+        <span>·</span>
+        <a href="tel:+88096100016211">24/7 Hotline: +88096100016211</a>
+      </div>
+    </div>
+  </div>
+</footer>
 {% endif %}
+
+<script src="{% static 'js/calendar.js' %}" defer></script>
 <script src="{% static 'js/app.js' %}" defer></script>
-</body></html>
+</body>
+</html>

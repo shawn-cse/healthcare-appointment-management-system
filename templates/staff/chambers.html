@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% block title %}Chambers & Rooms · Green Hospital{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">FACILITY & CLINICAL ROOMS</p>
+    <h1>Chambers & Consultation Rooms</h1>
+    <p>Manage consultation centers in Mirpur, allocate weekly days when multiple doctors share a chamber, and maintain room descriptions.</p>
+  </div>
+  <a class="button button-primary" href="{% url 'chamber_new' %}">
+    <svg class="icon"><use href="#ic-plus"/></svg> Add Chamber / Room
+  </a>
+</div>
+
+<!-- Occupancy Stats Bar -->
+<div class="chamber-stats-bar">
+  <div class="stat-pill-card">
+    <small>Total Chambers</small>
+    <b>{{ total_count }}</b>
+  </div>
+  <a href="?occupancy=empty" class="stat-pill-card pill-empty-link {% if selected_occupancy == 'empty' %}active-stat{% endif %}">
+    <small>🟢 Empty / Available Rooms</small>
+    <b>{{ empty_count }}</b>
+  </a>
+  <a href="?occupancy=occupied" class="stat-pill-card {% if selected_occupancy == 'occupied' %}active-stat{% endif %}">
+    <small>Occupied Rooms</small>
+    <b>{{ occupied_count }}</b>
+  </a>
+</div>
+
+<!-- Comprehensive Filter and Search Bar -->
+<div class="panel padded-panel chamber-filter-panel" style="margin-bottom: 24px;">
+  <form method="get" class="filter-form-grid">
+    <div class="filter-col-search">
+      <label for="chamber-search-input">Search Chamber or Doctor</label>
+      <input type="text" id="chamber-search-input" name="q" value="{{ query }}" class="field-control" placeholder="Search room (e.g. 302), building, description, or doctor name...">
+    </div>
+
+    <div class="filter-col-select">
+      <label for="building-filter-select">Building</label>
+      <select id="building-filter-select" name="building" class="field-control">
+        <option value="">All Buildings</option>
+        {% for b in buildings %}
+        <option value="{{ b }}" {% if selected_building == b %}selected{% endif %}>{{ b }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-col-select">
+      <label for="floor-filter-select">Floor</label>
+      <select id="floor-filter-select" name="floor" class="field-control">
+        <option value="">All Floors</option>
+        {% for f in floors %}
+        <option value="{{ f }}" {% if selected_floor == f %}selected{% endif %}>{{ f }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-col-select">
+      <label for="occupancy-filter-select">Occupancy</label>
+      <select id="occupancy-filter-select" name="occupancy" class="field-control">
+        <option value="all" {% if selected_occupancy == 'all' %}selected{% endif %}>All Chambers</option>
+        <option value="empty" {% if selected_occupancy == 'empty' %}selected{% endif %}>🟢 Empty Chambers ({{ empty_count }})</option>
+        <option value="occupied" {% if selected_occupancy == 'occupied' %}selected{% endif %}>Occupied Chambers ({{ occupied_count }})</option>
+      </select>
+    </div>
+
+    <div class="filter-col-select">
+      <label for="sort-filter-select">Sort By</label>
+      <select id="sort-filter-select" name="sort" class="field-control">
+        <option value="building" {% if selected_sort == 'building' %}selected{% endif %}>Building & Room</option>
+        <option value="empty_first" {% if selected_sort == 'empty_first' %}selected{% endif %}>Empty Chambers First</option>
+        <option value="doctors_desc" {% if selected_sort == 'doctors_desc' %}selected{% endif %}>Most Doctors First</option>
+        <option value="room" {% if selected_sort == 'room' %}selected{% endif %}>Room Number</option>
+        <option value="floor" {% if selected_sort == 'floor' %}selected{% endif %}>Floor Level</option>
+      </select>
+    </div>
+
+    <div class="filter-col-actions">
+      <button class="button button-primary button-sm" type="submit">Filter</button>
+      {% if query or selected_building or selected_floor or selected_occupancy != 'all' or selected_sort != 'building' %}
+      <a class="button button-outline button-sm" href="{% url 'chamber_list' %}">Reset</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<!-- Chambers Grid -->
+<div class="chamber-admin-grid">
+  {% for chamber in chambers %}
+  <div class="panel padded-panel chamber-card {% if chamber.is_empty %}is-empty-card{% endif %}">
+    <div class="chamber-card-header">
+      <div>
+        <div class="chamber-code-tag">
+          <b>{{ chamber.building }}</b> · <span>{{ chamber.room_number }}</span>
+        </div>
+        <h2 class="chamber-name">{{ chamber.name }}</h2>
+        <div class="chamber-meta-line">
+          {% if chamber.floor %}
+          <span class="chamber-floor-badge">{{ chamber.floor }}</span>
+          {% endif %}
+          {% if chamber.description %}
+          <span class="chamber-desc-text">{{ chamber.description }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        {% if chamber.is_empty %}
+        <span class="status status-empty-highlight">
+          🟢 Available / Empty Room
+        </span>
+        {% else %}
+        <span class="status status-confirmed">
+          {{ chamber.doctors_count }} Specialist{{ chamber.doctors_count|pluralize }}
+        </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="chamber-card-details">
+      <div class="details-row align-top">
+        <span>Address</span>
+        <b>{{ chamber.address }}</b>
+      </div>
+      <div class="details-row">
+        <span>24/7 Hotline</span>
+        <b class="contact-highlight">{{ chamber.contact_number }}</b>
+      </div>
+      {% if chamber.department %}
+      <div class="details-row">
+        <span>Department</span>
+        <b>{{ chamber.department.name }}</b>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="details-divider"></div>
+
+    <!-- Assigned Doctors & Days Allocation -->
+    <div class="assigned-doctors-section">
+      <div class="section-micro-header">
+        <span>Specialists & Allocated Consultation Days ({{ chamber.doctors_count }})</span>
+      </div>
+
+      <div class="assigned-doctor-list">
+        {% for doc in chamber.doctors_with_days %}
+        <div class="assigned-doc-card">
+          <div class="doc-main-row">
+            <span class="mini-avatar">{{ doc.user.first_name|first|upper }}{{ doc.user.last_name|first|upper }}</span>
+            <div class="doc-info-text">
+              <strong>{{ doc.full_doctor_title }}</strong>
+              <small>{{ doc.department.name }} · {{ doc.designation }}</small>
+            </div>
+          </div>
+
+          <div class="doc-days-strip">
+            <span class="days-label">Scheduled Days:</span>
+            <div class="day-chips-wrap">
+              {% for day in doc.assigned_days_display %}
+              <span class="day-pill-active">{{ day|upper }}</span>
+              {% empty %}
+              <span class="day-pill-unset">Unscheduled</span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="empty-room-box">
+          <svg class="icon"><use href="#ic-check"/></svg>
+          <div>
+            <b>Chamber is Empty</b>
+            <p>No specialists assigned yet. This room is available for all 7 weekdays.</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Overlap / Conflict Alert if multiple doctors share the same day -->
+      {% if chamber.day_conflicts %}
+      <div class="conflict-alert-box" style="margin-top: 10px; background: #fff8ed; border: 1px solid #ffd8a8; padding: 8px 12px; border-radius: 6px;">
+        <svg class="icon" style="width: 16px; height: 16px; color: #d9480f; margin-right: 6px;"><use href="#ic-alert"/></svg>
+        <span style="font-size: 12px; color: #d9480f; font-weight: 700;">
+          Shared Days:
+          {% for day, docs in chamber.day_conflicts.items %}
+            <b>{{ day }}</b> ({{ docs|join:', ' }}){% if not forloop.last %}; {% endif %}
+          {% endfor %}
+        </span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="chamber-card-actions">
+      <a class="button button-outline button-sm" href="{% url 'chamber_edit' chamber.pk %}">
+        <svg class="icon"><use href="#ic-settings"/></svg> Edit & Assign Days
+      </a>
+      <form method="post" action="{% url 'chamber_delete' chamber.pk %}" class="inline-form" onsubmit="return confirm('Delete this chamber? Doctors assigned to this chamber will be unlinked.');">
+        {% csrf_token %}
+        <button type="submit" class="button button-danger-outline button-sm">
+          Delete
+        </button>
+      </form>
+    </div>
+  </div>
+  {% empty %}
+  <div class="empty-state panel padded-panel full-width">
+    <svg class="icon empty-icon"><use href="#ic-building"/></svg>
+    <h3>No chambers match your search or filter</h3>
+    <p>Try clearing filters or search terms, or create a new chamber in Building 1, 2, or 3.</p>
+    <a class="button button-primary" href="{% url 'chamber_new' %}" style="margin-top: 14px;">
+      <svg class="icon"><use href="#ic-plus"/></svg> Add Chamber / Room
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

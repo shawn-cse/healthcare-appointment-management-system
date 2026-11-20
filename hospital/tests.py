@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.core.exceptions import ValidationError, PermissionDenied
 from .models import (User,Department,DoctorProfile,AppointmentSlot,Appointment,RefundRequest,
-                     PaymentTransaction)
+                     PaymentTransaction, Chamber)
 from .services import (create_appointment, record_cash_payment, cancel_appointment,
                        fee_for, approve_refund, finalize_cash_refund, collected_revenue_shares)
 from .forms import RegisterForm, StaffForm
@@ -183,16 +183,26 @@ class AppointmentSystemTests(TestCase):
         self.assertTrue(user.username.startswith('patient'))
 
     def test_new_doctor_requires_department_and_receptionist(self):
-        values={'role':'doctor','first_name':'New','last_name':'Doctor',
-                'username':'new_doctor','email':'new.doctor@example.org',
-                'phone':'01855555555','is_active':True,'new_password':'AnUniquePassword123!'}
-        form=StaffForm(data=values)
+        chamber = Chamber.objects.create(building='Building 1', room_number='Chamber 302', floor='3rd Floor')
+        values = {'role':'doctor','first_name':'New','last_name':'Doctor',
+                  'username':'new_doctor','email':'new.doctor@example.org',
+                  'phone':'01855555555','is_active':True,'new_password':'AnUniquePassword123!'}
+        form = StaffForm(data=values)
         self.assertFalse(form.is_valid())
-        self.assertIn('department',form.errors)
-        self.assertIn('assigned_receptionist',form.errors)
-        values.update({'department':str(self.department.pk),'assigned_receptionist':str(self.reception.pk)})
-        form=StaffForm(data=values)
-        self.assertTrue(form.is_valid(),form.errors)
+        self.assertIn('department', form.errors)
+        self.assertIn('assigned_receptionist', form.errors)
+        self.assertIn('chamber', form.errors)
+        self.assertIn('consultation_days', form.errors)
+        values.update({
+            'department': str(self.department.pk),
+            'assigned_receptionist': str(self.reception.pk),
+            'chamber': str(chamber.pk),
+            'consultation_days': ['0', '2', '4'],
+            'consultation_start_time': '18:00',
+            'consultation_end_time': '20:00'
+        })
+        form = StaffForm(data=values)
+        self.assertTrue(form.is_valid(), form.errors)
 
     def test_cash_payment_rejected_after_deadline(self):
         self.doc.payment_policy='within'
@@ -206,15 +216,22 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(booking.payment_status,'unpaid')
 
     def test_new_doctor_onboarding_saves_assignment(self):
+        chamber = Chamber.objects.create(building='Building 1', room_number='Chamber 302', floor='3rd Floor')
         self.client.force_login(self.admin)
-        response=self.client.post(reverse('staff_new'),{
-            'role':'doctor','first_name':'New','last_name':'Doctor','username':'new_doctor',
-            'email':'new.doctor@example.org','phone':'01855555555','is_active':'on',
-            'new_password':'AnUniquePassword123!', 'department':str(self.department.pk),
-            'assigned_receptionist':str(self.reception.pk)})
-        self.assertRedirects(response,reverse('staff_list'))
-        doctor=DoctorProfile.objects.get(user__username='new_doctor')
+        response = self.client.post(reverse('staff_new'), {
+            'role': 'doctor', 'first_name': 'New', 'last_name': 'Doctor', 'username': 'new_doctor',
+            'email': 'new.doctor@example.org', 'phone': '01855555555', 'is_active': 'on',
+            'new_password': 'AnUniquePassword123!', 'department': str(self.department.pk),
+            'assigned_receptionist': str(self.reception.pk),
+            'chamber': str(chamber.pk),
+            'consultation_days': ['0', '2', '4'],
+            'consultation_start_time': '18:00',
+            'consultation_end_time': '20:00'
+        })
+        self.assertRedirects(response, reverse('staff_list'))
+        doctor = DoctorProfile.objects.get(user__username='new_doctor')
         self.assertTrue(doctor.receptionists.filter(pk=self.reception.pk).exists())
+        self.assertEqual(doctor.chamber_id, chamber.pk)
 
     def test_new_admin_has_full_administrator_permissions(self):
         self.client.force_login(self.admin)
@@ -243,13 +260,42 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(doctor,Decimal('135.00'))
 
     def test_excel_escapes_untrusted_patient_values(self):
-        create_appointment(actor=self.reception,slot_id=self.slot.pk,patient=None,
-            name='=2+2',phone='01744444444',source='phone')
+        create_appointment(actor=self.reception, slot_id=self.slot.pk, patient=None,
+            name='=2+2', phone='01744444444', source='phone')
         self.client.force_login(self.admin)
-        response=self.client.get(reverse('export_excel'))
+        response = self.client.get(reverse('export_excel') + f'?from={timezone.localdate()}&to={self.future}')
         from openpyxl import load_workbook
         from io import BytesIO
-        wb=load_workbook(BytesIO(response.content))
-        sheet=wb['Appointments']
-        self.assertEqual(sheet.cell(2,6).data_type,'s')
-        self.assertEqual(sheet.cell(2,6).value,"'=2+2")
+        wb = load_workbook(BytesIO(response.content))
+        sheet = wb['Appointments']
+        self.assertEqual(sheet.cell(2, 6).data_type, 's')
+        self.assertEqual(sheet.cell(2, 6).value, "'=2+2")
+
+    def test_public_can_browse_doctors_and_departments_without_login(self):
+        # 1. Doctor Directory is accessible without authentication
+        response = self.client.get(reverse('doctor_directory'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Consult Our Specialist Doctors')
+
+        # 2. Search and sort work
+        response = self.client.get(reverse('doctor_directory') + '?q=doctor&sort=fee_asc')
+        self.assertEqual(response.status_code, 200)
+
+        # 3. Public Departments directory is accessible
+        response = self.client.get(reverse('public_departments'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Specialized Medical Departments')
+
+    def test_doctor_profile_displays_chamber_details_and_schedules(self):
+        # Doctor Profile is accessible without authentication
+        response = self.client.get(reverse('doctor_detail', args=[self.doc.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'MAKE APPOINTMENT')
+        self.assertContains(response, 'Room')
+        self.assertContains(response, 'SCHEDULE')
+
+    def test_unauthenticated_user_booking_redirects_to_login(self):
+        # Trying to book directly without authentication redirects to login with next param
+        response = self.client.get(reverse('patient_book', args=[self.slot.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)

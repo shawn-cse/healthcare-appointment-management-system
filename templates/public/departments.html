@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Medical Departments | Green Hospital{% endblock %}
+{% block content %}
+<div class="departments-page container">
+  <div class="page-heading">
+    <div>
+      <a class="back-link" href="{% url 'home' %}">‹ Back to Home</a>
+      <p class="eyebrow">CLINICAL EXCELLENCE</p>
+      <h1>Specialized Medical Departments</h1>
+      <p>Discover our comprehensive medical specialties, cutting-edge diagnostic facilities, and expert consultant panels dedicated to personalized patient care.</p>
+    </div>
+    <div class="heading-actions">
+      <a class="button button-primary" href="{% url 'doctor_directory' %}">
+        <svg class="icon"><use href="#ic-stethoscope"/></svg> Browse All Specialists
+      </a>
+    </div>
+  </div>
+
+  <div class="panel filter-bar">
+    <div class="search-input">
+      <svg class="icon"><use href="#ic-search"/></svg>
+      <input type="text" id="department-live-search" placeholder="Search departments by name or clinical services..." aria-label="Search departments">
+    </div>
+    <span class="small-muted" id="department-count">Showing {{ departments|length }} specialized departments</span>
+  </div>
+
+  <div class="department-showcase-grid" id="departments-container">
+    {% for dep in departments %}
+    <div class="department-showcase-card" data-dep-name="{{ dep.name|lower }}" data-dep-desc="{{ dep.description|lower }}">
+      <div class="department-card-header">
+        <span class="dep-icon-circle">
+          <svg class="icon"><use href="#ic-activity"/></svg>
+        </span>
+        <span class="dep-specialist-badge">
+          <b>{{ dep.total_doctors }}</b> Specialist{{ dep.total_doctors|pluralize }}
+        </span>
+      </div>
+      <h2>{{ dep.name }}</h2>
+      <p>{{ dep.description|default:'Advanced outpatient consultations, comprehensive diagnostics and personalized treatment plans.' }}</p>
+      <div class="department-card-footer">
+        <a class="button button-outline button-sm button-full" href="{% url 'doctor_directory' %}?department={{ dep.pk }}">
+          View Specialists <svg class="icon"><use href="#ic-arrow"/></svg>
+        </a>
+      </div>
+    </div>
+    {% empty %}
+    <div class="panel empty-state full-grid">
+      <span class="empty-icon"><svg class="icon"><use href="#ic-building"/></svg></span>
+      <h3>No departments published yet</h3>
+      <p>Please check back soon or contact front desk.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

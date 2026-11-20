@@ -1,7 +1,180 @@
 {% extends 'base.html' %}
-{% block title %}Find a doctor{% endblock %}
+{% block title %}Find a Specialist Doctor | Green Hospital{% endblock %}
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">SPECIALIST CARE</p><h1>Find your doctor</h1><p>Choose a department, explore specialists and view available appointment times.</p></div></div>
-<form method="get" class="panel filter-bar"><div class="search-input"><svg class="icon"><use href="#ic-search"/></svg><input name="q" value="{{ query }}" placeholder="Search doctors, specialties or qualifications" aria-label="Search doctors"></div><select name="department" aria-label="Filter department" class="field-control"><option value="">All departments</option>{% for dep in departments %}<option value="{{ dep.pk }}" {% if selected_department == dep.pk|stringformat:'s' %}selected{% endif %}>{{ dep.name }}</option>{% endfor %}</select><button class="button button-primary" type="submit">Search</button></form>
-<div class="doctor-grid">{% for d in doctors %}<article class="doctor-card"><div class="doctor-card-top"><span class="doctor-avatar">{% if d.user.avatar %}<img src="{{ d.user.avatar.url }}" alt="Doctor profile">{% else %}{{ d.user.first_name|first }}{{ d.user.last_name|first }}{% endif %}</span><span class="specialty-tag">{{ d.department.name }}</span></div><h2>Dr. {{ d.user.display_name }}</h2><p class="doctor-qual">{{ d.qualifications }} · {{ d.designation }}</p><div class="doctor-metadata"><span><svg class="icon"><use href="#ic-clock"/></svg> {{ d.experience_years }} years experience</span><span><svg class="icon"><use href="#ic-wallet"/></svg> From ৳{{ d.initial_fee|floatformat:0 }}</span></div><div class="doctor-card-bottom"><span><small>Follow-up</small><strong>৳{{ d.followup_fee|floatformat:0 }}</strong></span><a class="button button-primary button-sm" href="{% url 'doctor_detail' d.pk %}">View availability <svg class="icon"><use href="#ic-arrow"/></svg></a></div></article>{% empty %}<div class="panel empty-state full-grid"><span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span><h3>No matching specialists found</h3><p>Try another department or search phrase.</p><a class="button button-outline" href="{% url 'doctor_directory' %}">Clear filters</a></div>{% endfor %}</div>
+<div class="doctor-directory-page container">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">EXPERT MEDICAL FACULTY</p>
+      <h1>Consult Our Specialist Doctors</h1>
+      <p>Search Bangladesh's top medical consultants, view clinic room details, consultation fees, and reserve your appointment slot online without delays.</p>
+    </div>
+    <div class="heading-actions">
+      <a class="button button-outline" href="{% url 'public_departments' %}">
+        <svg class="icon"><use href="#ic-building"/></svg> Browse Departments
+      </a>
+      {% if not user.is_authenticated %}
+      <a class="button button-primary" href="{% url 'login_choice' %}">
+        <svg class="icon"><use href="#ic-user"/></svg> Patient Sign In
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Department Quick Filter Pills -->
+  <div class="department-pill-bar">
+    <a href="{% url 'doctor_directory' %}" class="dept-pill {% if not selected_department %}active{% endif %}">
+      All Departments
+    </a>
+    {% for dep in departments %}
+    <a href="{% url 'doctor_directory' %}?department={{ dep.pk }}" class="dept-pill {% if selected_department == dep.pk|stringformat:'s' %}active{% endif %}">
+      {{ dep.name }}
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Filter & Real-Time Search Bar -->
+  <form method="get" class="panel filter-bar-advanced" id="doctor-filter-form">
+    <div class="search-input-wrap">
+      <svg class="icon search-icon"><use href="#ic-search"/></svg>
+      <input type="text" name="q" id="doctor-search-input" value="{{ query }}" placeholder="Search by doctor name, qualification, department, institute, or room number..." aria-label="Search doctors" autocomplete="off">
+      <button type="button" id="search-clear-btn" class="search-clear-btn" style="display: none;" aria-label="Clear search">✕</button>
+    </div>
+
+    <div class="filter-controls">
+      <div class="control-group">
+        <label for="dept-select">Department:</label>
+        <select name="department" id="dept-select" class="field-control" aria-label="Filter department">
+          <option value="">All Departments</option>
+          {% for dep in departments %}
+          <option value="{{ dep.pk }}" {% if selected_department == dep.pk|stringformat:'s' %}selected{% endif %}>{{ dep.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="sort-select">Sort By:</label>
+        <select name="sort" id="sort-select" class="field-control" aria-label="Sort doctors">
+          <option value="name" {% if selected_sort == 'name' %}selected{% endif %}>Name (A – Z)</option>
+          <option value="fee_asc" {% if selected_sort == 'fee_asc' %}selected{% endif %}>Fee: Low to High</option>
+          <option value="fee_desc" {% if selected_sort == 'fee_desc' %}selected{% endif %}>Fee: High to Low</option>
+          <option value="experience" {% if selected_sort == 'experience' %}selected{% endif %}>Experience: High to Low</option>
+          <option value="department" {% if selected_sort == 'department' %}selected{% endif %}>Department Name</option>
+        </select>
+      </div>
+
+      <button class="button button-primary" type="submit">Filter</button>
+    </div>
+  </form>
+
+  <div class="directory-meta-strip">
+    <span class="results-count" id="results-count-text">Showing <b>{{ doctors|length }}</b> specialist{{ doctors|length|pluralize }}</span>
+    <span class="live-search-hint"><span class="pulse-indicator"></span> Real-time instant search active</span>
+  </div>
+
+  <!-- Doctors Card Grid -->
+  <div class="doctor-showcase-grid" id="doctor-cards-container">
+    {% for d in doctors %}
+    <article class="doctor-profile-card"
+             data-name="{{ d.full_doctor_title|lower }}"
+             data-dept="{{ d.department.name|lower }}"
+             data-dept-id="{{ d.department.pk }}"
+             data-qual="{{ d.qualifications|lower }}"
+             data-inst="{{ d.institute|lower }}"
+             data-room="{{ d.room_number|lower }}"
+             data-fee="{{ d.initial_fee }}"
+             data-exp="{{ d.experience_years }}">
+      <div class="doctor-card-header">
+        <div class="avatar-holder">
+          {% if d.user.avatar %}
+          <img src="{{ d.user.avatar.url }}" alt="{{ d.full_doctor_title }}" class="doctor-photo">
+          {% else %}
+          <div class="doctor-avatar-initials">
+            {{ d.user.first_name|first|upper }}{{ d.user.last_name|first|upper }}
+          </div>
+          {% endif %}
+          <span class="verified-badge" title="Verified Medical Specialist">✓</span>
+        </div>
+        <div class="doctor-header-info">
+          <span class="dept-badge">{{ d.department.name }}</span>
+          <h2 class="doctor-name">
+            <a href="{% url 'doctor_detail' d.pk %}">{{ d.full_doctor_title }}</a>
+          </h2>
+          <p class="doctor-designation"><b>{{ d.designation }}</b></p>
+        </div>
+      </div>
+
+      <div class="doctor-card-body">
+        <div class="qual-block">
+          <span class="info-label">Qualifications:</span>
+          <p class="qual-text">{{ d.qualifications|default:'MBBS, Specialist Consultant' }}</p>
+        </div>
+
+        {% if d.institute %}
+        <div class="institute-block">
+          <svg class="icon"><use href="#ic-building"/></svg>
+          <span>{{ d.institute }}</span>
+        </div>
+        {% endif %}
+
+        <div class="chamber-info-grid">
+          <div class="info-item">
+            <span class="item-label">Room / Chamber</span>
+            <span class="item-value highlight-room">{{ d.room_number|default:'Room 707' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="item-label">Consultation Fee</span>
+            <span class="item-value fee-value">৳{{ d.initial_fee|floatformat:0 }}</span>
+          </div>
+        </div>
+
+        <div class="chamber-address-row">
+          <svg class="icon"><use href="#ic-building"/></svg>
+          <small>{{ d.chamber_address|default:'Plot 1, Section 10, Mirpur, Dhaka-1216' }}</small>
+        </div>
+
+        <div class="contact-row">
+          <svg class="icon"><use href="#ic-activity"/></svg>
+          <span>24/7 Hotline: <b>{{ d.contact_number|default:'+88096100016211, +16211' }}</b></span>
+        </div>
+
+        <!-- Weekly Practice Schedule Preview -->
+        <div class="schedule-preview-box">
+          <span class="schedule-tag">SCHEDULE</span>
+          <div class="schedule-days-list">
+            {% for sched in d.weekly.all %}
+              {% if sched.active %}
+              <span class="schedule-chip">
+                <b>{{ sched.get_weekday_display|slice:":3" }}</b> {{ sched.start_time|time:"h:i A" }}–{{ sched.end_time|time:"h:i A" }}
+              </span>
+              {% endif %}
+            {% empty %}
+              <span class="small-muted">Daily outpatient clinic by appointment</span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="doctor-card-actions">
+        <a class="button button-primary button-full make-appt-btn" href="{% url 'doctor_detail' d.pk %}#appointment-section">
+          MAKE APPOINTMENT <svg class="icon"><use href="#ic-arrow"/></svg>
+        </a>
+      </div>
+    </article>
+    {% empty %}
+    <div class="panel empty-state full-grid" id="no-doctors-server">
+      <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
+      <h3>No matching specialists found</h3>
+      <p>Try clearing your search query or selecting another department.</p>
+      <a class="button button-outline" href="{% url 'doctor_directory' %}">View All Specialists</a>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="panel empty-state full-grid" id="no-doctors-client" style="display: none;">
+    <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
+    <h3>No specialists found matching your search</h3>
+    <p>Try typing another doctor name, specialty, or room number.</p>
+    <button class="button button-outline" type="button" id="reset-client-search">Clear Search</button>
+  </div>
+</div>
 {% endblock %}

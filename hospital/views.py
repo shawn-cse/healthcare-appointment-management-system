@@ -19,9 +19,10 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from .models import (User, DoctorProfile, Department, Appointment, AppointmentSlot,
-                     WeeklyAvailability, PaymentTransaction, RefundRequest, Complaint, HospitalPolicy, AuditEvent)
+                     WeeklyAvailability, PaymentTransaction, RefundRequest, Complaint, HospitalPolicy, AuditEvent, Chamber)
 from .forms import (RegisterForm, ProfileForm, StaffForm, DoctorSettingsForm, WeeklyForm, SlotForm,
-                    PatientBookingForm, ReceptionBookingForm, ComplaintForm, PolicyForm)
+                    PatientBookingForm, ReceptionBookingForm, ComplaintForm, PolicyForm,
+                    StaffAssistedBookingForm, ChamberForm)
 from .services import (create_appointment, materialize_weekly, record_cash_payment, cancel_appointment,
                        change_visit_status, approve_refund, finalize_cash_refund,
                        managed_doctors, doctor_allowed, appointment_allowed, log, local_start, valid_slot,
@@ -70,6 +71,7 @@ def login_screen(request, kind):
         raise Http404()
     if request.user.is_authenticated:
         return redirect('dashboard')
+    next_url = request.GET.get('next') or request.POST.get('next')
     if request.method == 'POST':
         identifier = request.POST.get('identifier', '').strip()
         password = request.POST.get('password', '')
@@ -83,21 +85,26 @@ def login_screen(request, kind):
         else:
             login(request, user)
             messages.success(request, f'Welcome back, {user.first_name or user.username}.')
+            if next_url and next_url.startswith('/'):
+                return redirect(next_url)
             return redirect('dashboard')
-    return render(request, 'auth/login.html', {'kind':kind})
+    return render(request, 'auth/login.html', {'kind': kind, 'next': next_url})
 
 
 def register(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
+    next_url = request.GET.get('next') or request.POST.get('next')
     form = RegisterForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         user = form.save()
         login(request, user, backend='hospital.auth_backends.RoleAwareBackend')
         log(user, 'patient.registered', user.pk)
         messages.success(request, 'Your account has been created. Welcome to Green Hospital.')
+        if next_url and next_url.startswith('/'):
+            return redirect(next_url)
         return redirect('dashboard')
-    return render(request, 'auth/register.html', {'form':form})
+    return render(request, 'auth/register.html', {'form': form, 'next': next_url})
 
 
 @require_POST
@@ -163,70 +170,168 @@ def profile(request):
                   'page_desc':'Keep your contact information accurate and up to date.', 'submit_label':'Save changes'})
 
 
-@login_required
 def doctor_directory(request):
     department = request.GET.get('department', '')
     q = request.GET.get('q', '').strip()
-    doctors = DoctorProfile.objects.filter(is_available=True,user__is_active=True).select_related('user','department')
-    if department.isdigit(): doctors = doctors.filter(department_id=int(department))
-    if q: doctors = doctors.filter(Q(user__first_name__icontains=q) | Q(user__last_name__icontains=q) |
-                                   Q(department__name__icontains=q) | Q(qualifications__icontains=q))
-    return render(request, 'patient/doctors.html', {'doctors':doctors,
-                  'departments':Department.objects.filter(is_active=True), 'selected_department':department, 'query':q})
+    sort = request.GET.get('sort', 'name')
+    doctors = DoctorProfile.objects.filter(is_available=True, user__is_active=True).select_related('user', 'department')
+    if department.isdigit():
+        doctors = doctors.filter(department_id=int(department))
+    if q:
+        doctors = doctors.filter(
+            Q(user__first_name__icontains=q) |
+            Q(user__last_name__icontains=q) |
+            Q(department__name__icontains=q) |
+            Q(qualifications__icontains=q) |
+            Q(designation__icontains=q) |
+            Q(institute__icontains=q) |
+            Q(room_number__icontains=q)
+        )
+    if sort == 'fee_asc':
+        doctors = doctors.order_by('initial_fee')
+    elif sort == 'fee_desc':
+        doctors = doctors.order_by('-initial_fee')
+    elif sort == 'experience':
+        doctors = doctors.order_by('-experience_years')
+    elif sort == 'department':
+        doctors = doctors.order_by('department__name', 'user__first_name')
+    else:
+        doctors = doctors.order_by('user__first_name', 'user__last_name')
+
+    return render(request, 'patient/doctors.html', {
+        'doctors': doctors,
+        'departments': Department.objects.filter(is_active=True),
+        'selected_department': department,
+        'query': q,
+        'selected_sort': sort,
+    })
 
 
-@role_required('patient')
+def public_departments(request):
+    deps = Department.objects.filter(is_active=True).annotate(
+        total_doctors=Count('doctors', filter=Q(doctors__user__is_active=True, doctors__is_available=True))
+    ).order_by('name')
+    return render(request, 'public/departments.html', {'departments': deps})
+
+
 def doctor_detail(request, pk):
-    doc = get_object_or_404(DoctorProfile.objects.select_related('user','department'), pk=pk, user__is_active=True)
+    doc = get_object_or_404(DoctorProfile.objects.select_related('user', 'department', 'chamber'), pk=pk, user__is_active=True)
     raw_date = request.GET.get('date')
     try:
         chosen = datetime.strptime(raw_date, '%Y-%m-%d').date() if raw_date else None
     except ValueError:
         chosen = None
     today = timezone.localdate()
-    next_dates = [today+timedelta(days=i) for i in range(1, 15)]
-    if not chosen: chosen = today + timedelta(days=1)
+    next_dates = [today + timedelta(days=i) for i in range(1, 15)]
+    if not chosen:
+        chosen = today + timedelta(days=1)
     slots = list(AppointmentSlot.objects.filter(doctor=doc, date=chosen, is_open=True).order_by('start_time'))
     now = timezone.now()
+    is_staff = request.user.is_authenticated and request.user.role in ('doctor', 'receptionist', 'admin')
     for s in slots:
-        s.booking_open = s.remaining > 0 and local_start(s) >= now + timedelta(hours=doc.booking_notice_hours) and local_start(s) <= now + timedelta(days=doc.booking_advance_days)
-    return render(request,'patient/doctor_detail.html', {'doctor':doc,'slots':slots,'chosen_date':chosen,'next_dates':next_dates,
-                  'gateway_enabled':gateway.enabled() and settings.PUBLIC_BASE_URL.startswith('https://')})
+        if is_staff:
+            s.booking_open = s.remaining > 0 and local_start(s) > now
+        else:
+            s.booking_open = s.remaining > 0 and local_start(s) >= now + timedelta(hours=doc.booking_notice_hours) and local_start(s) <= now + timedelta(days=doc.booking_advance_days)
+    weekly_schedules = doc.weekly.filter(active=True).order_by('weekday', 'start_time')
+    practice_weekdays = list(weekly_schedules.values_list('weekday', flat=True))
+    return render(request, 'patient/doctor_detail.html', {
+        'doctor': doc,
+        'slots': slots,
+        'chosen_date': chosen,
+        'next_dates': next_dates,
+        'weekly_schedules': weekly_schedules,
+        'practice_weekdays': practice_weekdays,
+        'is_staff': is_staff,
+        'gateway_enabled': gateway.enabled() and settings.PUBLIC_BASE_URL.startswith('https://')
+    })
 
 
-@role_required('patient')
+@role_required('patient', 'doctor', 'receptionist', 'admin')
 def patient_book(request, slot_id):
-    slot = get_object_or_404(AppointmentSlot.objects.select_related('doctor__user','doctor__department'), pk=slot_id)
+    slot = get_object_or_404(
+        AppointmentSlot.objects.select_for_update(nowait=False).select_related(
+            'doctor__user', 'doctor__department', 'doctor__chamber'
+        ),
+        pk=slot_id
+    )
+    is_staff_booking = request.user.role in ('doctor', 'receptionist', 'admin')
     try:
-        valid_slot(slot)
+        valid_slot(slot, is_staff_booking=is_staff_booking)
     except ValidationError as exc:
         messages.error(request, '; '.join(exc.messages))
         return redirect('doctor_detail', pk=slot.doctor_id)
-    form = PatientBookingForm(request.POST or None)
-    if slot.doctor.payment_policy == 'within':
-        form.fields['payment_method'].choices = [('online','Pay online (before deadline)')]
-    elif not gateway.enabled() or not settings.PUBLIC_BASE_URL.startswith('https://'):
-        form.fields['payment_method'].choices = [('cash','Pay at hospital')]
+
+    if is_staff_booking:
+        form = StaffAssistedBookingForm(request.POST or None)
+    else:
+        form = PatientBookingForm(request.POST or None)
+        if slot.doctor.payment_policy == 'within':
+            form.fields['payment_method'].choices = [('online', 'Pay online (before deadline)')]
+        elif not gateway.enabled() or not settings.PUBLIC_BASE_URL.startswith('https://'):
+            form.fields['payment_method'].choices = [('cash', 'Pay at hospital')]
+
     if request.method == 'POST' and form.is_valid():
-        method = form.cleaned_data['payment_method']
-        if method == 'online' and (not gateway.enabled() or not settings.PUBLIC_BASE_URL.startswith('https://')):
-            messages.error(request, 'Online checkout is not configured. Contact reception for booking assistance.')
-        else:
+        if is_staff_booking:
+            v = form.cleaned_data
             try:
-                appt = create_appointment(actor=request.user, slot_id=slot.pk, patient=request.user,
-                                          name=request.user.display_name, phone=request.user.phone,
-                                          visit_type=form.cleaned_data['visit_type'],
-                                          payment_method=method, notes=form.cleaned_data['notes'])
-                messages.success(request, f'Appointment {appt.reference} has been reserved.')
+                with transaction.atomic():
+                    appt = create_appointment(
+                        actor=request.user,
+                        slot_id=slot.pk,
+                        patient=v.get('patient'),
+                        name=v['name'].strip(),
+                        phone=v['phone'].strip(),
+                        dob=v.get('dob'),
+                        visit_type=v['visit_type'],
+                        source=v['source'],
+                        payment_method='cash',
+                        notes=v.get('notes', '')
+                    )
+                    if v['payment_choice'] == 'cash':
+                        record_cash_payment(appt, request.user, note=f'Collected at reception desk by {request.user.display_name}')
+                messages.success(request, f'Appointment {appt.reference} booked successfully for {v["name"]}.')
                 return redirect('appointment_detail', pk=appt.pk)
             except (ValidationError, PermissionDenied) as exc:
-                messages.error(request, '; '.join(exc.messages) if hasattr(exc,'messages') else str(exc))
-    return render(request,'patient/book.html', {'slot':slot,'doctor':slot.doctor,'form':form})
+                messages.error(request, '; '.join(exc.messages) if hasattr(exc, 'messages') else str(exc))
+        else:
+            method = form.cleaned_data['payment_method']
+            if method == 'online' and (not gateway.enabled() or not settings.PUBLIC_BASE_URL.startswith('https://')):
+                messages.error(request, 'Online checkout is not configured. Contact reception for booking assistance.')
+            else:
+                try:
+                    appt = create_appointment(
+                        actor=request.user,
+                        slot_id=slot.pk,
+                        patient=request.user,
+                        name=request.user.display_name,
+                        phone=request.user.phone,
+                        dob=request.user.dob,
+                        visit_type=form.cleaned_data['visit_type'],
+                        payment_method=method,
+                        notes=form.cleaned_data['notes']
+                    )
+                    messages.success(request, f'Appointment {appt.reference} has been reserved.')
+                    return redirect('appointment_detail', pk=appt.pk)
+                except (ValidationError, PermissionDenied) as exc:
+                    messages.error(request, '; '.join(exc.messages) if hasattr(exc, 'messages') else str(exc))
+
+    return render(request, 'patient/book.html', {
+        'slot': slot,
+        'doctor': slot.doctor,
+        'form': form,
+        'is_staff_booking': is_staff_booking,
+    })
 
 
 def visible_appointments(user):
-    qs = Appointment.objects.select_related('patient','slot__doctor__user','slot__doctor__department')
-    if user.role == 'patient': return qs.filter(patient=user)
+    qs = Appointment.objects.select_related('patient', 'slot__doctor__user', 'slot__doctor__department', 'slot__doctor__chamber', 'created_by')
+    if user.role == 'patient':
+        return qs.filter(patient=user)
+    if user.role == 'admin':
+        return qs
+    if user.role == 'receptionist':
+        return qs.filter(Q(slot__doctor__in=managed_doctors(user)) | Q(created_by=user)).distinct()
     return qs.filter(slot__doctor__in=managed_doctors(user))
 
 
@@ -564,19 +669,179 @@ def staff_edit(request,pk=None):
                 user = form.save()
                 if user.role == 'doctor' and not DoctorProfile.objects.filter(user=user).exists():
                     pol = HospitalPolicy.current()
-                    doctor_profile = DoctorProfile.objects.create(user=user,
+                    chamber = form.cleaned_data.get('chamber')
+                    consultation_days = form.cleaned_data.get('consultation_days') or ['0', '2', '4']
+                    start_t = form.cleaned_data.get('consultation_start_time') or datetime.strptime('18:00', '%H:%M').time()
+                    end_t = form.cleaned_data.get('consultation_end_time') or datetime.strptime('20:00', '%H:%M').time()
+                    days_str = ','.join(str(d) for d in consultation_days)
+
+                    doctor_profile = DoctorProfile.objects.create(
+                        user=user,
                         department=form.cleaned_data['department'],
+                        chamber=chamber,
+                        chamber_days=days_str,
+                        room_number=chamber.room_number if chamber else 'Chamber 302',
+                        chamber_address=chamber.address if chamber else 'Plot 1, Section 10, Mirpur, Dhaka-1216',
+                        contact_number=chamber.contact_number if chamber else '+88096100016211, +16211',
                         booking_notice_hours=pol.default_notice_hours,
                         booking_advance_days=pol.default_advance_days,
                         payment_deadline_hours=pol.default_payment_hours,
-                        cancel_fee_mode=pol.default_cancel_mode,cancel_fee_value=pol.default_cancel_value,
-                        hospital_share_mode=pol.default_hospital_mode,hospital_share_value=pol.default_hospital_value)
-                    doctor_profile.receptionists.add(form.cleaned_data['assigned_receptionist'])
+                        cancel_fee_mode=pol.default_cancel_mode,
+                        cancel_fee_value=pol.default_cancel_value,
+                        hospital_share_mode=pol.default_hospital_mode,
+                        hospital_share_value=pol.default_hospital_value
+                    )
+                    if form.cleaned_data.get('assigned_receptionist'):
+                        doctor_profile.receptionists.add(form.cleaned_data['assigned_receptionist'])
+
+                    # Create weekly availability for the selected days
+                    for day_int in [int(d) for d in consultation_days]:
+                        WeeklyAvailability.objects.create(
+                            doctor=doctor_profile,
+                            weekday=day_int,
+                            start_time=start_t,
+                            end_time=end_t,
+                            duration_minutes=30,
+                            capacity=2,
+                            active=True
+                        )
+                    materialize_weekly(doctor_profile, days=60)
                 log(request.user,'staff.saved',user.pk,user.role)
-            messages.success(request,'Staff account saved.')
+            messages.success(request,'Staff account saved successfully.')
             return redirect('staff_list')
-    return render(request,'staff/staff_edit.html',{'form':form,'member':member,
-                  'departments':Department.objects.filter(is_active=True)})
+    chambers_info = Chamber.objects.filter(is_active=True).prefetch_related('doctors__user')
+    return render(request,'staff/staff_edit.html',{
+        'form':form,
+        'member':member,
+        'departments':Department.objects.filter(is_active=True),
+        'chambers':chambers_info
+    })
+
+
+@role_required('admin')
+def chamber_list(request):
+    q = request.GET.get('q', '').strip()
+    building_filter = request.GET.get('building', '').strip()
+    floor_filter = request.GET.get('floor', '').strip()
+    occupancy_filter = request.GET.get('occupancy', 'all')
+    sort = request.GET.get('sort', 'building')
+
+    chambers = Chamber.objects.annotate(
+        total_doctors=Count('doctors', filter=Q(doctors__user__is_active=True))
+    ).prefetch_related('doctors__user', 'doctors__weekly', 'department')
+
+    if q:
+        chambers = chambers.filter(
+            Q(name__icontains=q) |
+            Q(room_number__icontains=q) |
+            Q(building__icontains=q) |
+            Q(floor__icontains=q) |
+            Q(description__icontains=q) |
+            Q(address__icontains=q) |
+            Q(doctors__user__first_name__icontains=q) |
+            Q(doctors__user__last_name__icontains=q)
+        ).distinct()
+
+    if building_filter:
+        chambers = chambers.filter(building__iexact=building_filter)
+
+    if floor_filter:
+        chambers = chambers.filter(floor__iexact=floor_filter)
+
+    if occupancy_filter == 'empty':
+        chambers = chambers.filter(total_doctors=0)
+    elif occupancy_filter == 'occupied':
+        chambers = chambers.filter(total_doctors__gt=0)
+
+    if sort == 'empty_first':
+        chambers = chambers.order_by('total_doctors', 'building', 'room_number')
+    elif sort == 'doctors_desc':
+        chambers = chambers.order_by('-total_doctors', 'building', 'room_number')
+    elif sort == 'room':
+        chambers = chambers.order_by('room_number', 'building')
+    elif sort == 'floor':
+        chambers = chambers.order_by('floor', 'room_number')
+    else:
+        chambers = chambers.order_by('building', 'room_number')
+
+    all_chambers = Chamber.objects.all()
+    buildings = list(all_chambers.exclude(building='').values_list('building', flat=True).distinct().order_by('building'))
+    floors = list(all_chambers.exclude(floor='').values_list('floor', flat=True).distinct().order_by('floor'))
+
+    total_count = all_chambers.count()
+    empty_count = all_chambers.annotate(total=Count('doctors', filter=Q(doctors__user__is_active=True))).filter(total=0).count()
+    occupied_count = total_count - empty_count
+
+    return render(request, 'staff/chambers.html', {
+        'chambers': chambers,
+        'buildings': buildings,
+        'floors': floors,
+        'selected_building': building_filter,
+        'selected_floor': floor_filter,
+        'selected_occupancy': occupancy_filter,
+        'selected_sort': sort,
+        'query': q,
+        'total_count': total_count,
+        'empty_count': empty_count,
+        'occupied_count': occupied_count,
+    })
+
+
+@role_required('admin')
+def chamber_edit(request, pk=None):
+    chamber = get_object_or_404(Chamber, pk=pk) if pk else None
+    form = ChamberForm(request.POST or None, instance=chamber)
+    all_doctors = DoctorProfile.objects.filter(user__is_active=True).select_related('user', 'department').prefetch_related('weekly')
+
+    if request.method == 'POST' and form.is_valid():
+        with transaction.atomic():
+            chamber = form.save()
+            assigned_docs = list(form.cleaned_data.get('doctors') or [])
+
+            # Process day allocation for assigned doctors
+            from datetime import time
+            for doc in assigned_docs:
+                days = request.POST.getlist(f'doctor_days_{doc.pk}')
+                if days:
+                    doc.chamber_days = ','.join(str(d) for d in days)
+                    # Sync weekly availability
+                    doc.weekly.all().delete()
+                    for d_str in days:
+                        WeeklyAvailability.objects.create(
+                            doctor=doc,
+                            weekday=int(d_str),
+                            start_time=time(18, 0),
+                            end_time=time(20, 0),
+                            duration_minutes=30,
+                            capacity=2,
+                            active=True
+                        )
+                    materialize_weekly(doc, days=60)
+                doc.save()
+
+            log(request.user, 'chamber.saved', chamber.pk, f'{chamber.building} {chamber.room_number}')
+            messages.success(request, f'Chamber "{chamber.display_code}" saved successfully with doctor schedules.')
+            return redirect('chamber_list')
+
+    return render(request, 'staff/chamber_form.html', {
+        'form': form,
+        'chamber': chamber,
+        'all_doctors': all_doctors,
+        'page_title': f'Edit {chamber.display_code}' if chamber else 'Add new chamber & consultation room',
+    })
+
+
+@require_POST
+@role_required('admin')
+def chamber_delete(request, pk):
+    chamber = get_object_or_404(Chamber, pk=pk)
+    name = chamber.name
+    room = chamber.room_number
+    DoctorProfile.objects.filter(chamber=chamber).update(chamber=None)
+    chamber.delete()
+    log(request.user, 'chamber.deleted', pk, f'{name} {room}')
+    messages.success(request, f'Chamber "{name} ({room})" deleted successfully.')
+    return redirect('chamber_list')
 
 
 @role_required('admin')

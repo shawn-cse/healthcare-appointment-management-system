@@ -2,7 +2,7 @@
 from datetime import date, time
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from hospital.models import User, Department, DoctorProfile, WeeklyAvailability, HospitalPolicy
+from hospital.models import User, Department, DoctorProfile, WeeklyAvailability, HospitalPolicy, Chamber
 from hospital.services import materialize_weekly
 
 DEPARTMENTS = [
@@ -98,15 +98,177 @@ class Command(BaseCommand):
                 doc,profile_new=DoctorProfile.objects.get_or_create(user=u,defaults={
                     'department':dep,'gender':gender,'qualifications':'MBBS, FCPS',
                     'designation':'Consultant','experience_years':5+((group+j)%17),
+                    'title_prefix':'Dr.',
+                    'institute':'Green Hospital Medical Center, Mirpur, Dhaka',
+                    'room_number':f'Chamber {300 + (group*10 + j)%15}',
+                    'chamber_address':'Plot 1, Section 10, Mirpur, Dhaka-1216',
+                    'contact_number':'+88096100016211, +16211',
                     'initial_fee':1000,'followup_fee':800,'followup_within_days':30,'report_fee':500,
                     'hospital_share_mode':policy.default_hospital_mode,'hospital_share_value':policy.default_hospital_value,
                     'booking_notice_hours':policy.default_notice_hours,'booking_advance_days':policy.default_advance_days,
                     'payment_deadline_hours':policy.default_payment_hours,
                     'cancel_fee_mode':policy.default_cancel_mode,'cancel_fee_value':policy.default_cancel_value})
                 if profile_new:
-                    doc.receptionists.add(receps[group//2])
+                    doc.receptionists.add(*receps)
                     for weekday in (0,2,4):
                         WeeklyAvailability.objects.get_or_create(doctor=doc,weekday=weekday,start_time=time(14,0),
                             defaults={'end_time':time(18,0),'duration_minutes':30,'capacity':2})
                 materialize_weekly(doc, days=60)
+
+        # Ensure exact reference doctor requested: Prof. Dr. Chowdhury Shamima Sultana
+        gynae_dep = next((d for d in departments if 'gynecology' in d.slug or 'gynae' in d.slug), departments[6])
+        from decimal import Decimal
+        doc_user, _ = User.objects.get_or_create(username='shamima_sultana', defaults={
+            'first_name': 'Chowdhury Shamima', 'last_name': 'Sultana', 'role': 'doctor',
+            'email': 'shamima.sultana@greenhospital.local', 'phone': '01899990707', 'dob': date(1975, 5, 20)
+        })
+        doc_user.first_name = 'Chowdhury Shamima'
+        doc_user.last_name = 'Sultana'
+        doc_user.save()
+        doc_user.set_password('abc123')
+        doc_user.save(update_fields=['password'])
+        # Seed and link Chambers with Building, Floor, Description, and Mirpur Location
+        c1, _ = Chamber.objects.get_or_create(
+            room_number='Chamber 302',
+            defaults={
+                'building': 'Building 1',
+                'name': 'Mirpur Central Outpatient Wing',
+                'floor': '3rd Floor',
+                'description': 'Building 1, chamber 302',
+                'address': 'Plot 1, Section 10, Mirpur, Dhaka-1216',
+                'contact_number': '+88096100016211, +16211',
+                'department': departments[0] if departments else None,
+                'is_active': True,
+            }
+        )
+        c1.building = 'Building 1'
+        c1.name = 'Mirpur Central Outpatient Wing'
+        c1.description = 'Building 1, chamber 302'
+        c1.floor = '3rd Floor'
+        c1.address = 'Plot 1, Section 10, Mirpur, Dhaka-1216'
+        c1.contact_number = '+88096100016211, +16211'
+        c1.save()
+
+        c2, _ = Chamber.objects.get_or_create(
+            room_number='Chamber 202',
+            defaults={
+                'building': 'Building 3',
+                'name': 'Green Hospital Specialized Wing',
+                'floor': '2nd Floor',
+                'description': 'Building 3, chamber 202',
+                'address': 'Plot 1, Section 10, Mirpur, Dhaka-1216',
+                'contact_number': '+88096100016211, +16211',
+                'department': departments[1] if len(departments) > 1 else None,
+                'is_active': True,
+            }
+        )
+        c2.building = 'Building 3'
+        c2.name = 'Green Hospital Specialized Wing'
+        c2.description = 'Building 3, chamber 202'
+        c2.floor = '2nd Floor'
+        c2.address = 'Plot 1, Section 10, Mirpur, Dhaka-1216'
+        c2.contact_number = '+88096100016211, +16211'
+        c2.save()
+
+        c3, _ = Chamber.objects.get_or_create(
+            room_number='Room 707',
+            defaults={
+                'building': 'Building 1',
+                'name': 'Mirpur Cancer Diagnostic & Oncology Center',
+                'floor': '7th Floor',
+                'description': 'Building 1, room 707',
+                'address': 'Plot 1, Section 10, Mirpur, Dhaka-1216',
+                'contact_number': '+88096100016211, +16211',
+                'department': gynae_dep,
+                'is_active': True,
+            }
+        )
+        c3.building = 'Building 1'
+        c3.name = 'Mirpur Cancer Diagnostic & Oncology Center'
+        c3.description = 'Building 1, room 707'
+        c3.floor = '7th Floor'
+        c3.address = 'Plot 1, Section 10, Mirpur, Dhaka-1216'
+        c3.contact_number = '+88096100016211, +16211'
+        c3.save()
+
+        c4, _ = Chamber.objects.get_or_create(
+            room_number='Chamber 105',
+            defaults={
+                'building': 'Building 2',
+                'name': 'Mirpur General Outpatient OPD',
+                'floor': '1st Floor',
+                'description': 'Building 2, chamber 105',
+                'address': 'Plot 1, Section 10, Mirpur, Dhaka-1216',
+                'contact_number': '+88096100016211, +16211',
+                'is_active': True,
+            }
+        )
+        c4.building = 'Building 2'
+        c4.description = 'Building 2, chamber 105'
+        c4.floor = '1st Floor'
+        c4.address = 'Plot 1, Section 10, Mirpur, Dhaka-1216'
+        c4.contact_number = '+88096100016211, +16211'
+        c4.save()
+
+        shamima_prof, _ = DoctorProfile.objects.get_or_create(user=doc_user, defaults={'department': gynae_dep})
+        shamima_prof.chamber = c3
+        shamima_prof.chamber_days = '0,2'  # Mon, Wed
+        shamima_prof.title_prefix = 'Prof. Dr.'
+        shamima_prof.qualifications = 'MBBS, FCPS(Gynaecological Oncology), FCPS(Gynae & Obs)'
+        shamima_prof.designation = 'Professor & Consultant'
+        shamima_prof.institute = 'National Institute of Cancer Research & Hospital(NICRH)'
+        shamima_prof.room_number = 'Room 707'
+        shamima_prof.chamber_address = 'Plot 1, Section 10, Mirpur, Dhaka-1216'
+        shamima_prof.contact_number = '+88096100016211, +16211'
+        shamima_prof.initial_fee = Decimal('1000.00')
+        shamima_prof.followup_fee = Decimal('800.00')
+        shamima_prof.report_fee = Decimal('500.00')
+        shamima_prof.save()
+
+        # Link doctors to chambers with multi-doctor sharing and distinct days
+        # E.g. Building 1, Chamber 302 is shared by Dr. Karim (Mon, Wed, Fri) and Dr. Mahmud (Tue, Thu, Sat)
+        karim_prof = DoctorProfile.objects.filter(user__username='karim').first()
+        if karim_prof:
+            karim_prof.chamber = c1
+            karim_prof.chamber_days = '0,2,4'  # Mon, Wed, Fri
+            karim_prof.room_number = c1.room_number
+            karim_prof.chamber_address = c1.address
+            karim_prof.contact_number = c1.contact_number
+            karim_prof.save()
+            karim_prof.weekly.all().delete()
+            for w in (0, 2, 4):
+                WeeklyAvailability.objects.create(doctor=karim_prof, weekday=w, start_time=time(16, 0),
+                                                   end_time=time(18, 0), duration_minutes=30, capacity=2)
+            materialize_weekly(karim_prof, days=60)
+
+        mahmud_prof = DoctorProfile.objects.filter(user__username='mahmud_rahman').first()
+        if mahmud_prof:
+            mahmud_prof.chamber = c1
+            mahmud_prof.chamber_days = '1,3,5'  # Tue, Thu, Sat (sharing Chamber 302!)
+            mahmud_prof.room_number = c1.room_number
+            mahmud_prof.chamber_address = c1.address
+            mahmud_prof.contact_number = c1.contact_number
+            mahmud_prof.save()
+            mahmud_prof.weekly.all().delete()
+            for w in (1, 3, 5):
+                WeeklyAvailability.objects.create(doctor=mahmud_prof, weekday=w, start_time=time(16, 0),
+                                                   end_time=time(18, 0), duration_minutes=30, capacity=2)
+            materialize_weekly(mahmud_prof, days=60)
+
+        # Other doctors in Chamber 202 (Building 3)
+        for doc in DoctorProfile.objects.filter(chamber__isnull=True):
+            doc.chamber = c2
+            doc.chamber_days = '0,2,4'
+            doc.room_number = c2.room_number
+            doc.chamber_address = c2.address
+            doc.contact_number = c2.contact_number
+            doc.save()
+        if receps:
+            shamima_prof.receptionists.add(*receps)
+        # Schedule: Mon (0) 18:00 - 20:00, Wed (2) 18:00 - 20:00
+        WeeklyAvailability.objects.get_or_create(doctor=shamima_prof, weekday=0, start_time=time(18, 0),
+            defaults={'end_time': time(20, 0), 'duration_minutes': 30, 'capacity': 2})
+        WeeklyAvailability.objects.get_or_create(doctor=shamima_prof, weekday=2, start_time=time(18, 0),
+            defaults={'end_time': time(20, 0), 'duration_minutes': 30, 'capacity': 2})
+        materialize_weekly(shamima_prof, days=60)
         self.stdout.write(self.style.SUCCESS(f'Green Hospital directory ready: {len(departments)} departments, 50 doctors, 5 receptionists, 5 patients; {created_doctors} new doctors.'))

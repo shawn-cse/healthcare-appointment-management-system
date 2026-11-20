@@ -75,12 +75,62 @@ class HospitalPolicy(models.Model):
         return obj
 
 
+class Chamber(models.Model):
+    building = models.CharField(max_length=80, blank=True, default="Building 1", help_text="e.g. Building 1, Building 2, Building 3")
+    name = models.CharField(max_length=150, help_text="Chamber, Hospital or Diagnostic Center name")
+    room_number = models.CharField(max_length=50, default="Chamber 302")
+    floor = models.CharField(max_length=50, blank=True, default="3rd Floor")
+    description = models.CharField(max_length=255, blank=True, default="Building 1, chamber 302", help_text="e.g. Building 1, chamber 302")
+    address = models.CharField(max_length=255, default="Plot 1, Section 10, Mirpur, Dhaka-1216")
+    contact_number = models.CharField(max_length=120, default="+88096100016211, +16211")
+    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='chambers')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['building', 'room_number']
+
+    def __str__(self):
+        prefix = f"{self.building} · " if self.building else ""
+        return f"{prefix}{self.name} ({self.room_number})"
+
+    @property
+    def display_code(self):
+        if self.building and self.room_number:
+            return f"{self.building}, {self.room_number}"
+        return self.room_number
+
+    @property
+    def doctors_count(self):
+        return self.doctors.filter(user__is_active=True).count()
+
+    @property
+    def is_empty(self):
+        return self.doctors_count == 0
+
+    @property
+    def doctors_with_days(self):
+        return self.doctors.filter(user__is_active=True).select_related('user', 'department').prefetch_related('weekly')
+
+    @property
+    def day_conflicts(self):
+        """Returns days where multiple doctors are scheduled in this room."""
+        from collections import defaultdict
+        day_map = defaultdict(list)
+        for doc in self.doctors_with_days:
+            for day in doc.assigned_days_display:
+                day_map[day].append(doc.user.display_name)
+        return {day: docs for day, docs in day_map.items() if len(docs) > 1}
+
+
 class DoctorProfile(models.Model):
     class Policy(models.TextChoices):
         PAY_ON_DAY = 'on_day', 'Pay on appointment day'
         PAY_WITHIN = 'within', 'Pay within deadline'
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='doctor_profile')
     department = models.ForeignKey(Department, on_delete=models.PROTECT, related_name='doctors')
+    chamber = models.ForeignKey(Chamber, on_delete=models.SET_NULL, null=True, blank=True, related_name='doctors')
+    chamber_days = models.CharField(max_length=50, blank=True, default='0,2', help_text='Comma-separated weekday numbers (0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun)')
     gender = models.CharField(max_length=10, choices=[('male','Male'), ('female','Female'), ('other','Other')], default='male')
     qualifications = models.CharField(max_length=180, blank=True)
     designation = models.CharField(max_length=150, default='Consultant')
@@ -100,13 +150,69 @@ class DoctorProfile(models.Model):
     cancel_fee_mode = models.CharField(max_length=10, choices=[('percent','Percentage'), ('fixed','Fixed amount')], default='percent')
     cancel_fee_value = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal('10.00'), validators=[money_min])
     receptionists = models.ManyToManyField(User, blank=True, related_name='assigned_doctors')
+    title_prefix = models.CharField(max_length=40, default='Dr.', blank=True)
+    institute = models.CharField(max_length=200, blank=True, default='National Institute of Cancer Research & Hospital(NICRH)')
+    room_number = models.CharField(max_length=50, blank=True, default='Chamber 302')
+    chamber_address = models.CharField(max_length=255, blank=True, default='Plot 1, Section 10, Mirpur, Dhaka-1216')
+    contact_number = models.CharField(max_length=100, blank=True, default='+88096100016211, +16211')
     is_available = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['user__first_name', 'user__last_name']
 
+    @property
+    def full_doctor_title(self):
+        prefix = self.title_prefix.strip() if self.title_prefix else 'Dr.'
+        return f'{prefix} {self.user.display_name}'
+
+    @property
+    def active_room(self):
+        if self.chamber:
+            return self.chamber.room_number
+        return self.room_number or 'Chamber 302'
+
+    @property
+    def active_address(self):
+        if self.chamber:
+            return self.chamber.address
+        return self.chamber_address or 'Plot 1, Section 10, Mirpur, Dhaka-1216'
+
+    @property
+    def active_contact(self):
+        if self.chamber:
+            return self.chamber.contact_number
+        return self.contact_number or '+88096100016211, +16211'
+
+    @property
+    def assigned_days_list(self):
+        """Returns list of integers for assigned weekdays [0, 1, 2, ...]."""
+        days = list(self.weekly.filter(active=True).values_list('weekday', flat=True).distinct().order_by('weekday'))
+        if not days and self.chamber_days:
+            try:
+                days = [int(x.strip()) for x in self.chamber_days.split(',') if x.strip().isdigit()]
+            except ValueError:
+                pass
+        return days
+
+    @property
+    def assigned_days_display(self):
+        WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        return [WEEKDAY_NAMES[d] for d in self.assigned_days_list if 0 <= d <= 6]
+
+    @property
+    def assigned_days_text(self):
+        d = self.assigned_days_display
+        return ', '.join(d) if d else 'Unscheduled'
+
+    def save(self, *args, **kwargs):
+        if self.chamber:
+            self.room_number = self.chamber.room_number
+            self.chamber_address = self.chamber.address
+            self.contact_number = self.chamber.contact_number
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f'Dr. {self.user.display_name}'
+        return self.full_doctor_title
 
     def hospital_cut(self, fee):
         fee = Decimal(fee)

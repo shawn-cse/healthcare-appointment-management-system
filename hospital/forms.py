@@ -7,9 +7,24 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from .models import (User, DoctorProfile, Department, WeeklyAvailability,
-                     AppointmentSlot, Complaint, HospitalPolicy, Appointment)
+                     AppointmentSlot, Complaint, HospitalPolicy, Appointment, Chamber)
 
-DATE = forms.DateInput(attrs={'type':'date'})
+DATE = forms.DateInput(attrs={
+    'type': 'text',
+    'class': 'field-control green-datepicker',
+    'placeholder': 'YYYY-MM-DD',
+    'autocomplete': 'off',
+    'data-datepicker': 'true'
+})
+DOB_DATE = forms.DateInput(attrs={
+    'type': 'text',
+    'class': 'field-control green-datepicker',
+    'placeholder': 'Select Date of Birth (YYYY-MM-DD)',
+    'autocomplete': 'off',
+    'data-datepicker': 'true',
+    'data-mode': 'dob',
+    'data-max': 'today'
+})
 TIME = forms.TimeInput(attrs={'type':'time'}, format='%H:%M')
 
 
@@ -48,7 +63,7 @@ class RegisterForm(forms.ModelForm, FormStyleMixin):
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'username', 'phone', 'dob', 'email', 'nid', 'address']
-        widgets = {'dob': DATE, 'address': forms.Textarea(attrs={'rows':2})}
+        widgets = {'dob': DOB_DATE, 'address': forms.Textarea(attrs={'rows':2})}
         labels = {'first_name':'First name', 'last_name':'Last name', 'username':'Username (optional)',
                   'dob':'Date of birth', 'nid':'NID (optional)', 'address':'Address (optional)', 'email':'Email (optional)'}
 
@@ -105,7 +120,7 @@ class ProfileForm(forms.ModelForm, FormStyleMixin):
     class Meta:
         model = User
         fields = ['first_name','last_name','username','email','phone','dob','nid','address','avatar']
-        widgets = {'dob': DATE, 'address': forms.Textarea(attrs={'rows':2})}
+        widgets = {'dob': DOB_DATE, 'address': forms.Textarea(attrs={'rows':2})}
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['phone'].required = True
@@ -134,6 +149,12 @@ class ProfileForm(forms.ModelForm, FormStyleMixin):
         return v
 
 
+WEEKDAY_CHOICES = [
+    ('0', 'Monday'), ('1', 'Tuesday'), ('2', 'Wednesday'), ('3', 'Thursday'),
+    ('4', 'Friday'), ('5', 'Saturday'), ('6', 'Sunday')
+]
+
+
 class StaffForm(forms.ModelForm, FormStyleMixin):
     new_password = forms.CharField(required=False, widget=forms.PasswordInput(attrs={'autocomplete':'new-password'}),
                                    help_text='Required for new accounts; leave empty when editing to keep current password.')
@@ -141,10 +162,27 @@ class StaffForm(forms.ModelForm, FormStyleMixin):
                                          label='Doctor department')
     assigned_receptionist = forms.ModelChoiceField(queryset=User.objects.filter(role='receptionist',is_active=True),
                                                     required=False, label='Assigned receptionist')
+    chamber = forms.ModelChoiceField(queryset=Chamber.objects.filter(is_active=True), required=False,
+                                     label='Chamber & Room Number', help_text='Select the consultation room for this doctor.')
+    consultation_days = forms.MultipleChoiceField(
+        choices=WEEKDAY_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label='Weekly Consultation Days in this Chamber',
+        help_text='Select which days this doctor will consult in this chamber (e.g. Mon, Wed, Fri).'
+    )
+    consultation_start_time = forms.TimeField(
+        widget=TIME, required=False, initial='18:00', label='Daily Session Start Time'
+    )
+    consultation_end_time = forms.TimeField(
+        widget=TIME, required=False, initial='20:00', label='Daily Session End Time'
+    )
+
     class Meta:
         model = User
         fields = ['role','first_name','last_name','username','email','phone','dob','nid','address','is_active']
-        widgets = {'dob': DATE, 'address':forms.Textarea(attrs={'rows':2})}
+        widgets = {'dob': DOB_DATE, 'address':forms.Textarea(attrs={'rows':2})}
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['role'].choices = [('doctor','Doctor'),('receptionist','Receptionist'),('admin','Administrator')]
@@ -152,20 +190,30 @@ class StaffForm(forms.ModelForm, FormStyleMixin):
             self.fields[key].required = True
         if not self.instance.pk:
             self.fields['new_password'].required = True
+            chambers_qs = Chamber.objects.filter(is_active=True).prefetch_related('doctors__user')
+            self.fields['chamber'].queryset = chambers_qs
+            self.fields['chamber'].label_from_instance = lambda c: f"{c.building} · {c.room_number} ({c.floor}) - {c.description} [{'Occupied: ' + ', '.join([d.user.display_name for d in c.doctors.all()]) if c.doctors.exists() else 'Empty / Available'}]"
         else:
-            self.fields.pop('department')
-            self.fields.pop('assigned_receptionist')
+            self.fields.pop('department', None)
+            self.fields.pop('assigned_receptionist', None)
+            self.fields.pop('chamber', None)
+            self.fields.pop('consultation_days', None)
+            self.fields.pop('consultation_start_time', None)
+            self.fields.pop('consultation_end_time', None)
         self.style_fields()
+
     def clean_email(self):
         v = self.cleaned_data['email'].strip().lower()
         if User.objects.filter(email__iexact=v).exclude(pk=self.instance.pk).exists():
             raise ValidationError('This email address is already associated with an account.')
         return v
+
     def clean_username(self):
         value = self.cleaned_data['username']
         if User.objects.filter(Q(username__iexact=value) | Q(phone=value) | Q(email__iexact=value)).exclude(pk=self.instance.pk).exists():
             raise ValidationError('This username conflicts with another account identifier.')
         return value
+
     def clean(self):
         data = super().clean()
         if self.instance.pk and data.get('role') and data['role'] != self.instance.role:
@@ -175,6 +223,10 @@ class StaffForm(forms.ModelForm, FormStyleMixin):
                 self.add_error('department', 'Choose a department for the new doctor.')
             if not data.get('assigned_receptionist'):
                 self.add_error('assigned_receptionist', 'Assign a receptionist when creating a doctor.')
+            if not data.get('chamber'):
+                self.add_error('chamber', 'Assign a consultation chamber/room for the new doctor.')
+            if not data.get('consultation_days'):
+                self.add_error('consultation_days', 'Select which weekly days the doctor will consult in this chamber.')
         return data
     def clean_new_password(self):
         value = self.cleaned_data.get('new_password')
@@ -194,7 +246,7 @@ class StaffForm(forms.ModelForm, FormStyleMixin):
 class DoctorSettingsForm(forms.ModelForm, FormStyleMixin):
     class Meta:
         model = DoctorProfile
-        fields = ['department','gender','designation','qualifications','registration_number','experience_years',
+        fields = ['chamber','department','gender','designation','qualifications','registration_number','experience_years',
                   'biography','initial_fee','followup_fee','followup_within_days','report_fee',
                   'hospital_share_mode','hospital_share_value','booking_notice_hours','booking_advance_days',
                   'payment_policy','payment_deadline_hours','cancel_fee_mode','cancel_fee_value',
@@ -203,10 +255,13 @@ class DoctorSettingsForm(forms.ModelForm, FormStyleMixin):
     def __init__(self, *args, is_admin=False, **kwargs):
         super().__init__(*args, **kwargs)
         if not is_admin:
-            for field in ('department','gender','registration_number','hospital_share_mode','hospital_share_value','receptionists'):
+            for field in ('chamber','department','gender','registration_number','hospital_share_mode','hospital_share_value','receptionists'):
                 self.fields.pop(field, None)
         else:
             self.fields['receptionists'].queryset = User.objects.filter(role='receptionist', is_active=True)
+            self.fields['chamber'].queryset = Chamber.objects.filter(is_active=True)
+            self.fields['chamber'].required = False
+            self.fields['chamber'].label = 'Assigned Chamber & Room'
         self.style_fields()
     def clean(self):
         data = super().clean()
@@ -253,19 +308,259 @@ class SlotForm(forms.ModelForm, FormStyleMixin):
 
 
 class PatientBookingForm(forms.Form, FormStyleMixin):
-    visit_type = forms.ChoiceField(choices=Appointment.Visit.choices)
-    payment_method = forms.ChoiceField(choices=[('cash','Pay at hospital'),('online','Pay online')])
-    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows':2}), label='Reason for visit (optional)')
+    visit_type = forms.ChoiceField(choices=Appointment.Visit.choices, label='Consultation Type')
+    payment_method = forms.ChoiceField(choices=[('cash','Pay at hospital'),('online','Pay online')], label='Payment Method')
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows':2, 'placeholder':'Optional reason for visit, symptoms, or remarks'}), label='Reason for visit (optional)')
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.style_fields()
+
+
+class StaffAssistedBookingForm(forms.Form, FormStyleMixin):
+    name = forms.CharField(
+        label='Patient Full Name',
+        max_length=150,
+        widget=forms.TextInput(attrs={'placeholder': 'e.g. Mohammad Ali', 'autocomplete': 'name'})
+    )
+    phone = forms.CharField(
+        label='Patient Contact Phone',
+        max_length=16,
+        widget=forms.TextInput(attrs={'placeholder': '+8801712345678', 'autocomplete': 'tel'})
+    )
+    dob = forms.DateField(
+        required=False,
+        label='Date of Birth (optional)',
+        widget=DOB_DATE
+    )
+    patient = forms.ModelChoiceField(
+        queryset=User.objects.filter(role='patient', is_active=True),
+        required=False,
+        label='Link Registered Patient (optional)',
+        help_text='If the patient already has an account, select it to attach visit to their history.'
+    )
+    visit_type = forms.ChoiceField(
+        choices=Appointment.Visit.choices,
+        label='Consultation Type',
+        initial=Appointment.Visit.FIRST
+    )
+    source = forms.ChoiceField(
+        choices=[
+            ('desk', 'Reception Desk / Walk-in'),
+            ('phone', 'Telephone / Helpline'),
+            ('web', 'Assisted Online / Email')
+        ],
+        label='Booking Channel',
+        initial='desk'
+    )
+    payment_choice = forms.ChoiceField(
+        choices=[
+            ('cash', 'Cash Collected Now (mark paid & generate receipt immediately)'),
+            ('later', 'Pay Later (unpaid - collect at reception on appointment day)')
+        ],
+        label='Payment Collection',
+        initial='cash'
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional internal notes, symptoms, or special instructions'}),
+        label='Staff & Consultation Notes (optional)'
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.is_bound and self.data.get('phone'):
+            phone = self.data.get('phone', '').strip()
+            self.fields['patient'].queryset = User.objects.filter(role='patient', phone=phone)
+        else:
+            self.fields['patient'].queryset = User.objects.filter(role='patient', is_active=True)[:100]
+        self.style_fields()
+
+    def clean_dob(self):
+        v = self.cleaned_data.get('dob')
+        if v and v > timezone.localdate():
+            raise ValidationError('Date of birth cannot be in the future.')
+        return v
+
+
+class ChamberForm(forms.ModelForm, FormStyleMixin):
+    doctors = forms.ModelMultipleChoiceField(
+        queryset=DoctorProfile.objects.filter(user__is_active=True).select_related('user', 'department'),
+        required=False,
+        label='Assign Doctors to this Chamber',
+        help_text='Select doctors consulting in this chamber. Room number, building, address and hotline will sync automatically.'
+    )
+
+    class Meta:
+        model = Chamber
+        fields = ['building', 'room_number', 'floor', 'description', 'name', 'address', 'contact_number', 'department', 'is_active']
+        widgets = {
+            'building': forms.TextInput(attrs={'placeholder': 'e.g. Building 1, Building 3'}),
+            'room_number': forms.TextInput(attrs={'placeholder': 'e.g. Chamber 302, Chamber 202'}),
+            'floor': forms.TextInput(attrs={'placeholder': 'e.g. 3rd Floor, 2nd Floor'}),
+            'description': forms.TextInput(attrs={'placeholder': 'e.g. Building 1, chamber 302'}),
+            'name': forms.TextInput(attrs={'placeholder': 'e.g. Mirpur Central Outpatient Wing'}),
+            'address': forms.TextInput(attrs={'placeholder': 'e.g. Plot 1, Section 10, Mirpur, Dhaka-1216'}),
+            'contact_number': forms.TextInput(attrs={'placeholder': 'e.g. +88096100016211, +16211'}),
+        }
+        labels = {
+            'building': 'Building / Wing',
+            'room_number': 'Chamber / Room Number',
+            'floor': 'Floor Level',
+            'description': 'Room Description (e.g. Building 1, chamber 302)',
+            'name': 'Center / Chamber Name',
+            'address': 'Chamber Address (Mirpur, Dhaka)',
+            'contact_number': 'Hotline Numbers (+88096100016211, +16211)',
+            'department': 'Primary Department (optional)',
+            'is_active': 'Active for Consultations',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields['doctors'].initial = self.instance.doctors.all()
+        self.style_fields()
+
+    def save(self, commit=True):
+        chamber = super().save(commit=commit)
+        if commit:
+            assigned = list(self.cleaned_data.get('doctors') or [])
+            # Unassign doctors no longer selected
+            DoctorProfile.objects.filter(chamber=chamber).exclude(pk__in=[d.pk for d in assigned]).update(chamber=None)
+            # Assign selected doctors and synchronize chamber data
+            for doc in assigned:
+                doc.chamber = chamber
+                doc.room_number = chamber.room_number
+                doc.chamber_address = chamber.address
+                doc.contact_number = chamber.contact_number
+                doc.save()
+        return chamber
+
+
+class StaffAssistedBookingForm(forms.Form, FormStyleMixin):
+    name = forms.CharField(
+        label='Patient Full Name',
+        max_length=150,
+        widget=forms.TextInput(attrs={'placeholder': 'e.g. Mohammad Ali', 'autocomplete': 'name'})
+    )
+    phone = forms.CharField(
+        label='Patient Contact Phone',
+        max_length=16,
+        widget=forms.TextInput(attrs={'placeholder': '+8801712345678', 'autocomplete': 'tel'})
+    )
+    dob = forms.DateField(
+        required=False,
+        label='Date of Birth (optional)',
+        widget=DOB_DATE
+    )
+    patient = forms.ModelChoiceField(
+        queryset=User.objects.filter(role='patient', is_active=True),
+        required=False,
+        label='Link Registered Patient (optional)',
+        help_text='If the patient already has an account, select it to attach visit to their history.'
+    )
+    visit_type = forms.ChoiceField(
+        choices=Appointment.Visit.choices,
+        label='Consultation Type',
+        initial=Appointment.Visit.FIRST
+    )
+    source = forms.ChoiceField(
+        choices=[
+            ('desk', 'Reception Desk / Walk-in'),
+            ('phone', 'Telephone / Helpline'),
+            ('web', 'Assisted Online / Email')
+        ],
+        label='Booking Channel',
+        initial='desk'
+    )
+    payment_choice = forms.ChoiceField(
+        choices=[
+            ('cash', 'Cash Collected Now (mark paid & generate receipt immediately)'),
+            ('later', 'Pay Later (unpaid - collect at reception on appointment day)')
+        ],
+        label='Payment Collection',
+        initial='cash'
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional internal notes, symptoms, or special instructions'}),
+        label='Staff & Consultation Notes (optional)'
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.is_bound and self.data.get('phone'):
+            phone = self.data.get('phone', '').strip()
+            self.fields['patient'].queryset = User.objects.filter(role='patient', phone=phone)
+        else:
+            self.fields['patient'].queryset = User.objects.filter(role='patient', is_active=True)[:100]
+        self.style_fields()
+
+    def clean_dob(self):
+        v = self.cleaned_data.get('dob')
+        if v and v > timezone.localdate():
+            raise ValidationError('Date of birth cannot be in the future.')
+        return v
+
+
+class ChamberForm(forms.ModelForm, FormStyleMixin):
+    doctors = forms.ModelMultipleChoiceField(
+        queryset=DoctorProfile.objects.filter(user__is_active=True).select_related('user', 'department'),
+        required=False,
+        label='Assign Doctors to this Chamber',
+        help_text='Select doctors consulting in this chamber. Room number, building, address and hotline will sync automatically.'
+    )
+
+    class Meta:
+        model = Chamber
+        fields = ['building', 'room_number', 'floor', 'description', 'name', 'address', 'contact_number', 'department', 'is_active']
+        widgets = {
+            'building': forms.TextInput(attrs={'placeholder': 'e.g. Building 1, Building 3'}),
+            'room_number': forms.TextInput(attrs={'placeholder': 'e.g. Chamber 302, Chamber 202'}),
+            'floor': forms.TextInput(attrs={'placeholder': 'e.g. 3rd Floor, 2nd Floor'}),
+            'description': forms.TextInput(attrs={'placeholder': 'e.g. Building 1, chamber 302'}),
+            'name': forms.TextInput(attrs={'placeholder': 'e.g. Mirpur Central Outpatient Wing'}),
+            'address': forms.TextInput(attrs={'placeholder': 'e.g. Plot 1, Section 10, Mirpur, Dhaka-1216'}),
+            'contact_number': forms.TextInput(attrs={'placeholder': 'e.g. +88096100016211, +16211'}),
+        }
+        labels = {
+            'building': 'Building / Wing',
+            'room_number': 'Chamber / Room Number',
+            'floor': 'Floor Level',
+            'description': 'Room Description (e.g. Building 1, chamber 302)',
+            'name': 'Center / Chamber Name',
+            'address': 'Chamber Address (Mirpur, Dhaka)',
+            'contact_number': 'Hotline Numbers (+88096100016211, +16211)',
+            'department': 'Primary Department (optional)',
+            'is_active': 'Active for Consultations',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields['doctors'].initial = self.instance.doctors.all()
+        self.style_fields()
+
+    def save(self, commit=True):
+        chamber = super().save(commit=commit)
+        if commit:
+            assigned = list(self.cleaned_data.get('doctors') or [])
+            # Unassign doctors no longer selected
+            DoctorProfile.objects.filter(chamber=chamber).exclude(pk__in=[d.pk for d in assigned]).update(chamber=None)
+            # Assign selected doctors and synchronize chamber data
+            for doc in assigned:
+                doc.chamber = chamber
+                doc.room_number = chamber.room_number
+                doc.chamber_address = chamber.address
+                doc.contact_number = chamber.contact_number
+                doc.save()
+        return chamber
 
 
 class ReceptionBookingForm(forms.Form, FormStyleMixin):
     slot = forms.ModelChoiceField(queryset=AppointmentSlot.objects.none(), label='Available appointment slot')
     name = forms.CharField(label='Patient full name', max_length=150)
     phone = forms.CharField(label='Patient phone', max_length=16)
-    dob = forms.DateField(required=False, label='Patient date of birth (optional)', widget=DATE)
+    dob = forms.DateField(required=False, label='Patient date of birth (optional)', widget=DOB_DATE)
     patient = forms.ModelChoiceField(queryset=User.objects.filter(role='patient'), required=False,
                                       label='Existing patient account (optional)', help_text='Choose only after confirming identity.')
     identity_verified = forms.BooleanField(required=False, label='Identity confirmed for linked account')

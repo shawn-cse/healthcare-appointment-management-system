@@ -13,6 +13,7 @@ All pre-seeded test accounts use the password: **`abc123`**
 | **Admin** | `admin` | `01900000000` | `admin@greenhospital.local` | `abc123` |
 | **Doctor** | `karim` | `01800000001` | `karim@gmail.com` | `abc123` |
 | **Doctor** | `mahmud_rahman` | `01800000002` | `mahmud_rahman@gmail.com` | `abc123` |
+| **Doctor (Prof.)** | `shamima_sultana` | `01899990707` | `shamima.sultana@greenhospital.local` | `abc123` |
 | **Receptionist** | `shirin` | `01700004001` | `shirin.reception@gmail.com` | `abc123` |
 | **Receptionist** | `masud` | `01700004002` | `masud.reception@gmail.com` | `abc123` |
 | **Patient** | `patient1` | `01600005001` | `patient.amin1@gmail.com` | `abc123` |

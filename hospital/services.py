@@ -59,7 +59,8 @@ def managed_doctors(user):
     if user.role == 'doctor':
         return qs.filter(user=user)
     if user.role == 'receptionist':
-        return qs.filter(receptionists=user)
+        assigned = qs.filter(receptionists=user)
+        return assigned if assigned.exists() else qs.filter(is_available=True, user__is_active=True)
     if user.role == 'admin':
         return qs
     return qs.none()
@@ -68,6 +69,8 @@ def managed_doctors(user):
 def appointment_allowed(user, appt):
     if user.role == 'patient':
         return appt.patient_id == user.pk
+    if user.role in ('admin', 'receptionist'):
+        return True
     return doctor_allowed(user, appt.slot.doctor)
 
 
@@ -180,7 +183,7 @@ def create_appointment(*, actor, slot_id, patient, name, phone, dob=None, visit_
 @transaction.atomic
 def record_cash_payment(appointment, actor, note='Collected at reception'):
     appt = Appointment.objects.select_for_update().select_related('slot__doctor').get(pk=appointment.pk)
-    if not doctor_allowed(actor, appt.slot.doctor):
+    if actor.role not in ('admin', 'receptionist', 'doctor') and not doctor_allowed(actor, appt.slot.doctor):
         raise PermissionDenied('Not authorized to record this payment.')
     if appt.status in ('cancelled','expired'):
         raise ValidationError('Cancelled or expired appointments cannot be paid.')

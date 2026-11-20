@@ -78,4 +78,155 @@
     staffRole.addEventListener('change',toggle);
     toggle();
   }
+
+  // --- Real-Time Instant Doctor Search & Sorting ---
+  const searchInput = doc.getElementById('doctor-search-input');
+  const deptSelect = doc.getElementById('dept-select');
+  const sortSelect = doc.getElementById('sort-select');
+  const cardsContainer = doc.getElementById('doctor-cards-container');
+  const clearBtn = doc.getElementById('search-clear-btn');
+  const countText = doc.getElementById('results-count-text');
+  const clientEmpty = doc.getElementById('no-doctors-client');
+  const serverEmpty = doc.getElementById('no-doctors-server');
+
+  if (searchInput && cardsContainer) {
+    const cards = Array.from(cardsContainer.querySelectorAll('.doctor-profile-card'));
+
+    function filterAndSortDoctors() {
+      const query = searchInput.value.trim().toLowerCase();
+      const selectedDept = deptSelect ? deptSelect.value : '';
+      const sortVal = sortSelect ? sortSelect.value : 'name';
+
+      if (clearBtn) {
+        clearBtn.style.display = query ? 'inline-flex' : 'none';
+      }
+
+      let visibleCards = [];
+
+      cards.forEach(card => {
+        const name = card.dataset.name || '';
+        const dept = card.dataset.dept || '';
+        const deptId = card.dataset.deptId || '';
+        const qual = card.dataset.qual || '';
+        const inst = card.dataset.inst || '';
+        const room = card.dataset.room || '';
+
+        const matchesQuery = !query ||
+          name.includes(query) ||
+          dept.includes(query) ||
+          qual.includes(query) ||
+          inst.includes(query) ||
+          room.includes(query);
+
+        const matchesDept = !selectedDept || deptId === selectedDept;
+
+        if (matchesQuery && matchesDept) {
+          card.style.display = '';
+          visibleCards.push(card);
+        } else {
+          card.style.display = 'none';
+        }
+      });
+
+      // Sort visible cards
+      visibleCards.sort((a, b) => {
+        if (sortVal === 'fee_asc') {
+          return parseFloat(a.dataset.fee || 0) - parseFloat(b.dataset.fee || 0);
+        } else if (sortVal === 'fee_desc') {
+          return parseFloat(b.dataset.fee || 0) - parseFloat(a.dataset.fee || 0);
+        } else if (sortVal === 'experience') {
+          return parseInt(b.dataset.exp || 0) - parseInt(a.dataset.exp || 0);
+        } else if (sortVal === 'department') {
+          return (a.dataset.dept || '').localeCompare(b.dataset.dept || '');
+        } else {
+          return (a.dataset.name || '').localeCompare(b.dataset.name || '');
+        }
+      });
+
+      // Re-append sorted cards in order
+      visibleCards.forEach(card => cardsContainer.appendChild(card));
+
+      // Update counter
+      if (countText) {
+        countText.innerHTML = `Showing <b>${visibleCards.length}</b> specialist${visibleCards.length === 1 ? '' : 's'}`;
+      }
+
+      // Handle empty state
+      if (clientEmpty) {
+        clientEmpty.style.display = (visibleCards.length === 0) ? 'block' : 'none';
+      }
+      if (serverEmpty && visibleCards.length > 0) {
+        serverEmpty.style.display = 'none';
+      }
+    }
+
+    searchInput.addEventListener('input', filterAndSortDoctors);
+    if (deptSelect) deptSelect.addEventListener('change', filterAndSortDoctors);
+    if (sortSelect) sortSelect.addEventListener('change', filterAndSortDoctors);
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchInput.focus();
+        filterAndSortDoctors();
+      });
+    }
+
+    const resetBtn = doc.getElementById('reset-client-search');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        if (deptSelect) deptSelect.value = '';
+        if (sortSelect) sortSelect.value = 'name';
+        filterAndSortDoctors();
+      });
+    }
+  }
+
+  // --- Real-Time Instant Department Search ---
+  const depSearch = doc.getElementById('department-live-search');
+  const depContainer = doc.getElementById('departments-container');
+  const depCount = doc.getElementById('department-count');
+
+  if (depSearch && depContainer) {
+    const depCards = Array.from(depContainer.querySelectorAll('.department-showcase-card'));
+    depSearch.addEventListener('input', () => {
+      const q = depSearch.value.trim().toLowerCase();
+      let matchCount = 0;
+      depCards.forEach(card => {
+        const name = card.dataset.depName || '';
+        const desc = card.dataset.depDesc || '';
+        if (!q || name.includes(q) || desc.includes(q)) {
+          card.style.display = '';
+          matchCount++;
+        } else {
+          card.style.display = 'none';
+        }
+      });
+      if (depCount) {
+        depCount.textContent = `Showing ${matchCount} specialized department${matchCount === 1 ? '' : 's'}`;
+      }
+    });
+  }
+
+  // --- Public Mobile Navigation Drawer ---
+  const publicNavToggle = doc.querySelector('[data-toggle-public-nav]');
+  const publicNav = doc.getElementById('public-navigation');
+  if (publicNavToggle && publicNav) {
+    publicNavToggle.addEventListener('click', () => {
+      publicNav.classList.toggle('nav-expanded');
+    });
+  }
+
+  // --- Smooth Scroll for Make Appointment Button ---
+  const heroMakeAppt = doc.getElementById('hero-make-appt-btn');
+  if (heroMakeAppt) {
+    heroMakeAppt.addEventListener('click', (e) => {
+      const target = doc.getElementById('appointment-section');
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }
 })();
