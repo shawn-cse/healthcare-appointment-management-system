@@ -113,17 +113,8 @@
         {% endif %}
       {% endif %}
     </nav>
-    <div class="nav-eyebrow nav-section">ACCOUNT</div>
-    <nav class="nav-list" aria-label="Account navigation">
-      <a href="{% url 'profile' %}" data-nav="profile"><svg class="icon"><use href="#ic-user"/></svg> My Profile</a>
-      <a href="{% url 'password_change' %}" data-nav="password_change"><svg class="icon"><use href="#ic-settings"/></svg> Password & Security</a>
-    </nav>
   </div>
   <div class="sidebar-footer">
-    <div class="contact-line">
-      <svg class="icon"><use href="#ic-building"/></svg>
-      <span>Section 10, Mirpur, Dhaka-1216<br><b>24/7 Hotline: +88096100016211, +16211</b></span>
-    </div>
     <form action="{% url 'logout' %}" method="post">
       {% csrf_token %}
       <button class="sidebar-logout" type="submit"><svg class="icon"><use href="#ic-log-out"/></svg> Sign out</button>
@@ -145,15 +136,52 @@
         <svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors
       </a>
       <span class="today-chip"><svg class="icon"><use href="#ic-clock"/></svg>{% now "D, d M Y" %}</span>
-      <a href="{% url 'profile' %}" class="profile-chip">
-        <span class="avatar avatar-small">
-          {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="Profile photo">{% else %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% endif %}
-        </span>
-        <span class="profile-chip-text">
-          <b>{{ user.display_name }}</b>
-          <small>{{ user.get_role_display }}</small>
-        </span>
-      </a>
+
+      <!-- User Profile Dropdown Menu in Top Right -->
+      <div class="profile-dropdown-wrap" id="profile-dropdown-wrap">
+        <button type="button" class="profile-chip profile-trigger" id="profile-trigger-btn" aria-expanded="false" aria-haspopup="true">
+          <span class="avatar avatar-small">
+            {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="{{ user.display_name }}">{% else %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% endif %}
+          </span>
+          <span class="profile-chip-text">
+            <b>{{ user.display_name }}</b>
+            <small>{{ user.get_role_display }}</small>
+          </span>
+          <svg class="icon dropdown-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+
+        <div class="profile-dropdown-menu" id="profile-dropdown-menu" role="menu">
+          <div class="dropdown-user-header">
+            <span class="avatar avatar-medium">
+              {% if user.avatar %}<img src="{{ user.avatar.url }}" alt="{{ user.display_name }}">{% else %}{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}{% endif %}
+            </span>
+            <div class="dd-user-meta">
+              <strong class="dd-user-name">{{ user.display_name }}</strong>
+              <span class="dd-user-email">{{ user.email|default:user.username }}</span>
+              <span class="role-pill-badge">{{ user.get_role_display }}</span>
+            </div>
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-links-list">
+            <a href="{% url 'profile' %}" class="dropdown-link-item" role="menuitem">
+              <svg class="icon"><use href="#ic-user"/></svg>
+              <span>Update Profile</span>
+            </a>
+            <a href="{% url 'password_change' %}" class="dropdown-link-item" role="menuitem">
+              <svg class="icon"><use href="#ic-settings"/></svg>
+              <span>Change Password</span>
+            </a>
+          </div>
+          <div class="dropdown-divider"></div>
+          <form action="{% url 'logout' %}" method="post" class="dropdown-logout-form">
+            {% csrf_token %}
+            <button type="submit" class="dropdown-link-item dropdown-logout-action" role="menuitem">
+              <svg class="icon"><use href="#ic-log-out"/></svg>
+              <span>Sign Out</span>
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   </header>
   <main class="main-content" id="main-content">

@@ -20,6 +20,32 @@
   function updateSelected(){const counter=doc.getElementById('selected-count');if(counter)counter.textContent=doc.querySelectorAll('.bulk-check:checked').length;}
   // Confirm destructive or financial operations using accessible native prompts.
   doc.querySelectorAll('[data-confirm]').forEach(button=>button.addEventListener('click',e=>{if(!window.confirm(button.dataset.confirm)){e.preventDefault();e.stopPropagation()}}));
+
+  // --- Profile Dropdown Menu in Topbar ---
+  const profileDropdown = doc.getElementById('profile-dropdown-wrap');
+  const profileTrigger = doc.getElementById('profile-trigger-btn');
+  if (profileDropdown && profileTrigger) {
+    profileTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = profileDropdown.classList.toggle('is-open');
+      profileTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+
+    doc.addEventListener('click', (e) => {
+      if (!profileDropdown.contains(e.target)) {
+        profileDropdown.classList.remove('is-open');
+        profileTrigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    doc.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && profileDropdown.classList.contains('is-open')) {
+        profileDropdown.classList.remove('is-open');
+        profileTrigger.setAttribute('aria-expanded', 'false');
+        profileTrigger.focus();
+      }
+    });
+  }
   const booking=doc.getElementById('reception-booking-form');
   if(booking){
     const docSelect=doc.getElementById('booking-doctor');const date=doc.getElementById('booking-date');const select=doc.getElementById('id_slot');const hint=doc.getElementById('slot-capacity-hint');
