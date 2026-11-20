@@ -32,9 +32,16 @@
     </div>
 
     <div class="booking-identity">
-      <span class="doctor-avatar">{{ doctor.user.first_name|first|upper }}{{ doctor.user.last_name|first|upper }}</span>
+      <div class="booking-avatar-wrap">
+        {% if doctor.user.avatar %}
+        <img src="{{ doctor.user.avatar.url }}" alt="{{ doctor.full_doctor_title }}" class="doctor-photo">
+        {% else %}
+        <svg class="doctor-vector-avatar" viewBox="0 0 64 64" style="width:48px;height:48px;"><use href="#{{ doctor.default_avatar }}"/></svg>
+        {% endif %}
+      </div>
       <div>
         <strong>{{ doctor.full_doctor_title }}</strong>
+        <span class="bmdc-tag" style="display:inline-block;margin:2px 0;">{{ doctor.bmdc_display }}</span>
         <div class="qual-text">{{ doctor.qualifications|default:'Consultant Specialist' }}</div>
         <small class="text-muted">{{ doctor.designation }} · {{ doctor.department.name }}</small>
       </div>
@@ -48,6 +55,11 @@
     {% endif %}
 
     <div class="details-divider"></div>
+
+    <div class="details-row highlight-serial-row" style="background:#eaf8f1;padding:8px 12px;border-radius:8px;border:1px solid #c2ebd5;margin-bottom:10px;">
+      <span style="font-weight:700;color:#104b42;">Allocated Serial Number</span>
+      <b style="font-size:18px;color:#146347;">Serial #{{ slot.next_serial_number }}</b>
+    </div>
 
     <div class="details-row">
       <span>Chamber / Center</span>

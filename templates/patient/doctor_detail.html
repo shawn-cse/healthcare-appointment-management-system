@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
-{% block title %}{{ doctor.full_doctor_title }} | Green Hospital{% endblock %}
+{% block title %}{{ doctor.full_doctor_title }} | Green Hospital Mirpur{% endblock %}
 {% block content %}
 <div class="doctor-profile-page container">
   <!-- Top Navigation Breadcrumb -->
   <div class="profile-top-bar">
-    <a class="back-link" href="{% url 'doctor_directory' %}">‹ Back to All Doctors</a>
+    <a class="back-link" href="{% url 'doctor_directory' %}">‹ Back to Specialist Doctors</a>
     <span class="breadcrumb-dept">{{ doctor.department.name }}</span>
   </div>
 
@@ -15,26 +15,40 @@
         {% if doctor.user.avatar %}
         <img src="{{ doctor.user.avatar.url }}" alt="{{ doctor.full_doctor_title }}" class="doctor-hero-avatar">
         {% else %}
-        <div class="doctor-hero-initials">
-          {{ doctor.user.first_name|first|upper }}{{ doctor.user.last_name|first|upper }}
-        </div>
+        <svg class="doctor-vector-avatar-hero" viewBox="0 0 64 64"><use href="#{{ doctor.default_avatar }}"/></svg>
         {% endif %}
-        <span class="hero-verified-tag">✓ Verified Specialist</span>
       </div>
 
       <div class="doctor-hero-content">
-        <div class="dept-pill-tag">{{ doctor.department.name }}</div>
+        <div class="doctor-hero-badges">
+          <span class="dept-pill-tag">{{ doctor.department.name }}</span>
+          <span class="bmdc-pill-tag">{{ doctor.bmdc_display }}</span>
+        </div>
+
         <h1 class="hero-doctor-name">{{ doctor.full_doctor_title }}</h1>
-        <p class="hero-doctor-designation"><b>{{ doctor.designation }}</b></p>
-        
-        <div class="hero-qualifications">
-          <span class="hero-label">Degrees & Qualifications:</span>
-          <p class="qual-highlight">{{ doctor.qualifications|default:'MBBS, FCPS' }}</p>
+        <p class="hero-doctor-designation">{{ doctor.designation }}</p>
+
+        <!-- Structured Qualifications Box -->
+        <div class="hero-qualifications-box">
+          <span class="qual-box-label">Degrees & Specializations:</span>
+          <div class="qual-box-list">
+            {% for line in doctor.qualifications_list %}
+            <div class="qual-item-line">
+              <span class="qual-bullet">•</span>
+              <span>{{ line }}</span>
+            </div>
+            {% empty %}
+            <div class="qual-item-line">
+              <span class="qual-bullet">•</span>
+              <span>{{ doctor.qualifications|default:'MBBS, Specialist Consultant' }}</span>
+            </div>
+            {% endfor %}
+          </div>
         </div>
 
         {% if doctor.institute %}
         <div class="hero-institute">
-          <span class="hero-label">Institute / Hospital:</span>
+          <span class="hero-label">Institute / Affiliation:</span>
           <p class="inst-highlight">
             <svg class="icon"><use href="#ic-building"/></svg>
             {{ doctor.institute }}
@@ -44,10 +58,10 @@
 
         <!-- Big Primary CTA: MAKE APPOINTMENT -->
         <div class="hero-cta-section">
-          <button type="button" class="button button-primary button-lg hero-appointment-btn" id="hero-make-appt-btn">
+          <a href="#appointment-section" class="button button-primary button-lg hero-appointment-btn" id="hero-make-appt-btn">
             MAKE APPOINTMENT <svg class="icon"><use href="#ic-arrow"/></svg>
-          </button>
-          <span class="instant-book-note"><span class="pulse-indicator"></span> Available for online reservation</span>
+          </a>
+          <span class="instant-book-note"><span class="pulse-indicator"></span> Direct online serial enrollment open</span>
         </div>
       </div>
     </div>
@@ -66,7 +80,7 @@
         <div class="chamber-detail-row">
           <span class="detail-label">Room</span>
           <span class="detail-sep">:</span>
-          <b class="detail-value highlight-room">{{ doctor.room_number|default:'Room: 707' }}</b>
+          <b class="detail-value highlight-room">{{ doctor.room_number|default:'Room 707' }}</b>
         </div>
 
         <div class="chamber-detail-row align-top">
@@ -76,10 +90,10 @@
         </div>
 
         <div class="chamber-detail-row">
-          <span class="detail-label">24/7 Hotline</span>
+          <span class="detail-label">Contact</span>
           <span class="detail-sep">:</span>
           <b class="detail-value hotline-link">
-            <a href="tel:+88096100016211">{{ doctor.active_contact|default:'+88096100016211, +16211' }}</a>
+            <a href="tel:+88096100016211">{{ doctor.active_contact|default:'+88096100016211' }}</a>
           </b>
         </div>
 
@@ -109,7 +123,7 @@
       <div class="chamber-extra-info">
         <div class="extra-item">
           <span>Booking advance notice:</span>
-          <b>{{ doctor.booking_notice_hours }} hours</b>
+          <b>{{ doctor.booking_notice_hours }} hours before session</b>
         </div>
         <div class="extra-item">
           <span>Payment policy:</span>
@@ -134,127 +148,162 @@
           </div>
           <div class="schedule-time-range">
             <b>{{ sched.start_time|time:"h:iA" }} – {{ sched.end_time|time:"h:iA" }}</b>
-            <small>{{ sched.duration_minutes }} min sessions · {{ sched.capacity }} patient{{ sched.capacity|pluralize }} per slot</small>
+            <small>Sequential patient serials · Max {{ doctor.max_patients_per_session }} patients</small>
           </div>
         </div>
         {% empty %}
         <div class="empty-state">
-          <p>Please check the calendar below for published appointment dates.</p>
+          <p>Please check upcoming consultation dates below for scheduled clinic sessions.</p>
         </div>
         {% endfor %}
       </div>
 
       <div class="schedule-footer-note">
         <svg class="icon"><use href="#ic-check"/></svg>
-        <span>Select an upcoming date below to view open appointment slots and reserve your seat.</span>
+        <span>Patients receive sequential serial numbers on booking and are attended in orderly sequence.</span>
       </div>
     </div>
   </div>
 
-  <!-- Interactive Appointment Slot Booking Section -->
+  <!-- Interactive Appointment Slot & Serial Booking Section -->
   <section class="panel padded-panel appointment-booking-section" id="appointment-section">
     <div class="section-title-wrap">
       <div class="title-with-badge">
         <span class="badge-step">STEP 1</span>
-        <h2>Select Consultation Date & Time Slot</h2>
+        <h2>Select Consultation Date & Time</h2>
       </div>
       <p>Room: <b>{{ doctor.room_number|default:'Room 707' }}</b> · Fee: <b>৳{{ doctor.initial_fee|floatformat:0 }}</b> · Advance Notice: <b>{{ doctor.booking_notice_hours }}h</b></p>
     </div>
 
-    <!-- Date Strip Selector -->
-    <div class="date-strip-wrapper">
-      <div class="date-strip-scroll">
-        {% for day in next_dates %}
-        <a class="date-card-pill {% if day == chosen_date %}selected{% endif %}" href="?date={{ day|date:'Y-m-d' }}">
-          <span class="pill-weekday">{{ day|date:'D' }}</span>
-          <b class="pill-day-num">{{ day|date:'d' }}</b>
-          <span class="pill-month">{{ day|date:'M' }}</span>
-          {% if day.weekday in practice_weekdays %}
-          <span class="pill-clinic-tag">Clinic</span>
-          {% endif %}
+    <!-- Upcoming Clinic Session Dates Tabs -->
+    <div class="clinic-sessions-selector">
+      <span class="selector-heading">Upcoming Consultation Sessions:</span>
+      <div class="session-dates-grid">
+        {% for s in upcoming_slots|slice:":8" %}
+        <a href="?date={{ s.date|date:'Y-m-d' }}#appointment-section"
+           class="session-date-card {% if s.date == chosen_date %}is-active{% endif %}">
+          <span class="s-weekday">{{ s.date|date:'l' }}</span>
+          <b class="s-date">{{ s.date|date:'d M Y' }}</b>
+          <span class="s-time">{{ s.start_time|time:'h:i A' }} – {{ s.end_time|time:'h:i A' }}</span>
+          <div class="s-serial-status">
+            {% if s.remaining > 0 %}
+            <span class="badge-serial-open">Next: Serial #{{ s.next_serial_number }}</span>
+            {% else %}
+            <span class="badge-serial-full">Full</span>
+            {% endif %}
+          </div>
         </a>
+        {% empty %}
+        <div class="empty-state">
+          <p>No upcoming clinic sessions currently open for online booking.</p>
+        </div>
         {% endfor %}
       </div>
     </div>
 
-    <!-- Custom Date Jump with GreenCalendar -->
-    <form method="get" action="." class="custom-date-picker">
-      <label for="choose-date"><svg class="icon" style="width:16px;height:16px;color:#1e7552;"><use href="#ic-calendar"/></svg> Select consultation date:</label>
-      <input id="choose-date" class="field-control date-input green-datepicker" type="text" name="date" value="{{ chosen_date|date:'Y-m-d' }}" data-datepicker="true" data-min="today" placeholder="YYYY-MM-DD" autocomplete="off">
-      <button class="button button-outline button-sm" type="submit">Show Slots</button>
-    </form>
+    <!-- Selected Date Consultation Session Card -->
+    {% if slots %}
+    {% with slot=slots.0 %}
+    <div class="active-session-ticket panel">
+      <div class="ticket-header-row">
+        <div class="ticket-session-info">
+          <span class="ticket-badge">ACTIVE CLINIC SESSION</span>
+          <h3 class="ticket-session-date">{{ chosen_date|date:'l, d F Y' }}</h3>
+          <div class="ticket-session-timing">
+            <svg class="icon"><use href="#ic-clock"/></svg>
+            <b>{{ slot.start_time|time:'h:i A' }} – {{ slot.end_time|time:'h:i A' }}</b>
+            <span>· Room: <b>{{ doctor.room_number|default:'Room 707' }}</b></span>
+          </div>
+        </div>
 
-    <!-- Selected Date Banner -->
-    <div class="active-date-banner">
-      <div class="date-banner-left">
-        <svg class="icon"><use href="#ic-calendar"/></svg>
-        <div>
-          <h3>{{ chosen_date|date:'l, d F Y' }}</h3>
-          <span class="small-muted">{{ slots|length }} consultation slot{{ slots|length|pluralize }} scheduled</span>
+        <div class="ticket-serial-box">
+          <span class="serial-box-label">YOUR SERIAL NUMBER</span>
+          <b class="serial-box-number">#{{ slot.next_serial_number }}</b>
+          <small class="serial-box-cap">Capacity: {{ slot.capacity }} patients</small>
         </div>
       </div>
-      <div class="date-banner-right">
-        <span class="status status-confirmed">Room {{ doctor.room_number|default:'707' }}</span>
+
+      <div class="ticket-body-content">
+        <!-- Visit Type & Consultation Fee Selector Info -->
+        <div class="visit-type-showcase">
+          <h4 class="visit-type-heading">Consultation Fee Options</h4>
+          <div class="fee-cards-row">
+            <div class="fee-card selected-fee">
+              <span class="fee-card-title">First Visit / New Patient</span>
+              <b class="fee-card-amount">৳{{ doctor.initial_fee|floatformat:0 }}</b>
+              <small>New consultation with diagnosis</small>
+            </div>
+
+            {% if doctor.followup_fee %}
+            <div class="fee-card">
+              <span class="fee-card-title">Second Visit / Follow-up</span>
+              <b class="fee-card-amount">৳{{ doctor.followup_fee|floatformat:0 }}</b>
+              <small>Within {{ doctor.followup_within_days }} days of last visit</small>
+            </div>
+            {% endif %}
+
+            {% if doctor.report_fee %}
+            <div class="fee-card">
+              <span class="fee-card-title">Report Review</span>
+              <b class="fee-card-amount">৳{{ doctor.report_fee|floatformat:0 }}</b>
+              <small>Diagnostic report analysis</small>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Session Policy & Notice Info -->
+        <div class="session-policy-notice">
+          <svg class="icon"><use href="#ic-alert"/></svg>
+          <div>
+            <b>Advance Notice Rule:</b>
+            <span>Doctor requires at least {{ doctor.booking_notice_hours }} hours advance notice for online serial reservation. For urgent or same-day consultations, please call helpline at <b>+88096100016211</b>.</span>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <!-- Slots Grid -->
-    <div class="consultation-slots-grid">
-      {% for slot in slots %}
-      <div class="slot-ticket-card {% if not slot.booking_open %}ticket-disabled{% endif %}">
-        <div class="slot-ticket-time">
-          <svg class="icon"><use href="#ic-clock"/></svg>
-          <span class="time-main">{{ slot.start_time|time:'h:i A' }}</span>
-          <small class="time-end">to {{ slot.end_time|time:'h:i A' }}</small>
-        </div>
-
-        <div class="slot-ticket-meta">
-          <span class="capacity-pill {% if slot.remaining > 0 %}cap-open{% else %}cap-full{% endif %}">
-            {% if slot.remaining > 0 %}
-              {{ slot.remaining }} place{{ slot.remaining|pluralize }} available
-            {% else %}
-              Fully Booked
-            {% endif %}
-          </span>
-          <span class="slot-room-tag">{{ doctor.room_number|default:'Room 707' }}</span>
-        </div>
-
-        <div class="slot-ticket-action">
-          {% if slot.booking_open %}
-            {% if user.is_authenticated and user.role == 'patient' %}
-              <a class="button button-primary button-sm button-full" href="{% url 'patient_book' slot.pk %}">
-                Book Slot <svg class="icon"><use href="#ic-arrow"/></svg>
-              </a>
-            {% elif user.is_authenticated %}
-              <a class="button button-outline button-sm button-full" href="{% url 'patient_book' slot.pk %}">
-                Select Slot
-              </a>
-            {% else %}
-              <a class="button button-primary button-sm button-full" href="{% url 'login_screen' 'patient' %}?next={% url 'patient_book' slot.pk %}">
-                Book Slot <svg class="icon"><use href="#ic-arrow"/></svg>
-              </a>
-            {% endif %}
+      <div class="ticket-action-row">
+        {% if slot.booking_open %}
+          {% if user.is_authenticated and user.role == 'patient' %}
+          <a class="button button-primary button-lg button-full proceed-booking-btn" href="{% url 'patient_book' slot.pk %}">
+            Proceed to Book Serial #{{ slot.next_serial_number }} <svg class="icon"><use href="#ic-arrow"/></svg>
+          </a>
+          {% elif user.is_authenticated %}
+          <a class="button button-primary button-lg button-full proceed-booking-btn" href="{% url 'patient_book' slot.pk %}">
+            Staff Book Serial #{{ slot.next_serial_number }} for Patient <svg class="icon"><use href="#ic-arrow"/></svg>
+          </a>
           {% else %}
-            <button class="button button-sm button-full disabled-btn" disabled>Unavailable</button>
+          <a class="button button-primary button-lg button-full proceed-booking-btn" href="{% url 'login_screen' 'patient' %}?next={% url 'patient_book' slot.pk %}">
+            Sign In & Book Serial #{{ slot.next_serial_number }} <svg class="icon"><use href="#ic-arrow"/></svg>
+          </a>
           {% endif %}
-        </div>
+        {% else %}
+          <div class="session-closed-notice">
+            <svg class="icon"><use href="#ic-alert"/></svg>
+            <div>
+              <b>Online Booking Closed for This Session</b>
+              <p>This session is either fully booked or closed because it is within the {{ doctor.booking_notice_hours }}-hour notice window. Please select another upcoming date or call <b>+88096100016211</b>.</p>
+            </div>
+          </div>
+        {% endif %}
       </div>
-      {% empty %}
-      <div class="empty-state full-grid panel">
-        <span class="empty-icon"><svg class="icon"><use href="#ic-clock"/></svg></span>
-        <h3>No appointment slots available for this date</h3>
-        <p>Doctor <b>{{ doctor.full_doctor_title }}</b> is not consulting on {{ chosen_date|date:'l, d M Y' }}.</p>
-        <p class="small-muted">Please select another date from the schedule calendar above or check regular practice days.</p>
-      </div>
-      {% endfor %}
     </div>
+    {% endwith %}
+    {% else %}
+    <div class="empty-state panel">
+      <span class="empty-icon"><svg class="icon"><use href="#ic-clock"/></svg></span>
+      <h3>No consultation sessions on {{ chosen_date|date:'l, d M Y' }}</h3>
+      <p>Doctor {{ doctor.full_doctor_title }} is not consulting on this date.</p>
+      <p class="small-muted">Please click one of the available upcoming consultation session dates above.</p>
+    </div>
+    {% endif %}
 
     <!-- Booking Assistance Banner -->
     <div class="booking-help-banner">
       <svg class="icon"><use href="#ic-help"/></svg>
       <div>
         <b>Need immediate appointment assistance or walk-in consultation?</b>
-        <p>Call Green Hospital 24/7 hotline at <b>{{ doctor.active_contact|default:'+88096100016211, +16211' }}</b> or front desk <b>{{ hospital_phone }}</b>.</p>
+        <p>Call Green Hospital 24/7 hotline at <b>{{ doctor.active_contact|default:'+88096100016211' }}</b>.</p>
       </div>
     </div>
   </section>

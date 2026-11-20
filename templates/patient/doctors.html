@@ -1,180 +1,210 @@
 {% extends 'base.html' %}
-{% block title %}Find a Specialist Doctor | Green Hospital{% endblock %}
+{% block title %}Find Specialist Doctors | Green Hospital Dhaka{% endblock %}
 {% block content %}
-<div class="doctor-directory-page container">
-  <div class="page-heading">
+<div class="doctor-directory-container container">
+  <!-- Minimal Clean Page Title -->
+  <div class="directory-header-bar">
     <div>
-      <p class="eyebrow">EXPERT MEDICAL FACULTY</p>
-      <h1>Consult Our Specialist Doctors</h1>
-      <p>Search Bangladesh's top medical consultants, view clinic room details, consultation fees, and reserve your appointment slot online without delays.</p>
-    </div>
-    <div class="heading-actions">
-      <a class="button button-outline" href="{% url 'public_departments' %}">
-        <svg class="icon"><use href="#ic-building"/></svg> Browse Departments
-      </a>
-      {% if not user.is_authenticated %}
-      <a class="button button-primary" href="{% url 'login_choice' %}">
-        <svg class="icon"><use href="#ic-user"/></svg> Patient Sign In
-      </a>
-      {% endif %}
+      <span class="directory-eyebrow">DHAKA MEDICAL FACULTY</span>
+      <h1 class="directory-title">Consult Our Specialist Doctors</h1>
+      <p class="directory-subtitle">Consult verified senior professors, consultants, and surgeons at Green Hospital Mirpur. Book your serial directly online without waiting.</p>
     </div>
   </div>
 
-  <!-- Department Quick Filter Pills -->
-  <div class="department-pill-bar">
-    <a href="{% url 'doctor_directory' %}" class="dept-pill {% if not selected_department %}active{% endif %}">
-      All Departments
-    </a>
-    {% for dep in departments %}
-    <a href="{% url 'doctor_directory' %}?department={{ dep.pk }}" class="dept-pill {% if selected_department == dep.pk|stringformat:'s' %}active{% endif %}">
-      {{ dep.name }}
-    </a>
-    {% endfor %}
-  </div>
+  <!-- Main Directory 2-Column Layout -->
+  <div class="directory-layout">
+    <!-- LEFT SIDEBAR: FILTERS -->
+    <aside class="directory-sidebar">
+      <div class="filter-panel panel">
+        <div class="filter-header">
+          <div class="filter-title">
+            <svg class="icon"><use href="#ic-filter"/></svg>
+            <h3>Filters</h3>
+          </div>
+          <a href="{% url 'doctor_directory' %}" class="filter-reset-link" id="reset-all-filters">Reset All</a>
+        </div>
 
-  <!-- Filter & Real-Time Search Bar -->
-  <form method="get" class="panel filter-bar-advanced" id="doctor-filter-form">
-    <div class="search-input-wrap">
-      <svg class="icon search-icon"><use href="#ic-search"/></svg>
-      <input type="text" name="q" id="doctor-search-input" value="{{ query }}" placeholder="Search by doctor name, qualification, department, institute, or room number..." aria-label="Search doctors" autocomplete="off">
-      <button type="button" id="search-clear-btn" class="search-clear-btn" style="display: none;" aria-label="Clear search">✕</button>
-    </div>
+        <form method="get" id="directory-filter-form">
+          <!-- Preserved query -->
+          <input type="hidden" name="q" id="hidden-search-query" value="{{ query }}">
 
-    <div class="filter-controls">
-      <div class="control-group">
-        <label for="dept-select">Department:</label>
-        <select name="department" id="dept-select" class="field-control" aria-label="Filter department">
-          <option value="">All Departments</option>
-          {% for dep in departments %}
-          <option value="{{ dep.pk }}" {% if selected_department == dep.pk|stringformat:'s' %}selected{% endif %}>{{ dep.name }}</option>
-          {% endfor %}
-        </select>
+          <!-- Department Filter -->
+          <div class="filter-group">
+            <h4 class="filter-group-title">Departments</h4>
+            <div class="filter-options-list">
+              <label class="filter-radio-item {% if not selected_department %}active{% endif %}">
+                <input type="radio" name="department" value="" {% if not selected_department %}checked{% endif %} onchange="this.form.submit()">
+                <span class="radio-label">All Departments</span>
+                <span class="count-tag">{{ total_doctors_count }}</span>
+              </label>
+              {% for dep in departments %}
+              <label class="filter-radio-item {% if selected_department == dep.pk|stringformat:'s' %}active{% endif %}">
+                <input type="radio" name="department" value="{{ dep.pk }}" {% if selected_department == dep.pk|stringformat:'s' %}checked{% endif %} onchange="this.form.submit()">
+                <span class="radio-label">{{ dep.name }}</span>
+                <span class="count-tag">{{ dep.doc_count }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Gender Filter -->
+          <div class="filter-group">
+            <h4 class="filter-group-title">Doctor Gender</h4>
+            <div class="filter-options-list">
+              <label class="filter-radio-item {% if not selected_gender %}active{% endif %}">
+                <input type="radio" name="gender" value="" {% if not selected_gender %}checked{% endif %} onchange="this.form.submit()">
+                <span class="radio-label">All Doctors</span>
+              </label>
+              <label class="filter-radio-item {% if selected_gender == 'female' %}active{% endif %}">
+                <input type="radio" name="gender" value="female" {% if selected_gender == 'female' %}checked{% endif %} onchange="this.form.submit()">
+                <span class="radio-label">Female Specialists</span>
+              </label>
+              <label class="filter-radio-item {% if selected_gender == 'male' %}active{% endif %}">
+                <input type="radio" name="gender" value="male" {% if selected_gender == 'male' %}checked{% endif %} onchange="this.form.submit()">
+                <span class="radio-label">Male Specialists</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Sort Filter -->
+          <div class="filter-group">
+            <h4 class="filter-group-title">Sort By</h4>
+            <div class="filter-options-list">
+              <label class="filter-radio-item {% if selected_sort == 'name' or not selected_sort %}active{% endif %}">
+                <input type="radio" name="sort" value="name" {% if selected_sort == 'name' or not selected_sort %}checked{% endif %} onchange="this.form.submit()">
+                <span class="radio-label">Doctor Name (A – Z)</span>
+              </label>
+              <label class="filter-radio-item {% if selected_sort == 'experience' %}active{% endif %}">
+                <input type="radio" name="sort" value="experience" {% if selected_sort == 'experience' %}checked{% endif %} onchange="this.form.submit()">
+                <span class="radio-label">Experience (High to Low)</span>
+              </label>
+              <label class="filter-radio-item {% if selected_sort == 'fee_asc' %}active{% endif %}">
+                <input type="radio" name="sort" value="fee_asc" {% if selected_sort == 'fee_asc' %}checked{% endif %} onchange="this.form.submit()">
+                <span class="radio-label">Consultation Fee (Low to High)</span>
+              </label>
+              <label class="filter-radio-item {% if selected_sort == 'fee_desc' %}active{% endif %}">
+                <input type="radio" name="sort" value="fee_desc" {% if selected_sort == 'fee_desc' %}checked{% endif %} onchange="this.form.submit()">
+                <span class="radio-label">Consultation Fee (High to Low)</span>
+              </label>
+            </div>
+          </div>
+        </form>
+      </div>
+    </aside>
+
+    <!-- RIGHT MAIN CONTENT: SEARCH + CARDS GRID -->
+    <main class="directory-main">
+      <!-- Search Input Box -->
+      <div class="directory-search-panel panel">
+        <div class="search-field-wrapper">
+          <svg class="icon search-icon"><use href="#ic-search"/></svg>
+          <input type="text" id="live-doctor-search" class="directory-search-input" placeholder="Search doctor by name, qualification, specialty, or chamber..." value="{{ query }}" autocomplete="off">
+          <button type="button" id="clear-search-btn" class="clear-search-btn" style="display: none;">✕</button>
+        </div>
       </div>
 
-      <div class="control-group">
-        <label for="sort-select">Sort By:</label>
-        <select name="sort" id="sort-select" class="field-control" aria-label="Sort doctors">
-          <option value="name" {% if selected_sort == 'name' %}selected{% endif %}>Name (A – Z)</option>
-          <option value="fee_asc" {% if selected_sort == 'fee_asc' %}selected{% endif %}>Fee: Low to High</option>
-          <option value="fee_desc" {% if selected_sort == 'fee_desc' %}selected{% endif %}>Fee: High to Low</option>
-          <option value="experience" {% if selected_sort == 'experience' %}selected{% endif %}>Experience: High to Low</option>
-          <option value="department" {% if selected_sort == 'department' %}selected{% endif %}>Department Name</option>
-        </select>
+      <!-- Live Results Summary Bar -->
+      <div class="results-meta-bar">
+        <span class="results-text">Showing <b id="visible-count">{{ doctors|length }}</b> specialist doctor{{ doctors|length|pluralize }}</span>
+        <span class="online-booking-indicator"><span class="pulse-dot"></span> Online Serial Booking Active</span>
       </div>
 
-      <button class="button button-primary" type="submit">Filter</button>
-    </div>
-  </form>
-
-  <div class="directory-meta-strip">
-    <span class="results-count" id="results-count-text">Showing <b>{{ doctors|length }}</b> specialist{{ doctors|length|pluralize }}</span>
-    <span class="live-search-hint"><span class="pulse-indicator"></span> Real-time instant search active</span>
-  </div>
-
-  <!-- Doctors Card Grid -->
-  <div class="doctor-showcase-grid" id="doctor-cards-container">
-    {% for d in doctors %}
-    <article class="doctor-profile-card"
-             data-name="{{ d.full_doctor_title|lower }}"
-             data-dept="{{ d.department.name|lower }}"
-             data-dept-id="{{ d.department.pk }}"
-             data-qual="{{ d.qualifications|lower }}"
-             data-inst="{{ d.institute|lower }}"
-             data-room="{{ d.room_number|lower }}"
-             data-fee="{{ d.initial_fee }}"
-             data-exp="{{ d.experience_years }}">
-      <div class="doctor-card-header">
-        <div class="avatar-holder">
-          {% if d.user.avatar %}
-          <img src="{{ d.user.avatar.url }}" alt="{{ d.full_doctor_title }}" class="doctor-photo">
-          {% else %}
-          <div class="doctor-avatar-initials">
-            {{ d.user.first_name|first|upper }}{{ d.user.last_name|first|upper }}
-          </div>
-          {% endif %}
-          <span class="verified-badge" title="Verified Medical Specialist">✓</span>
-        </div>
-        <div class="doctor-header-info">
-          <span class="dept-badge">{{ d.department.name }}</span>
-          <h2 class="doctor-name">
-            <a href="{% url 'doctor_detail' d.pk %}">{{ d.full_doctor_title }}</a>
-          </h2>
-          <p class="doctor-designation"><b>{{ d.designation }}</b></p>
-        </div>
-      </div>
-
-      <div class="doctor-card-body">
-        <div class="qual-block">
-          <span class="info-label">Qualifications:</span>
-          <p class="qual-text">{{ d.qualifications|default:'MBBS, Specialist Consultant' }}</p>
-        </div>
-
-        {% if d.institute %}
-        <div class="institute-block">
-          <svg class="icon"><use href="#ic-building"/></svg>
-          <span>{{ d.institute }}</span>
-        </div>
-        {% endif %}
-
-        <div class="chamber-info-grid">
-          <div class="info-item">
-            <span class="item-label">Room / Chamber</span>
-            <span class="item-value highlight-room">{{ d.room_number|default:'Room 707' }}</span>
-          </div>
-          <div class="info-item">
-            <span class="item-label">Consultation Fee</span>
-            <span class="item-value fee-value">৳{{ d.initial_fee|floatformat:0 }}</span>
-          </div>
-        </div>
-
-        <div class="chamber-address-row">
-          <svg class="icon"><use href="#ic-building"/></svg>
-          <small>{{ d.chamber_address|default:'Plot 1, Section 10, Mirpur, Dhaka-1216' }}</small>
-        </div>
-
-        <div class="contact-row">
-          <svg class="icon"><use href="#ic-activity"/></svg>
-          <span>24/7 Hotline: <b>{{ d.contact_number|default:'+88096100016211, +16211' }}</b></span>
-        </div>
-
-        <!-- Weekly Practice Schedule Preview -->
-        <div class="schedule-preview-box">
-          <span class="schedule-tag">SCHEDULE</span>
-          <div class="schedule-days-list">
-            {% for sched in d.weekly.all %}
-              {% if sched.active %}
-              <span class="schedule-chip">
-                <b>{{ sched.get_weekday_display|slice:":3" }}</b> {{ sched.start_time|time:"h:i A" }}–{{ sched.end_time|time:"h:i A" }}
-              </span>
+      <!-- Doctor Cards Grid -->
+      <div class="directory-cards-grid" id="doctor-cards-grid">
+        {% for d in doctors %}
+        <article class="doctor-card panel"
+                 data-name="{{ d.full_doctor_title|lower }}"
+                 data-dept="{{ d.department.name|lower }}"
+                 data-dept-id="{{ d.department.pk }}"
+                 data-qual="{{ d.qualifications|lower }}"
+                 data-inst="{{ d.institute|lower }}"
+                 data-room="{{ d.room_number|lower }}"
+                 data-fee="{{ d.initial_fee }}"
+                 data-gender="{{ d.gender }}"
+                 data-exp="{{ d.experience_years }}">
+          <div class="doctor-card-top">
+            <div class="doctor-avatar-wrapper">
+              {% if d.user.avatar %}
+              <img src="{{ d.user.avatar.url }}" alt="{{ d.full_doctor_title }}" class="doctor-avatar-img">
+              {% else %}
+              <svg class="doctor-vector-avatar" viewBox="0 0 64 64"><use href="#{{ d.default_avatar }}"/></svg>
               {% endif %}
-            {% empty %}
-              <span class="small-muted">Daily outpatient clinic by appointment</span>
-            {% endfor %}
+            </div>
+            <div class="doctor-primary-meta">
+              <div class="doctor-badge-row">
+                <span class="dept-tag">{{ d.department.name }}</span>
+                <span class="bmdc-tag">{{ d.bmdc_display }}</span>
+              </div>
+              <h2 class="doctor-name-heading">
+                <a href="{% url 'doctor_detail' d.pk %}">{{ d.full_doctor_title }}</a>
+              </h2>
+              <p class="doctor-designation-text">{{ d.designation }}</p>
+            </div>
           </div>
+
+          <div class="doctor-card-middle">
+            <div class="doctor-qual-block">
+              <span class="qual-label">Degrees & Qualifications:</span>
+              <p class="qual-content">{{ d.qualifications|linebreaksbr|default:'MBBS, Specialist Consultant' }}</p>
+            </div>
+
+            {% if d.institute %}
+            <div class="doctor-institute-row">
+              <svg class="icon"><use href="#ic-building"/></svg>
+              <span>{{ d.institute }}</span>
+            </div>
+            {% endif %}
+
+            <div class="doctor-chamber-row">
+              <div class="chamber-info-cell">
+                <span class="cell-label">Room / Chamber</span>
+                <b class="cell-value room-text">{{ d.room_number|default:'Room 707' }}</b>
+              </div>
+              <div class="chamber-info-cell fee-cell">
+                <span class="cell-label">Consultation Fee</span>
+                <b class="cell-value fee-text">৳{{ d.initial_fee|floatformat:0 }}</b>
+              </div>
+            </div>
+
+            <!-- Schedule summary -->
+            <div class="doctor-schedule-preview">
+              <span class="schedule-label"><svg class="icon"><use href="#ic-clock"/></svg> SCHEDULE:</span>
+              <div class="schedule-pills-wrap">
+                {% for sched in d.weekly.all %}
+                  {% if sched.active %}
+                  <span class="sched-pill"><b>{{ sched.get_weekday_display|slice:":3"|upper }}</b> {{ sched.start_time|time:"h:iA" }}–{{ sched.end_time|time:"h:iA" }}</span>
+                  {% endif %}
+                {% empty %}
+                  <span class="sched-pill sched-pill-open">Consultation by Appointment</span>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <div class="doctor-card-bottom">
+            <a href="{% url 'doctor_detail' d.pk %}" class="button button-outline button-sm">View Profile</a>
+            <a href="{% url 'doctor_detail' d.pk %}#appointment-section" class="button button-primary button-sm appt-action-btn">
+              Make Appointment <svg class="icon"><use href="#ic-arrow"/></svg>
+            </a>
+          </div>
+        </article>
+        {% empty %}
+        <div class="panel empty-state full-grid" id="no-doctors-server">
+          <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
+          <h3>No doctors found in this category</h3>
+          <p>Please clear filters to view all specialists available at Green Hospital.</p>
+          <a class="button button-outline" href="{% url 'doctor_directory' %}">View All Doctors</a>
         </div>
+        {% endfor %}
       </div>
 
-      <div class="doctor-card-actions">
-        <a class="button button-primary button-full make-appt-btn" href="{% url 'doctor_detail' d.pk %}">
-          MAKE APPOINTMENT <svg class="icon"><use href="#ic-arrow"/></svg>
-        </a>
+      <div class="panel empty-state full-grid" id="no-search-results" style="display: none;">
+        <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
+        <h3>No matching doctors found</h3>
+        <p>No specialist matches your search text. Try another specialty, doctor name, or degree.</p>
+        <button type="button" class="button button-outline" id="clear-search-btn-empty">Clear Search</button>
       </div>
-    </article>
-    {% empty %}
-    <div class="panel empty-state full-grid" id="no-doctors-server">
-      <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
-      <h3>No matching specialists found</h3>
-      <p>Try clearing your search query or selecting another department.</p>
-      <a class="button button-outline" href="{% url 'doctor_directory' %}">View All Specialists</a>
-    </div>
-    {% endfor %}
-  </div>
-
-  <div class="panel empty-state full-grid" id="no-doctors-client" style="display: none;">
-    <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
-    <h3>No specialists found matching your search</h3>
-    <p>Try typing another doctor name, specialty, or room number.</p>
-    <button class="button button-outline" type="button" id="reset-client-search">Clear Search</button>
+    </main>
   </div>
 </div>
 {% endblock %}

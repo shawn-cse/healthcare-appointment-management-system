@@ -79,7 +79,7 @@ def local_start(slot):
 
 
 def materialize_weekly(doctor, days=60):
-    """Publish recurring availability efficiently; never replace a manually edited slot."""
+    """Publish recurring availability; one consultation session per clinic day with full capacity."""
     today = timezone.localdate()
     until = today + timedelta(days=min(days, 180))
     patterns = list(doctor.weekly.filter(active=True))
@@ -88,22 +88,21 @@ def materialize_weekly(doctor, days=60):
     existing = set(AppointmentSlot.objects.filter(
         doctor=doctor, date__range=(today,until)).values_list('date','start_time'))
     pending = []
+    session_capacity = getattr(doctor, 'max_patients_per_session', 30) or 30
     for day_n in range((until - today).days + 1):
         day = today + timedelta(days=day_n)
         for pattern in patterns:
             if day.weekday() != pattern.weekday:
                 continue
-            t = datetime.combine(day, pattern.start_time)
-            finish = datetime.combine(day, pattern.end_time)
-            step = timedelta(minutes=pattern.duration_minutes)
-            while t + step <= finish:
-                key = (day, t.time())
-                if key not in existing:
-                    pending.append(AppointmentSlot(doctor=doctor, date=day,
-                        start_time=t.time(), end_time=(t+step).time(),
-                        capacity=pattern.capacity, template=pattern))
-                    existing.add(key)
-                t += step
+            key = (day, pattern.start_time)
+            if key not in existing:
+                cap = pattern.capacity if pattern.capacity > 2 else session_capacity
+                pending.append(AppointmentSlot(
+                    doctor=doctor, date=day,
+                    start_time=pattern.start_time, end_time=pattern.end_time,
+                    capacity=cap, template=pattern
+                ))
+                existing.add(key)
     AppointmentSlot.objects.bulk_create(pending, ignore_conflicts=True, batch_size=500)
     return len(pending)
 
@@ -113,10 +112,20 @@ def valid_slot(slot, *, is_staff_booking=False):
     start = local_start(slot)
     profile = slot.doctor
     if not slot.is_open or not profile.is_available or not profile.user.is_active or start <= now:
-        raise ValidationError('This time is no longer open for booking.')
+        raise ValidationError('This consultation session is no longer open for booking.')
     if not is_staff_booking:
-        if start < now + timedelta(hours=profile.booking_notice_hours):
-            raise ValidationError(f'Please book at least {profile.booking_notice_hours} hours ahead.')
+        notice_deadline = now + timedelta(hours=profile.booking_notice_hours)
+        if start < notice_deadline:
+            hours = profile.booking_notice_hours
+            if hours >= 24:
+                days = hours // 24
+                time_str = f"{days} day{'s' if days > 1 else ''}" if hours % 24 == 0 else f"{hours} hours"
+            else:
+                time_str = f"{hours} hours"
+            raise ValidationError(
+                f'Online booking for this session is closed. This doctor requires at least {time_str} advance notice. '
+                f'For urgent consultations or today’s serials, please contact the hospital helpline at +88096100016211.'
+            )
         if start > now + timedelta(days=profile.booking_advance_days):
             raise ValidationError(f'Appointments can be booked up to {profile.booking_advance_days} days ahead.')
 
@@ -164,14 +173,15 @@ def create_appointment(*, actor, slot_id, patient, name, phone, dob=None, visit_
         raise ValidationError('You already have an appointment at this time.')
     count = slot.appointments.filter(status__in=ACTIVE).count()
     if count >= slot.capacity:
-        raise ValidationError('All places in this time slot have been booked.')
+        raise ValidationError(f'All {slot.capacity} serials for this consultation session have been booked.')
+    serial = count + 1
     fee = fee_for(slot.doctor, visit_type, patient=patient, phone=phone, appointment_date=slot.date)
     hospital_cut = slot.doctor.hospital_cut(fee)
     within = slot.doctor.payment_policy == 'within'
     # Payment window ends by session start, whichever comes first.
     due = min(timezone.now() + timedelta(hours=slot.doctor.payment_deadline_hours), local_start(slot)) if within else None
     appointment = Appointment.objects.create(
-        slot=slot, patient=patient, guest_name=name, guest_phone=phone, guest_dob=dob,
+        slot=slot, serial_number=serial, patient=patient, guest_name=name, guest_phone=phone, guest_dob=dob,
         visit_type=visit_type, status='pending' if within else 'confirmed',
         payment_method=payment_method, source=source, fee=fee, hospital_cut=hospital_cut,
         doctor_cut=fee-hospital_cut, cancel_mode_snapshot=slot.doctor.cancel_fee_mode,

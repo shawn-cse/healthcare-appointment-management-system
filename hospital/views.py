@@ -172,11 +172,14 @@ def profile(request):
 
 def doctor_directory(request):
     department = request.GET.get('department', '')
+    gender = request.GET.get('gender', '')
     q = request.GET.get('q', '').strip()
     sort = request.GET.get('sort', 'name')
-    doctors = DoctorProfile.objects.filter(is_available=True, user__is_active=True).select_related('user', 'department')
+    doctors = DoctorProfile.objects.filter(is_available=True, user__is_active=True).select_related('user', 'department', 'chamber').prefetch_related('weekly')
     if department.isdigit():
         doctors = doctors.filter(department_id=int(department))
+    if gender in ('male', 'female'):
+        doctors = doctors.filter(gender=gender)
     if q:
         doctors = doctors.filter(
             Q(user__first_name__icontains=q) |
@@ -198,12 +201,20 @@ def doctor_directory(request):
     else:
         doctors = doctors.order_by('user__first_name', 'user__last_name')
 
+    dept_list = Department.objects.filter(is_active=True).annotate(
+        doc_count=Count('doctors', filter=Q(doctors__user__is_active=True, doctors__is_available=True))
+    ).order_by('name')
+
+    total_count = DoctorProfile.objects.filter(is_available=True, user__is_active=True).count()
+
     return render(request, 'patient/doctors.html', {
         'doctors': doctors,
-        'departments': Department.objects.filter(is_active=True),
+        'departments': dept_list,
         'selected_department': department,
+        'selected_gender': gender,
         'query': q,
         'selected_sort': sort,
+        'total_doctors_count': total_count,
     })
 
 
@@ -216,16 +227,28 @@ def public_departments(request):
 
 def doctor_detail(request, pk):
     doc = get_object_or_404(DoctorProfile.objects.select_related('user', 'department', 'chamber'), pk=pk, user__is_active=True)
+    today = timezone.localdate()
     raw_date = request.GET.get('date')
     try:
         chosen = datetime.strptime(raw_date, '%Y-%m-%d').date() if raw_date else None
     except ValueError:
         chosen = None
-    today = timezone.localdate()
-    next_dates = [today + timedelta(days=i) for i in range(1, 15)]
+
+    # Fetch next 45 days open slots for this doctor
+    upcoming_slots = list(AppointmentSlot.objects.filter(
+        doctor=doc, date__gte=today, date__lte=today + timedelta(days=45), is_open=True
+    ).order_by('date', 'start_time'))
+
     if not chosen:
-        chosen = today + timedelta(days=1)
-    slots = list(AppointmentSlot.objects.filter(doctor=doc, date=chosen, is_open=True).order_by('start_time'))
+        if upcoming_slots:
+            chosen = upcoming_slots[0].date
+        else:
+            chosen = today + timedelta(days=1)
+
+    slots = [s for s in upcoming_slots if s.date == chosen]
+    if not slots and chosen:
+        slots = list(AppointmentSlot.objects.filter(doctor=doc, date=chosen, is_open=True).order_by('start_time'))
+
     now = timezone.now()
     is_staff = request.user.is_authenticated and request.user.role in ('doctor', 'receptionist', 'admin')
     for s in slots:
@@ -233,13 +256,24 @@ def doctor_detail(request, pk):
             s.booking_open = s.remaining > 0 and local_start(s) > now
         else:
             s.booking_open = s.remaining > 0 and local_start(s) >= now + timedelta(hours=doc.booking_notice_hours) and local_start(s) <= now + timedelta(days=doc.booking_advance_days)
+
     weekly_schedules = doc.weekly.filter(active=True).order_by('weekday', 'start_time')
     practice_weekdays = list(weekly_schedules.values_list('weekday', flat=True))
+
+    # Distinct upcoming dates with open slots
+    available_dates = []
+    seen_dates = set()
+    for s in upcoming_slots:
+        if s.date not in seen_dates:
+            seen_dates.add(s.date)
+            available_dates.append(s.date)
+
     return render(request, 'patient/doctor_detail.html', {
         'doctor': doc,
         'slots': slots,
         'chosen_date': chosen,
-        'next_dates': next_dates,
+        'upcoming_slots': upcoming_slots,
+        'available_dates': available_dates,
         'weekly_schedules': weekly_schedules,
         'practice_weekdays': practice_weekdays,
         'is_staff': is_staff,

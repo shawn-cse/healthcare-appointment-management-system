@@ -80,17 +80,17 @@
   }
 
   // --- Real-Time Instant Doctor Search & Sorting ---
-  const searchInput = doc.getElementById('doctor-search-input');
+  const searchInput = doc.getElementById('live-doctor-search') || doc.getElementById('doctor-search-input');
   const deptSelect = doc.getElementById('dept-select');
   const sortSelect = doc.getElementById('sort-select');
-  const cardsContainer = doc.getElementById('doctor-cards-container');
-  const clearBtn = doc.getElementById('search-clear-btn');
-  const countText = doc.getElementById('results-count-text');
-  const clientEmpty = doc.getElementById('no-doctors-client');
+  const cardsContainer = doc.getElementById('doctor-cards-grid') || doc.getElementById('doctor-cards-container');
+  const clearBtn = doc.getElementById('clear-search-btn') || doc.getElementById('search-clear-btn');
+  const countText = doc.getElementById('visible-count') || doc.getElementById('results-count-text');
+  const clientEmpty = doc.getElementById('no-search-results') || doc.getElementById('no-doctors-client');
   const serverEmpty = doc.getElementById('no-doctors-server');
 
   if (searchInput && cardsContainer) {
-    const cards = Array.from(cardsContainer.querySelectorAll('.doctor-profile-card'));
+    const cards = Array.from(cardsContainer.querySelectorAll('.doctor-card, .doctor-profile-card'));
 
     function filterAndSortDoctors() {
       const query = searchInput.value.trim().toLowerCase();
@@ -148,7 +148,11 @@
 
       // Update counter
       if (countText) {
-        countText.innerHTML = `Showing <b>${visibleCards.length}</b> specialist${visibleCards.length === 1 ? '' : 's'}`;
+        if (countText.tagName === 'B') {
+          countText.textContent = visibleCards.length;
+        } else {
+          countText.innerHTML = `Showing <b>${visibleCards.length}</b> specialist${visibleCards.length === 1 ? '' : 's'}`;
+        }
       }
 
       // Handle empty state
@@ -172,7 +176,7 @@
       });
     }
 
-    const resetBtn = doc.getElementById('reset-client-search');
+    const resetBtn = doc.getElementById('clear-search-btn-empty') || doc.getElementById('reset-client-search');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
         searchInput.value = '';

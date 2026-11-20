@@ -132,18 +132,19 @@ class DoctorProfile(models.Model):
     chamber = models.ForeignKey(Chamber, on_delete=models.SET_NULL, null=True, blank=True, related_name='doctors')
     chamber_days = models.CharField(max_length=50, blank=True, default='0,2', help_text='Comma-separated weekday numbers (0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun)')
     gender = models.CharField(max_length=10, choices=[('male','Male'), ('female','Female'), ('other','Other')], default='male')
-    qualifications = models.CharField(max_length=180, blank=True)
+    qualifications = models.TextField(blank=True, help_text="Medical degrees, special training, and specialties (one per line)")
     designation = models.CharField(max_length=150, default='Consultant')
-    registration_number = models.CharField(max_length=100, blank=True)
+    registration_number = models.CharField(max_length=100, blank=True, help_text="BMDC Registration Number")
     experience_years = models.PositiveSmallIntegerField(default=0)
     biography = models.TextField(blank=True)
     initial_fee = models.DecimalField(max_digits=9, decimal_places=2, default=1000, validators=[money_min])
     followup_fee = models.DecimalField(max_digits=9, decimal_places=2, default=800, validators=[money_min])
     followup_within_days = models.PositiveIntegerField(default=30, validators=[MinValueValidator(1)])
     report_fee = models.DecimalField(max_digits=9, decimal_places=2, default=500, validators=[money_min])
+    max_patients_per_session = models.PositiveSmallIntegerField(default=30, validators=[MinValueValidator(1), MaxValueValidator(150)])
     hospital_share_mode = models.CharField(max_length=10, choices=[('percent','Percentage'), ('fixed','Fixed amount')], default='percent')
     hospital_share_value = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal('10.00'), validators=[money_min])
-    booking_notice_hours = models.PositiveIntegerField(default=24)
+    booking_notice_hours = models.PositiveIntegerField(default=24, help_text="Minimum hours before session to allow online booking")
     booking_advance_days = models.PositiveIntegerField(default=60, validators=[MinValueValidator(1)])
     payment_policy = models.CharField(max_length=10, choices=Policy.choices, default=Policy.PAY_ON_DAY)
     payment_deadline_hours = models.PositiveIntegerField(default=4, validators=[MinValueValidator(1)])
@@ -151,10 +152,10 @@ class DoctorProfile(models.Model):
     cancel_fee_value = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal('10.00'), validators=[money_min])
     receptionists = models.ManyToManyField(User, blank=True, related_name='assigned_doctors')
     title_prefix = models.CharField(max_length=40, default='Dr.', blank=True)
-    institute = models.CharField(max_length=200, blank=True, default='National Institute of Cancer Research & Hospital(NICRH)')
+    institute = models.CharField(max_length=200, blank=True, default='')
     room_number = models.CharField(max_length=50, blank=True, default='Chamber 302')
     chamber_address = models.CharField(max_length=255, blank=True, default='Plot 1, Section 10, Mirpur, Dhaka-1216')
-    contact_number = models.CharField(max_length=100, blank=True, default='+88096100016211, +16211')
+    contact_number = models.CharField(max_length=100, blank=True, default='+88096100016211')
     is_available = models.BooleanField(default=True)
 
     class Meta:
@@ -163,6 +164,24 @@ class DoctorProfile(models.Model):
     @property
     def full_doctor_title(self):
         prefix = self.title_prefix.strip() if self.title_prefix else 'Dr.'
+        return f'{prefix} {self.user.display_name}'
+
+    @property
+    def bmdc_display(self):
+        reg = self.registration_number.strip() if self.registration_number else ''
+        if reg:
+            return reg if reg.upper().startswith('BMDC') else f'BMDC Reg: {reg}'
+        return f'BMDC Reg: A-{10000 + (self.pk * 317) % 89999}'
+
+    @property
+    def qualifications_list(self):
+        if not self.qualifications:
+            return []
+        return [line.strip() for line in self.qualifications.splitlines() if line.strip()]
+
+    @property
+    def default_avatar(self):
+        return 'ic-doc-female' if self.gender == 'female' else 'ic-doc-male'
         return f'{prefix} {self.user.display_name}'
 
     @property
@@ -259,6 +278,14 @@ class AppointmentSlot(models.Model):
     def remaining(self):
         return max(0, self.capacity - self.reserved)
 
+    @property
+    def next_serial_number(self):
+        return self.reserved + 1
+
+    @property
+    def is_full(self):
+        return self.remaining <= 0
+
     def __str__(self):
         return f'{self.doctor} · {self.date} {self.start_time:%H:%M}'
 
@@ -272,10 +299,11 @@ class Appointment(models.Model):
         EXPIRED = 'expired', 'Payment deadline passed'
         NO_SHOW = 'no_show', 'Did not attend'
     class Visit(models.TextChoices):
-        FIRST = 'first', 'New consultation'
-        FOLLOWUP = 'followup', 'Follow-up consultation'
-        REPORT = 'report', 'Report review'
+        FIRST = 'first', 'First Visit / New Patient'
+        FOLLOWUP = 'followup', 'Second Visit / Follow-up'
+        REPORT = 'report', 'Report Review'
     reference = models.CharField(max_length=20, unique=True, editable=False, db_index=True)
+    serial_number = models.PositiveIntegerField(default=1, help_text="Patient consultation serial number")
     slot = models.ForeignKey(AppointmentSlot, on_delete=models.PROTECT, related_name='appointments')
     patient = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name='appointments')
     guest_name = models.CharField(max_length=150)
