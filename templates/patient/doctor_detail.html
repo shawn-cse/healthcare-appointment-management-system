@@ -44,9 +44,9 @@
 
         <!-- Big Primary CTA: MAKE APPOINTMENT -->
         <div class="hero-cta-section">
-          <a class="button button-primary button-lg hero-appointment-btn" href="#appointment-section" id="hero-make-appt-btn">
+          <button type="button" class="button button-primary button-lg hero-appointment-btn" id="hero-make-appt-btn">
             MAKE APPOINTMENT <svg class="icon"><use href="#ic-arrow"/></svg>
-          </a>
+          </button>
           <span class="instant-book-note"><span class="pulse-indicator"></span> Available for online reservation</span>
         </div>
       </div>
@@ -165,7 +165,7 @@
     <div class="date-strip-wrapper">
       <div class="date-strip-scroll">
         {% for day in next_dates %}
-        <a class="date-card-pill {% if day == chosen_date %}selected{% endif %}" href="?date={{ day|date:'Y-m-d' }}#appointment-section">
+        <a class="date-card-pill {% if day == chosen_date %}selected{% endif %}" href="?date={{ day|date:'Y-m-d' }}">
           <span class="pill-weekday">{{ day|date:'D' }}</span>
           <b class="pill-day-num">{{ day|date:'d' }}</b>
           <span class="pill-month">{{ day|date:'M' }}</span>
@@ -178,7 +178,7 @@
     </div>
 
     <!-- Custom Date Jump with GreenCalendar -->
-    <form method="get" action="#appointment-section" class="custom-date-picker">
+    <form method="get" action="." class="custom-date-picker">
       <label for="choose-date"><svg class="icon" style="width:16px;height:16px;color:#1e7552;"><use href="#ic-calendar"/></svg> Select consultation date:</label>
       <input id="choose-date" class="field-control date-input green-datepicker" type="text" name="date" value="{{ chosen_date|date:'Y-m-d' }}" data-datepicker="true" data-min="today" placeholder="YYYY-MM-DD" autocomplete="off">
       <button class="button button-outline button-sm" type="submit">Show Slots</button>

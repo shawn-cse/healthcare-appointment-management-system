@@ -222,11 +222,33 @@
   const heroMakeAppt = doc.getElementById('hero-make-appt-btn');
   if (heroMakeAppt) {
     heroMakeAppt.addEventListener('click', (e) => {
+      e.preventDefault();
       const target = doc.getElementById('appointment-section');
       if (target) {
-        e.preventDefault();
         target.scrollIntoView({ behavior: 'smooth' });
       }
     });
+  }
+
+  // --- Ensure Clean URLs (auto-remove any lingering hash from address bar) ---
+  if (window.location.hash) {
+    const hash = window.location.hash;
+    try {
+      const target = doc.querySelector(hash);
+      if (target) {
+        setTimeout(() => {
+          target.scrollIntoView({ behavior: 'smooth' });
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+        }, 50);
+      } else if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    } catch (_) {
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
   }
 })();
