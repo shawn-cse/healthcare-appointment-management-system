@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link href="{% static 'css/app.css' %}?v=20261121_41" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}?v=20261121_42" rel="stylesheet">
   <link href="{% static 'css/calendar.css' %}?v=20261121_30" rel="stylesheet">
 </head>
 <body class="{% if user.is_authenticated %}app-layout{% else %}public-layout{% endif %}">
@@ -157,12 +157,6 @@
       {% endif %}
     </nav>
   </div>
-  <div class="sidebar-footer">
-    <form action="{% url 'logout' %}" method="post">
-      {% csrf_token %}
-      <button class="sidebar-logout" type="submit"><svg class="icon"><use href="#ic-log-out"/></svg> Sign out</button>
-    </form>
-  </div>
 </aside>
 <div class="app-shell">
   <header class="topbar">
@@ -175,9 +169,6 @@
       </div>
     </div>
     <div class="topbar-right">
-      <a href="{% url 'doctor_directory' %}" class="button button-outline button-sm">
-        <svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors
-      </a>
       <span class="today-chip"><svg class="icon"><use href="#ic-clock"/></svg>{% now "D, d M Y" %}</span>
 
       <!-- User Profile Dropdown Menu in Top Right -->
@@ -261,9 +252,6 @@
     </nav>
 
     <div class="public-header-actions">
-      <a class="button button-outline button-sm hidden-mobile" href="{% url 'doctor_directory' %}">
-        <svg class="icon"><use href="#ic-calendar"/></svg> Consult Specialist
-      </a>
       <a class="button button-primary button-sm" href="{% url 'login_choice' %}">
         Sign In <svg class="icon"><use href="#ic-arrow"/></svg>
       </a>
