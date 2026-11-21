@@ -6691,123 +6691,480 @@ input[type="checkbox"] {
 }
 
 /* ==========================================================================
-   Doctor Profile Detail Page Hero & Ticket UI
+   Doctor Profile Detail Page - Modern Concise & Organized Layout
    ========================================================================== */
-.doctor-hero-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f4faf6 100%);
-  border: 1.5px solid #d4ebd9;
-  border-radius: 16px;
-  padding: 30px;
-  margin-bottom: 24px;
-  box-shadow: 0 6px 24px rgba(10, 48, 38, 0.06);
+.doctor-profile-page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 16px 20px 60px;
 }
 
-.doctor-hero-grid {
+.profile-top-bar {
   display: flex;
-  gap: 28px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.profile-top-bar .back-link {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #156448;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.18s ease;
+}
+
+.profile-top-bar .back-link:hover {
+  color: #064e3b;
+  transform: translateX(-3px);
+}
+
+.breadcrumb-dept {
+  font-size: 12px;
+  font-weight: 700;
+  color: #156448;
+  background: #e8f7ee;
+  border: 1px solid #c2ebcf;
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+
+/* 1. Doctor Profile Header Card */
+.doctor-profile-card {
+  background: #ffffff;
+  border: 1.5px solid #d4ebd9;
+  border-radius: 16px;
+  padding: 24px 28px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(10, 48, 38, 0.05);
+}
+
+.doctor-profile-top {
+  display: flex;
+  gap: 24px;
   align-items: flex-start;
 }
 
-@media (max-width: 768px) {
-  .doctor-hero-grid {
+@media (max-width: 640px) {
+  .doctor-profile-top {
     flex-direction: column;
     align-items: center;
     text-align: center;
   }
 }
 
-.doctor-hero-avatar-wrap {
+.doctor-profile-avatar-wrap {
   flex-shrink: 0;
 }
 
-.doctor-hero-avatar {
-  width: 110px;
-  height: 110px;
+.doctor-profile-avatar,
+.doctor-vector-avatar-profile {
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
   object-fit: cover;
-  border: 4px solid #ffffff;
-  box-shadow: 0 4px 16px rgba(16, 75, 66, 0.15);
+  border: 3px solid #e1f2e8;
+  box-shadow: 0 4px 14px rgba(16, 75, 66, 0.12);
+  display: block;
 }
 
-.doctor-hero-content {
+.doctor-profile-meta {
   flex: 1;
   min-width: 0;
 }
 
-.doctor-hero-badges {
+.doctor-badge-row {
   display: flex;
   gap: 8px;
   align-items: center;
   margin-bottom: 6px;
-}
-
-.hero-doctor-name {
-  font-size: 26px;
-  font-weight: 800;
-  color: #08281f;
-  margin: 0 0 4px 0;
-  line-height: 1.25;
-}
-
-.hero-doctor-designation {
-  font-size: 15px;
-  font-weight: 700;
-  color: #1f7754;
-  margin: 0 0 14px 0;
-}
-
-.hero-qualifications-box {
-  background: #ffffff;
-  border: 1px solid #d6ece0;
-  border-radius: 10px;
-  padding: 12px 16px;
-  margin-bottom: 14px;
-}
-
-.qual-box-label {
-  font-size: 11.5px;
-  font-weight: 800;
-  color: #4f7366;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 6px;
-}
-
-.qual-box-list {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.qual-item-line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #0d3629;
-  line-height: 1.4;
-}
-
-.qual-bullet {
-  color: #1f7754;
-  font-weight: 800;
-  font-size: 16px;
-}
-
-.hero-cta-section {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 18px;
   flex-wrap: wrap;
 }
 
-.hero-appointment-btn {
-  padding: 12px 24px;
+.dept-pill-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #156448;
+  background: #e8f7ee;
+  border: 1px solid #bfe8ce;
+  padding: 2px 9px;
+  border-radius: 6px;
+}
+
+.bmdc-pill-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 2px 9px;
+  border-radius: 6px;
+}
+
+.doctor-profile-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0a2d23;
+  margin: 0 0 3px 0;
+  line-height: 1.25;
+}
+
+.doctor-profile-designation {
   font-size: 14.5px;
-  letter-spacing: 0.02em;
-  box-shadow: 0 6px 18px rgba(31, 119, 84, 0.3);
+  font-weight: 700;
+  color: #156448;
+  margin: 0 0 10px 0;
+}
+
+.doctor-qualifications-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qual-line-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: #27483e;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.qual-dot {
+  color: #156448;
+  font-weight: 800;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.qual-text {
+  flex: 1;
+}
+
+/* 2. Quick Chamber, Receptionist & Consultation Fees Strip */
+.doctor-info-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #e8f3ed;
+}
+
+@media (max-width: 900px) {
+  .doctor-info-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 540px) {
+  .doctor-info-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
+.info-strip-card {
+  background: #f7fbf9;
+  border: 1px solid #d8ede0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-strip-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4f7366;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.info-strip-label .icon {
+  width: 13px;
+  height: 13px;
+  color: #156448;
+}
+
+.info-strip-val {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0b3026;
+  line-height: 1.35;
+}
+
+.helpline-link {
+  color: #156448;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fee-strip-card {
+  background: #f3faf5;
+  border-color: #c9e9d6;
+}
+
+.fee-pill-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.fee-pill-item {
+  font-size: 11.5px;
+  color: #1e3d33;
+  background: #ffffff;
+  border: 1px solid #c2e2cf;
+  padding: 2px 7px;
+  border-radius: 5px;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.fee-pill-item strong {
+  color: #0d5c46;
+  font-weight: 800;
+}
+
+/* 3. Weekly Available Consultation Schedule (Clean, Direct, Beautiful) */
+.doctor-schedule-panel {
+  background: #ffffff;
+  border: 1.5px solid #d4ebd9;
+  border-radius: 16px;
+  padding: 24px 28px;
+  box-shadow: 0 4px 20px rgba(10, 48, 38, 0.05);
+}
+
+.schedule-panel-header {
+  margin-bottom: 18px;
+}
+
+.schedule-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #156448;
+  text-transform: uppercase;
+  display: inline-block;
+  margin-bottom: 4px;
+}
+
+.schedule-header-title h2 {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0a2d23;
+  margin: 0 0 4px 0;
+}
+
+.schedule-header-title p {
+  font-size: 13px;
+  color: #4b6f63;
+  margin: 0;
+}
+
+.schedule-sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.schedule-session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #ffffff;
+  border: 1.5px solid #d6ece0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(10, 48, 38, 0.03);
+}
+
+.schedule-session-row:hover {
+  border-color: #156448;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(21, 100, 72, 0.12);
+}
+
+@media (max-width: 768px) {
+  .schedule-session-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .session-action-block {
+    width: 100%;
+  }
+  .slot-book-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.session-day-block {
+  flex-shrink: 0;
+}
+
+.session-weekday-pill {
+  width: 52px;
+  height: 46px;
+  background: #0d5c46;
+  color: #ffffff;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 6px rgba(13, 92, 70, 0.2);
+}
+
+.session-info-block {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-date-line {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #0a2d23;
+}
+
+.session-time-line {
+  font-size: 13px;
+  font-weight: 600;
+  color: #156448;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.session-time-line .icon {
+  width: 13px;
+  height: 13px;
+  color: #156448;
+}
+
+.session-room-line {
+  font-size: 12px;
+  color: #55786b;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.session-room-line .icon {
+  width: 12px;
+  height: 12px;
+  color: #2b9d6a;
+}
+
+.session-allocation-block {
+  flex-shrink: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+@media (max-width: 640px) {
+  .session-allocation-block {
+    display: none;
+  }
+}
+
+.session-status-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #065f46;
+  background: #d8f1e2;
+  border: 1px solid #b6e4c7;
+  padding: 2px 8px;
+  border-radius: 5px;
+}
+
+.session-quota-note {
+  font-size: 11px;
+  color: #5d7e72;
+}
+
+.session-action-block {
+  flex-shrink: 0;
+}
+
+.slot-book-button {
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 3px 10px rgba(13, 92, 70, 0.22);
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.slot-book-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(13, 92, 70, 0.32);
+}
+
+.slot-opening-soon-pill {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 7px 14px;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.schedule-footer-strip {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #e8f3ed;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.footer-strip-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #3b5f53;
+  line-height: 1.4;
+}
+
+.footer-strip-item .icon {
+  width: 15px;
+  height: 15px;
+  color: #156448;
+  flex-shrink: 0;
+}
+
+.helpline-strip-item a {
+  color: #156448;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* Upcoming Sessions Selector */

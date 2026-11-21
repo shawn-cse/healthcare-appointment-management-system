@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.core.exceptions import ValidationError, PermissionDenied
 from .models import (User,Department,DoctorProfile,AppointmentSlot,Appointment,RefundRequest,
-                     PaymentTransaction, Chamber)
+                     PaymentTransaction, Chamber, WeeklyAvailability)
 from .services import (create_appointment, record_cash_payment, cancel_appointment,
                        fee_for, approve_refund, finalize_cash_refund, collected_revenue_shares)
 from .forms import RegisterForm, StaffForm
@@ -35,6 +35,8 @@ class AppointmentSystemTests(TestCase):
         cls.other_patient=User.objects.create_user(username='patient2',password='securePatient123!',
             role='patient',phone='01622222222')
         cls.future=timezone.localdate()+timedelta(days=5)
+        cls.weekly=WeeklyAvailability.objects.create(doctor=cls.doc,weekday=cls.future.weekday(),
+            start_time=time(15,0),end_time=time(15,30),capacity=1)
         cls.slot=AppointmentSlot.objects.create(doctor=cls.doc,date=cls.future,
             start_time=time(15,0),end_time=time(15,30),capacity=1)
         cls.slot_two=AppointmentSlot.objects.create(doctor=cls.other_doc,date=cls.future,
@@ -295,7 +297,7 @@ class AppointmentSystemTests(TestCase):
         # Doctor Profile is accessible via semantic slug without authentication
         response = self.client.get(reverse('doctor_detail', args=[self.doc.profile_slug]))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'MAKE APPOINTMENT')
+        self.assertContains(response, 'Book Appointment')
         self.assertContains(response, 'Room')
         self.assertContains(response, 'SCHEDULE')
         self.assertNotContains(response, 'Address')
