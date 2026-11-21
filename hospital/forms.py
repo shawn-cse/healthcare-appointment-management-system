@@ -55,8 +55,7 @@ class RegisterForm(forms.ModelForm, FormStyleMixin):
     username = forms.CharField(
         label='Username (optional)',
         required=False,
-        widget=forms.TextInput(attrs={'placeholder': 'Leave blank for patient1, patient2, etc.'}),
-        help_text='Optional. Leave blank to automatically assign patient1, patient2, etc.'
+        widget=forms.TextInput(attrs={'placeholder': 'Choose a username (optional)'}),
     )
     password1 = forms.CharField(label='Password', widget=forms.PasswordInput(attrs={'autocomplete':'new-password'}))
     password2 = forms.CharField(label='Confirm password', widget=forms.PasswordInput(attrs={'autocomplete':'new-password'}))
