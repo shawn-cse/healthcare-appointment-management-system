@@ -82,7 +82,7 @@ class Chamber(models.Model):
     room_number = models.CharField(max_length=50, default="Chamber 302")
     floor = models.CharField(max_length=50, blank=True, default="3rd Floor")
     description = models.CharField(max_length=255, blank=True, default="Building 1, chamber 302", help_text="e.g. Building 1, chamber 302")
-    address = models.CharField(max_length=255, default="Plot 1, Section 10, Mirpur, Dhaka-1216")
+    address = models.CharField(max_length=255, default="Mirpur, Dhaka")
     contact_number = models.CharField(max_length=120, default="+88096100016211")
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='chambers')
     is_active = models.BooleanField(default=True)
@@ -155,7 +155,7 @@ class DoctorProfile(models.Model):
     title_prefix = models.CharField(max_length=40, default='Dr.', blank=True)
     institute = models.CharField(max_length=200, blank=True, default='')
     room_number = models.CharField(max_length=50, blank=True, default='Chamber 302')
-    chamber_address = models.CharField(max_length=255, blank=True, default='Plot 1, Section 10, Mirpur, Dhaka-1216')
+    chamber_address = models.CharField(max_length=255, blank=True, default='Mirpur, Dhaka')
     contact_number = models.CharField(max_length=100, blank=True, default='+88096100016211')
     is_available = models.BooleanField(default=True)
 
@@ -201,7 +201,7 @@ class DoctorProfile(models.Model):
     def active_address(self):
         if self.chamber:
             return self.chamber.address
-        return self.chamber_address or 'Plot 1, Section 10, Mirpur, Dhaka-1216'
+        return self.chamber_address or 'Mirpur, Dhaka'
 
     @property
     def active_contact(self):

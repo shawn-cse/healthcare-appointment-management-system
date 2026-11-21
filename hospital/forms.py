@@ -487,7 +487,7 @@ class ChamberForm(forms.ModelForm, FormStyleMixin):
             'floor': forms.TextInput(attrs={'placeholder': 'e.g. 3rd Floor, 2nd Floor'}),
             'description': forms.TextInput(attrs={'placeholder': 'e.g. Building 1, chamber 302'}),
             'name': forms.TextInput(attrs={'placeholder': 'e.g. Mirpur Central Outpatient Wing'}),
-            'address': forms.TextInput(attrs={'placeholder': 'e.g. Plot 1, Section 10, Mirpur, Dhaka-1216'}),
+            'address': forms.TextInput(attrs={'placeholder': 'e.g. Mirpur, Dhaka'}),
             'contact_number': forms.TextInput(attrs={'placeholder': 'e.g. +88096100016211'}),
         }
         labels = {
@@ -607,7 +607,7 @@ class ChamberForm(forms.ModelForm, FormStyleMixin):
             'floor': forms.TextInput(attrs={'placeholder': 'e.g. 3rd Floor, 2nd Floor'}),
             'description': forms.TextInput(attrs={'placeholder': 'e.g. Building 1, chamber 302'}),
             'name': forms.TextInput(attrs={'placeholder': 'e.g. Mirpur Central Outpatient Wing'}),
-            'address': forms.TextInput(attrs={'placeholder': 'e.g. Plot 1, Section 10, Mirpur, Dhaka-1216'}),
+            'address': forms.TextInput(attrs={'placeholder': 'e.g. Mirpur, Dhaka'}),
             'contact_number': forms.TextInput(attrs={'placeholder': 'e.g. +88096100016211'}),
         }
         labels = {

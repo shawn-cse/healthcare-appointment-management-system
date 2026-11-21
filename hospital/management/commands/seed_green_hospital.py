@@ -207,14 +207,14 @@ class Command(BaseCommand):
                     'name': f'Green Hospital {bld} - {rm}',
                     'floor': desc.split(',')[0],
                     'description': f'{bld}, {rm} ({desc})',
-                    'address': 'Plot 1, Section 10, Mirpur, Dhaka-1216',
+                    'address': 'Mirpur, Dhaka',
                     'contact_number': '+88096100016211',
                     'is_active': True,
                 }
             )
             ch.name = f'Green Hospital {bld} - {rm}'
             ch.description = f'{bld}, {rm} ({desc})'
-            ch.address = 'Plot 1, Section 10, Mirpur, Dhaka-1216'
+            ch.address = 'Mirpur, Dhaka'
             ch.contact_number = '+88096100016211'
             ch.save()
             chambers_objs.append(ch)
@@ -349,7 +349,7 @@ class Command(BaseCommand):
         shamima_prof.gender = 'female'
         shamima_prof.max_patients_per_session = 35
         shamima_prof.room_number = 'Room 707'
-        shamima_prof.chamber_address = 'Plot 1, Section 10, Mirpur, Dhaka-1216'
+        shamima_prof.chamber_address = 'Mirpur, Dhaka'
         shamima_prof.contact_number = '+88096100016211'
         shamima_prof.initial_fee = Decimal('1500.00')
         shamima_prof.followup_fee = Decimal('1000.00')
