@@ -77,17 +77,6 @@
               </label>
             </div>
           </div>
-
-          <!-- 4. Sort By: Consultation Fee & Experience -->
-          <div class="filter-group">
-            <label for="filter-sort-select" class="filter-group-title">Sort By</label>
-            <select name="sort" id="filter-sort-select" class="field-control filter-select">
-              <option value="default" {% if not selected_sort or selected_sort == 'default' or selected_sort == 'name' %}selected{% endif %}>Default</option>
-              <option value="fee_asc" {% if selected_sort == 'fee_asc' %}selected{% endif %}>Consultation Fee: Low to High</option>
-              <option value="fee_desc" {% if selected_sort == 'fee_desc' %}selected{% endif %}>Consultation Fee: High to Low</option>
-              <option value="experience" {% if selected_sort == 'experience' %}selected{% endif %}>Experience (Seniority)</option>
-            </select>
-          </div>
         </form>
       </div>
     </aside>
@@ -272,7 +261,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const clearDeptBtn = document.getElementById('clear-dept-filter');
   const genderMaleCheck = document.getElementById('gender-check-male');
   const genderFemaleCheck = document.getElementById('gender-check-female');
-  const sortSelect = document.getElementById('filter-sort-select');
   const cardsContainer = document.getElementById('doctor-cards-grid');
   const resetLink = document.getElementById('reset-all-filters');
   const clientEmpty = document.getElementById('no-doctors-client');
@@ -284,14 +272,11 @@ document.addEventListener('DOMContentLoaded', function() {
   if (!cardsContainer) return;
 
   const cards = Array.from(cardsContainer.querySelectorAll('.doctor-card'));
-  // Record initial order for 'default' sort
-  cards.forEach((c, idx) => { c.dataset.origOrder = idx; });
 
   function filterAndSortDoctors() {
     const rawQuery = (searchInput ? searchInput.value : '').trim();
     const query = rawQuery.toLowerCase();
     const terms = query.split(/\s+/).filter(Boolean);
-    const sortVal = sortSelect ? sortSelect.value : 'default';
 
     const hasQuery = Boolean(rawQuery);
     if (clearBtn) clearBtn.style.display = hasQuery ? 'inline-flex' : 'none';
@@ -354,23 +339,6 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
 
-    // 3. Sorting
-    visibleCards.sort((a, b) => {
-      if (sortVal === 'fee_asc') {
-        return (parseFloat(a.dataset.fee) || 0) - (parseFloat(b.dataset.fee) || 0);
-      } else if (sortVal === 'fee_desc') {
-        return (parseFloat(b.dataset.fee) || 0) - (parseFloat(a.dataset.fee) || 0);
-      } else if (sortVal === 'experience') {
-        return (parseInt(b.dataset.exp, 10) || 0) - (parseInt(a.dataset.exp, 10) || 0);
-      } else {
-        // default: original DOM order
-        return (parseInt(a.dataset.origOrder, 10) || 0) - (parseInt(b.dataset.origOrder, 10) || 0);
-      }
-    });
-
-    // Re-append in sorted order
-    visibleCards.forEach(card => cardsContainer.appendChild(card));
-
     // Update results counter
     if (visibleCountEl) {
       visibleCountEl.textContent = visibleCards.length;
@@ -399,7 +367,6 @@ document.addEventListener('DOMContentLoaded', function() {
       selectedDepts.forEach(id => params.append('department', id));
     }
     if (targetGender !== 'all') params.set('gender', targetGender);
-    if (sortVal && sortVal !== 'default') params.set('sort', sortVal);
 
     const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
     window.history.replaceState(null, '', newUrl);
@@ -442,18 +409,12 @@ document.addEventListener('DOMContentLoaded', function() {
   if (genderMaleCheck) genderMaleCheck.addEventListener('change', filterAndSortDoctors);
   if (genderFemaleCheck) genderFemaleCheck.addEventListener('change', filterAndSortDoctors);
 
-  // --- Sort Dropdown Listener ---
-  if (sortSelect) {
-    sortSelect.addEventListener('change', filterAndSortDoctors);
-  }
-
   // --- Reset All Filters ---
   function resetAll() {
     if (searchInput) searchInput.value = '';
     deptCheckboxes.forEach(cb => { cb.checked = false; });
     if (genderMaleCheck) genderMaleCheck.checked = false;
     if (genderFemaleCheck) genderFemaleCheck.checked = false;
-    if (sortSelect) sortSelect.value = 'default';
     filterAndSortDoctors();
   }
 
