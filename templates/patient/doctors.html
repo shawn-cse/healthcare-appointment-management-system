@@ -129,7 +129,9 @@
               {% if d.user.avatar %}
                 <img src="{{ d.user.avatar.url }}" alt="{{ d.full_doctor_title }}" class="doctor-avatar-img">
               {% else %}
-                <svg class="doctor-vector-avatar" viewBox="0 0 64 64"><use href="#{{ d.default_avatar }}"/></svg>
+                <div class="doctor-avatar-circle">
+                  <svg class="doctor-vector-avatar" viewBox="0 0 64 64"><use href="#{{ d.default_avatar }}"/></svg>
+                </div>
               {% endif %}
             </div>
             <div class="doctor-primary-meta">
@@ -146,13 +148,23 @@
 
           <!-- Card Middle: Qualifications, Chamber & Fees -->
           <div class="doctor-card-middle">
+            <!-- Degrees & Qualifications -->
             <div class="doctor-qual-block">
-              <span class="qual-label">Degrees & Qualifications:</span>
+              <div class="qual-label">
+                <svg class="icon"><use href="#ic-stethoscope"/></svg>
+                <span>Degrees & Qualifications</span>
+              </div>
               <div class="qual-list">
                 {% for line in d.qualifications_list %}
-                  <div class="qual-line">• {{ line }}</div>
+                  <div class="qual-line">
+                    <span class="qual-dot"></span>
+                    <span class="qual-text">{{ line }}</span>
+                  </div>
                 {% empty %}
-                  <div class="qual-line">• {{ d.qualifications|default:'MBBS, Specialist Consultant' }}</div>
+                  <div class="qual-line">
+                    <span class="qual-dot"></span>
+                    <span class="qual-text">{{ d.qualifications|default:'MBBS, Specialist Consultant' }}</span>
+                  </div>
                 {% endfor %}
               </div>
             </div>
@@ -160,16 +172,31 @@
             <!-- Chamber, Receptionist & Helpline -->
             <div class="doctor-chamber-section">
               <div class="chamber-info-item">
-                <svg class="icon icon-xs"><use href="#ic-building"/></svg>
-                <span>Chamber: <b>{{ d.room_number|default:'Chamber 201' }}{% if d.chamber and d.chamber.building %}, {{ d.chamber.building }}{% elif d.chamber %}, {{ d.chamber.name }}{% endif %}</b></span>
+                <span class="chamber-icon-box chamber-icon-building">
+                  <svg class="icon"><use href="#ic-building"/></svg>
+                </span>
+                <span class="chamber-info-text">
+                  <span class="chamber-lbl">Chamber:</span>
+                  <b class="chamber-val">{{ d.room_number|default:'Chamber 201' }}{% if d.chamber and d.chamber.building %}, {{ d.chamber.building }}{% elif d.chamber %}, {{ d.chamber.name }}{% endif %}</b>
+                </span>
               </div>
               <div class="chamber-info-item">
-                <svg class="icon icon-xs"><use href="#ic-user"/></svg>
-                <span>Receptionist: <b>{{ d.assigned_receptionist_name }}</b></span>
+                <span class="chamber-icon-box chamber-icon-user">
+                  <svg class="icon"><use href="#ic-user"/></svg>
+                </span>
+                <span class="chamber-info-text">
+                  <span class="chamber-lbl">Receptionist:</span>
+                  <b class="chamber-val">{{ d.assigned_receptionist_name }}</b>
+                </span>
               </div>
-              <div class="chamber-info-item">
-                <svg class="icon icon-xs"><use href="#ic-phone"/></svg>
-                <span>Helpline: <a href="tel:+88096100016211" class="helpline-link"><b>{{ d.active_contact|default:'+88096100016211, +16211' }}</b></a></span>
+              <div class="chamber-info-item helpline-item">
+                <span class="chamber-icon-box chamber-icon-phone">
+                  <svg class="icon"><use href="#ic-phone"/></svg>
+                </span>
+                <span class="chamber-info-text">
+                  <span class="chamber-lbl">Helpline:</span>
+                  <a href="tel:+88096100016211" class="helpline-link"><b>{{ d.active_contact|default:'+88096100016211' }}</b></a>
+                </span>
               </div>
             </div>
 
@@ -191,13 +218,17 @@
 
             <!-- Schedule summary -->
             <div class="doctor-schedule-preview">
-              <span class="schedule-label"><svg class="icon"><use href="#ic-clock"/></svg> APPOINTMENT SCHEDULE:</span>
+              <div class="schedule-label">
+                <svg class="icon"><use href="#ic-clock"/></svg>
+                <span>APPOINTMENT SCHEDULE:</span>
+              </div>
               <div class="schedule-pills-wrap">
                 {% for sched in d.weekly.all %}
                   {% if sched.active %}
-                  <span class="sched-pill">
-                    <strong>{{ sched.get_weekday_display|slice:":3"|upper }}</strong> {{ sched.start_time|time:"h:iA" }}–{{ sched.end_time|time:"h:iA" }}
-                  </span>
+                  <div class="sched-pill">
+                    <span class="sched-day-badge">{{ sched.get_weekday_display|slice:":3"|upper }}</span>
+                    <span class="sched-time-text">{{ sched.start_time|time:"h:iA" }}–{{ sched.end_time|time:"h:iA" }}</span>
+                  </div>
                   {% endif %}
                 {% empty %}
                   <span class="sched-pill sched-pill-open">Consultation by Appointment</span>
@@ -209,7 +240,8 @@
           <!-- Card Bottom Actions: Single Make Appointment Button -->
           <div class="doctor-card-bottom">
             <a href="{% url 'doctor_detail' d.profile_slug %}" class="button button-primary button-full appt-action-btn">
-              Make Appointment <svg class="icon"><use href="#ic-arrow"/></svg>
+              <span>Make Appointment</span>
+              <svg class="icon btn-arrow-icon"><use href="#ic-arrow"/></svg>
             </a>
           </div>
         </article>
