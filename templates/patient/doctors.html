@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Find Specialist Doctors | Green Hospital Dhaka{% endblock %}
+
 {% block content %}
 <div class="doctor-directory-container container">
   <!-- Minimal Clean Page Title -->
@@ -7,106 +8,91 @@
     <div>
       <span class="directory-eyebrow">DHAKA MEDICAL FACULTY</span>
       <h1 class="directory-title">Consult Our Specialist Doctors</h1>
-      <p class="directory-subtitle">Consult verified senior professors, consultants, and surgeons at Green Hospital Mirpur. Book your serial directly online without waiting.</p>
+      <p class="directory-subtitle">Consult verified senior professors, consultants, and surgeons at Green Hospital Mirpur. Choose your consultation date and receive sequential serial numbers directly.</p>
     </div>
   </div>
 
   <!-- Main Directory 2-Column Layout -->
   <div class="directory-layout">
-    <!-- LEFT SIDEBAR: FILTERS -->
+    <!-- LEFT SIDEBAR: SEARCH & FILTERS -->
     <aside class="directory-sidebar">
       <div class="filter-panel panel">
         <div class="filter-header">
           <div class="filter-title">
             <svg class="icon"><use href="#ic-filter"/></svg>
-            <h3>Filters</h3>
+            <h3>Search & Filters</h3>
           </div>
-          <a href="{% url 'doctor_directory' %}" class="filter-reset-link" id="reset-all-filters">Reset All</a>
+          {% if selected_department or selected_gender or query or selected_sort != 'name' %}
+            <a href="{% url 'doctor_directory' %}" class="filter-reset-link" id="reset-all-filters">Reset All</a>
+          {% endif %}
         </div>
 
-        <form method="get" id="directory-filter-form">
-          <!-- Preserved query -->
-          <input type="hidden" name="q" id="hidden-search-query" value="{{ query }}">
-
-          <!-- Department Filter -->
+        <form method="get" id="directory-filter-form" class="directory-filter-form">
+          <!-- 1. Search Box Inside Left Filter Box -->
           <div class="filter-group">
-            <h4 class="filter-group-title">Departments</h4>
-            <div class="filter-options-list">
-              <label class="filter-radio-item {% if not selected_department %}active{% endif %}">
-                <input type="radio" name="department" value="" {% if not selected_department %}checked{% endif %} onchange="this.form.submit()">
-                <span class="radio-label">All Departments</span>
-                <span class="count-tag">{{ total_doctors_count }}</span>
-              </label>
+            <label for="left-doctor-search-input" class="filter-group-title">Search Doctor</label>
+            <div class="filter-search-box">
+              <svg class="icon search-icon"><use href="#ic-search"/></svg>
+              <input type="text" name="q" id="left-doctor-search-input"
+                     class="filter-search-input"
+                     placeholder="Search doctor, qualification, room..."
+                     value="{{ query }}" autocomplete="off">
+              {% if query %}
+                <a href="{% url 'doctor_directory' %}" class="filter-clear-btn" title="Clear text">✕</a>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- 2. Department Dropdown -->
+          <div class="filter-group">
+            <label for="filter-department-select" class="filter-group-title">Specialty Department</label>
+            <select name="department" id="filter-department-select" class="field-control filter-select" onchange="this.form.submit()">
+              <option value="">All Departments ({{ total_doctors_count }} Doctors)</option>
               {% for dep in departments %}
-              <label class="filter-radio-item {% if selected_department == dep.pk|stringformat:'s' %}active{% endif %}">
-                <input type="radio" name="department" value="{{ dep.pk }}" {% if selected_department == dep.pk|stringformat:'s' %}checked{% endif %} onchange="this.form.submit()">
-                <span class="radio-label">{{ dep.name }}</span>
-                <span class="count-tag">{{ dep.doc_count }}</span>
-              </label>
+              <option value="{{ dep.pk }}" {% if selected_department == dep.pk|stringformat:'s' %}selected{% endif %}>
+                {{ dep.name }} ({{ dep.doc_count }})
+              </option>
               {% endfor %}
-            </div>
+            </select>
           </div>
 
-          <!-- Gender Filter -->
+          <!-- 3. Gender Dropdown -->
           <div class="filter-group">
-            <h4 class="filter-group-title">Doctor Gender</h4>
-            <div class="filter-options-list">
-              <label class="filter-radio-item {% if not selected_gender %}active{% endif %}">
-                <input type="radio" name="gender" value="" {% if not selected_gender %}checked{% endif %} onchange="this.form.submit()">
-                <span class="radio-label">All Doctors</span>
-              </label>
-              <label class="filter-radio-item {% if selected_gender == 'female' %}active{% endif %}">
-                <input type="radio" name="gender" value="female" {% if selected_gender == 'female' %}checked{% endif %} onchange="this.form.submit()">
-                <span class="radio-label">Female Specialists</span>
-              </label>
-              <label class="filter-radio-item {% if selected_gender == 'male' %}active{% endif %}">
-                <input type="radio" name="gender" value="male" {% if selected_gender == 'male' %}checked{% endif %} onchange="this.form.submit()">
-                <span class="radio-label">Male Specialists</span>
-              </label>
-            </div>
+            <label for="filter-gender-select" class="filter-group-title">Doctor Gender</label>
+            <select name="gender" id="filter-gender-select" class="field-control filter-select" onchange="this.form.submit()">
+              <option value="" {% if not selected_gender %}selected{% endif %}>All Doctors</option>
+              <option value="female" {% if selected_gender == 'female' %}selected{% endif %}>Female Specialists</option>
+              <option value="male" {% if selected_gender == 'male' %}selected{% endif %}>Male Specialists</option>
+            </select>
           </div>
 
-          <!-- Sort Filter -->
+          <!-- 4. Consultation Fee Sort Dropdown -->
           <div class="filter-group">
-            <h4 class="filter-group-title">Sort By</h4>
-            <div class="filter-options-list">
-              <label class="filter-radio-item {% if selected_sort == 'name' or not selected_sort %}active{% endif %}">
-                <input type="radio" name="sort" value="name" {% if selected_sort == 'name' or not selected_sort %}checked{% endif %} onchange="this.form.submit()">
-                <span class="radio-label">Doctor Name (A – Z)</span>
-              </label>
-              <label class="filter-radio-item {% if selected_sort == 'experience' %}active{% endif %}">
-                <input type="radio" name="sort" value="experience" {% if selected_sort == 'experience' %}checked{% endif %} onchange="this.form.submit()">
-                <span class="radio-label">Experience (High to Low)</span>
-              </label>
-              <label class="filter-radio-item {% if selected_sort == 'fee_asc' %}active{% endif %}">
-                <input type="radio" name="sort" value="fee_asc" {% if selected_sort == 'fee_asc' %}checked{% endif %} onchange="this.form.submit()">
-                <span class="radio-label">Consultation Fee (Low to High)</span>
-              </label>
-              <label class="filter-radio-item {% if selected_sort == 'fee_desc' %}active{% endif %}">
-                <input type="radio" name="sort" value="fee_desc" {% if selected_sort == 'fee_desc' %}checked{% endif %} onchange="this.form.submit()">
-                <span class="radio-label">Consultation Fee (High to Low)</span>
-              </label>
-            </div>
+            <label for="filter-sort-select" class="filter-group-title">Sort By</label>
+            <select name="sort" id="filter-sort-select" class="field-control filter-select" onchange="this.form.submit()">
+              <option value="name" {% if selected_sort == 'name' or not selected_sort %}selected{% endif %}>Doctor Name (A – Z)</option>
+              <option value="fee_asc" {% if selected_sort == 'fee_asc' %}selected{% endif %}>Consultation Fee: Low to High</option>
+              <option value="fee_desc" {% if selected_sort == 'fee_desc' %}selected{% endif %}>Consultation Fee: High to Low</option>
+              <option value="experience" {% if selected_sort == 'experience' %}selected{% endif %}>Experience (Seniority)</option>
+            </select>
           </div>
+
+          <button type="submit" class="button button-primary button-full" style="margin-top: 10px;">
+            <svg class="icon"><use href="#ic-filter"/></svg> Apply Filters
+          </button>
         </form>
       </div>
     </aside>
 
-    <!-- RIGHT MAIN CONTENT: SEARCH + CARDS GRID -->
+    <!-- RIGHT MAIN CONTENT: CARDS GRID -->
     <main class="directory-main">
-      <!-- Search Input Box -->
-      <div class="directory-search-panel panel">
-        <div class="search-field-wrapper">
-          <svg class="icon search-icon"><use href="#ic-search"/></svg>
-          <input type="text" id="live-doctor-search" class="directory-search-input" placeholder="Search doctor by name, qualification, specialty, or chamber..." value="{{ query }}" autocomplete="off">
-          <button type="button" id="clear-search-btn" class="clear-search-btn" style="display: none;">✕</button>
-        </div>
-      </div>
-
       <!-- Live Results Summary Bar -->
       <div class="results-meta-bar">
-        <span class="results-text">Showing <b id="visible-count">{{ doctors|length }}</b> specialist doctor{{ doctors|length|pluralize }}</span>
-        <span class="online-booking-indicator"><span class="pulse-dot"></span> Online Serial Booking Active</span>
+        <span class="results-text">
+          Showing <b>{{ doctors|length }}</b> specialist doctor{{ doctors|length|pluralize }}
+          {% if query %} matching "<b>{{ query }}</b>"{% endif %}
+        </span>
+        <span class="online-booking-indicator"><span class="pulse-dot"></span> Online Serial Active</span>
       </div>
 
       <!-- Doctor Cards Grid -->
@@ -117,17 +103,17 @@
                  data-dept="{{ d.department.name|lower }}"
                  data-dept-id="{{ d.department.pk }}"
                  data-qual="{{ d.qualifications|lower }}"
-                 data-inst="{{ d.institute|lower }}"
                  data-room="{{ d.room_number|lower }}"
                  data-fee="{{ d.initial_fee }}"
                  data-gender="{{ d.gender }}"
                  data-exp="{{ d.experience_years }}">
+          <!-- Card Top: Avatar + Meta -->
           <div class="doctor-card-top">
             <div class="doctor-avatar-wrapper">
               {% if d.user.avatar %}
-              <img src="{{ d.user.avatar.url }}" alt="{{ d.full_doctor_title }}" class="doctor-avatar-img">
+                <img src="{{ d.user.avatar.url }}" alt="{{ d.full_doctor_title }}" class="doctor-avatar-img">
               {% else %}
-              <svg class="doctor-vector-avatar" viewBox="0 0 64 64"><use href="#{{ d.default_avatar }}"/></svg>
+                <svg class="doctor-vector-avatar" viewBox="0 0 64 64"><use href="#{{ d.default_avatar }}"/></svg>
               {% endif %}
             </div>
             <div class="doctor-primary-meta">
@@ -142,37 +128,46 @@
             </div>
           </div>
 
+          <!-- Card Middle: Qualifications, Chamber & Fees -->
           <div class="doctor-card-middle">
             <div class="doctor-qual-block">
               <span class="qual-label">Degrees & Qualifications:</span>
               <p class="qual-content">{{ d.qualifications|linebreaksbr|default:'MBBS, Specialist Consultant' }}</p>
             </div>
 
-            {% if d.institute %}
-            <div class="doctor-institute-row">
-              <svg class="icon"><use href="#ic-building"/></svg>
-              <span>{{ d.institute }}</span>
-            </div>
-            {% endif %}
-
+            <!-- Room / Chamber -->
             <div class="doctor-chamber-row">
               <div class="chamber-info-cell">
-                <span class="cell-label">Room / Chamber</span>
-                <b class="cell-value room-text">{{ d.room_number|default:'Room 707' }}</b>
+                <span class="cell-label"><svg class="icon icon-xs"><use href="#ic-building"/></svg> Chamber</span>
+                <b class="cell-value room-text">{{ d.room_number|default:'Room 707' }}{% if d.chamber and d.chamber.building %}, {{ d.chamber.building }}{% endif %}</b>
               </div>
-              <div class="chamber-info-cell fee-cell">
-                <span class="cell-label">Consultation Fee</span>
-                <b class="cell-value fee-text">৳{{ d.initial_fee|floatformat:0 }}</b>
+            </div>
+
+            <!-- 3 Distinct Consultation Fees -->
+            <div class="doctor-fees-grid">
+              <div class="fee-tile fee-initial">
+                <span class="fee-tile-label">1st Visit / New</span>
+                <b class="fee-tile-amount">৳{{ d.initial_fee|floatformat:0 }}</b>
+              </div>
+              <div class="fee-tile fee-followup">
+                <span class="fee-tile-label">Follow-up (<small>{{ d.followup_within_days }}d</small>)</span>
+                <b class="fee-tile-amount">৳{{ d.followup_fee|floatformat:0 }}</b>
+              </div>
+              <div class="fee-tile fee-report">
+                <span class="fee-tile-label">Report Review</span>
+                <b class="fee-tile-amount">৳{{ d.report_fee|floatformat:0 }}</b>
               </div>
             </div>
 
             <!-- Schedule summary -->
             <div class="doctor-schedule-preview">
-              <span class="schedule-label"><svg class="icon"><use href="#ic-clock"/></svg> SCHEDULE:</span>
+              <span class="schedule-label"><svg class="icon"><use href="#ic-clock"/></svg> PRACTICE SCHEDULE:</span>
               <div class="schedule-pills-wrap">
                 {% for sched in d.weekly.all %}
                   {% if sched.active %}
-                  <span class="sched-pill"><b>{{ sched.get_weekday_display|slice:":3"|upper }}</b> {{ sched.start_time|time:"h:iA" }}–{{ sched.end_time|time:"h:iA" }}</span>
+                  <span class="sched-pill">
+                    <b>{{ sched.get_weekday_display|slice:":3"|upper }}</b> {{ sched.start_time|time:"h:iA" }}–{{ sched.end_time|time:"h:iA" }}
+                  </span>
                   {% endif %}
                 {% empty %}
                   <span class="sched-pill sched-pill-open">Consultation by Appointment</span>
@@ -181,6 +176,7 @@
             </div>
           </div>
 
+          <!-- Card Bottom Actions -->
           <div class="doctor-card-bottom">
             <a href="{% url 'doctor_detail' d.pk %}" class="button button-outline button-sm">View Profile</a>
             <a href="{% url 'doctor_detail' d.pk %}#appointment-section" class="button button-primary button-sm appt-action-btn">
@@ -191,18 +187,11 @@
         {% empty %}
         <div class="panel empty-state full-grid" id="no-doctors-server">
           <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
-          <h3>No doctors found in this category</h3>
-          <p>Please clear filters to view all specialists available at Green Hospital.</p>
+          <h3>No doctors found matching your criteria</h3>
+          <p>Please clear filters or search query to view all specialist doctors at Green Hospital.</p>
           <a class="button button-outline" href="{% url 'doctor_directory' %}">View All Doctors</a>
         </div>
         {% endfor %}
-      </div>
-
-      <div class="panel empty-state full-grid" id="no-search-results" style="display: none;">
-        <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
-        <h3>No matching doctors found</h3>
-        <p>No specialist matches your search text. Try another specialty, doctor name, or degree.</p>
-        <button type="button" class="button button-outline" id="clear-search-btn-empty">Clear Search</button>
       </div>
     </main>
   </div>

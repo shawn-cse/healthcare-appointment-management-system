@@ -71,24 +71,62 @@
 </symbol>
 </svg>
 
+<!-- Modern Floating Top-Right Toast Notifications Container -->
+<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true">
+  {% if messages %}
+    {% for message in messages %}
+    <div class="toast-card toast-{{ message.tags|default:'info' }}" role="alert" data-auto-dismiss="3000">
+      <div class="toast-icon-wrap">
+        {% if 'error' in message.tags or 'danger' in message.tags %}
+          <svg class="icon"><use href="#ic-alert"/></svg>
+        {% elif 'success' in message.tags %}
+          <svg class="icon"><use href="#ic-check"/></svg>
+        {% elif 'warning' in message.tags %}
+          <svg class="icon"><use href="#ic-alert"/></svg>
+        {% else %}
+          <svg class="icon"><use href="#ic-help"/></svg>
+        {% endif %}
+      </div>
+      <div class="toast-body">
+        <span class="toast-badge-title">
+          {% if 'error' in message.tags or 'danger' in message.tags %}
+            Notice / Error
+          {% elif 'success' in message.tags %}
+            Success
+          {% elif 'warning' in message.tags %}
+            Attention
+          {% else %}
+            Information
+          {% endif %}
+        </span>
+        <p class="toast-msg-text">{{ message }}</p>
+      </div>
+      <button type="button" class="toast-dismiss-btn" aria-label="Dismiss notification" data-toast-close>✕</button>
+      <div class="toast-progress-track"><div class="toast-progress-bar"></div></div>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+
 {% if user.is_authenticated %}
 <!-- Authenticated Application Layout with Sidebar -->
 <div class="sidebar-scrim" data-close-nav></div>
 <aside class="sidebar" id="sidebar">
-  <a class="brand sidebar-brand" href="{% url 'dashboard' %}">
+  <a class="brand sidebar-brand" href="{% if user.role == 'patient' %}{% url 'doctor_directory' %}{% else %}{% url 'dashboard' %}{% endif %}">
     <span class="brand-mark-emblem"><svg class="brand-logo-icon" viewBox="0 0 40 40"><use href="#ic-hospital-logo"/></svg></span>
-    <span><strong>Green Hospital</strong><small>Clinical Management</small></span>
+    <span><strong>Green Hospital</strong><small>{% if user.role == 'patient' %}Patient Portal{% else %}Clinical Management{% endif %}</small></span>
   </a>
   <div class="sidebar-scroll">
-    <div class="nav-eyebrow">WORKSPACE</div>
+    <div class="nav-eyebrow">{% if user.role == 'patient' %}PATIENT SERVICES{% else %}WORKSPACE{% endif %}</div>
     <nav class="nav-list" aria-label="Main navigation">
-      <a href="{% url 'dashboard' %}" data-nav="dashboard"><svg class="icon"><use href="#ic-grid"/></svg> Overview</a>
-      <a href="{% url 'doctor_directory' %}" data-nav="doctor_directory"><svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors</a>
-      <a href="{% url 'public_departments' %}" data-nav="public_departments"><svg class="icon"><use href="#ic-building"/></svg> Departments</a>
       {% if user.role == 'patient' %}
+        <a href="{% url 'doctor_directory' %}" data-nav="doctor_directory"><svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors</a>
         <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> My Appointments</a>
-        <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Support & Concerns</a>
+        <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Complaints & Support</a>
       {% else %}
+        <a href="{% url 'dashboard' %}" data-nav="dashboard"><svg class="icon"><use href="#ic-grid"/></svg> Overview</a>
+        <a href="{% url 'doctor_directory' %}" data-nav="doctor_directory"><svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors</a>
+        <a href="{% url 'public_departments' %}" data-nav="public_departments"><svg class="icon"><use href="#ic-building"/></svg> Departments</a>
         <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> Appointments</a>
         <a href="{% url 'staff_book' %}" data-nav="staff_book"><svg class="icon"><use href="#ic-plus"/></svg> Register Booking</a>
         <a href="{% url 'schedule' %}" data-nav="schedule"><svg class="icon"><use href="#ic-clock"/></svg> Schedules & Slots</a>
@@ -185,17 +223,6 @@
     </div>
   </header>
   <main class="main-content" id="main-content">
-    {% if messages %}
-    <div class="flash-stack" aria-live="polite">
-      {% for message in messages %}
-      <div class="flash flash-{{ message.tags|default:'info' }}">
-        <svg class="icon"><use href="#ic-alert"/></svg>
-        <span>{{ message }}</span>
-        <button type="button" aria-label="Dismiss" data-dismiss><svg class="icon"><use href="#ic-x"/></svg></button>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
 {% else %}
 <!-- Public Header with Top Announcement Bar -->
 <div class="header-top-bar">
@@ -233,7 +260,7 @@
 
     <div class="public-header-actions">
       <a class="button button-outline button-sm hidden-mobile" href="{% url 'doctor_directory' %}">
-        <svg class="icon"><use href="#ic-calendar"/></svg> Book Appointment
+        <svg class="icon"><use href="#ic-calendar"/></svg> Consult Specialist
       </a>
       <a class="button button-primary button-sm" href="{% url 'login_choice' %}">
         Sign In <svg class="icon"><use href="#ic-arrow"/></svg>
@@ -244,17 +271,6 @@
     </div>
   </div>
 </header>
-
-{% if messages %}
-<div class="container public-flashes flash-stack" aria-live="polite">
-  {% for message in messages %}
-  <div class="flash flash-{{ message.tags|default:'info' }}">
-    <span>{{ message }}</span>
-    <button data-dismiss type="button">✕</button>
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
 
 <main class="public-main-content">
 {% endif %}
@@ -299,7 +315,7 @@
           <li><a href="{% url 'doctor_directory' %}">Find a Specialist Doctor</a></li>
           <li><a href="{% url 'public_departments' %}">Medical Departments</a></li>
           <li><a href="{% url 'login_screen' 'patient' %}">Patient Portal Sign In</a></li>
-          <li><a href="{% url 'register' %}">Create Patient Account</a></li>
+          <li><a href="{% url 'register' %}">Patient Registration</a></li>
           <li><a href="{% url 'login_screen' 'staff' %}">Doctor & Staff Workspace</a></li>
         </ul>
       </div>

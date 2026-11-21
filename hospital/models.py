@@ -387,9 +387,28 @@ class Complaint(models.Model):
     patient = models.ForeignKey(User, on_delete=models.PROTECT, related_name='complaints')
     appointment = models.ForeignKey(Appointment, on_delete=models.SET_NULL, null=True, blank=True)
     subject = models.CharField(max_length=150)
-    category = models.CharField(max_length=15, choices=[('appointment','Appointment'),('billing','Billing'),('service','Service'),('other','Other')], default='service')
+    category = models.CharField(
+        max_length=20,
+        choices=[
+            ('support', 'General Support & Help'),
+            ('doctor', 'Doctor & Consultation'),
+            ('hospital', 'Hospital Facilities'),
+            ('staff', 'Staff & Reception'),
+            ('billing', 'Billing & Payment'),
+            ('other', 'Other Issue'),
+        ],
+        default='support'
+    )
     message = models.TextField()
-    status = models.CharField(max_length=14, choices=[('submitted','Submitted'),('reviewing','Under review'),('in_progress','In progress'),('resolved','Resolved')], default='submitted')
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('submitted', 'Complaint Generated'),
+            ('reviewing', 'Under Review'),
+            ('resolved', 'Issue Solved'),
+        ],
+        default='submitted'
+    )
     response = models.TextField(blank=True)
     updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='handled_complaints')
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1,9 +1,421 @@
 {% extends 'base.html' %}
-{% block title %}{% if user.role == 'patient' %}My appointments{% else %}Appointment management{% endif %}{% endblock %}
+{% block title %}{% if user.role == 'patient' %}My Appointments | Green Hospital{% else %}Appointment Management | Green Hospital{% endif %}{% endblock %}
+
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">APPOINTMENT CENTER</p><h1>{% if user.role == 'patient' %}My appointments{% else %}Appointments{% endif %}</h1><p>{% if user.role == 'patient' %}Track confirmed, previous and cancelled consultations.{% else %}Search, filter and manage consultation records for your assigned doctors.{% endif %}</p></div><a class="button button-primary" href="{% if user.role == 'patient' %}{% url 'doctor_directory' %}{% else %}{% url 'staff_book' %}{% endif %}"><svg class="icon"><use href="#ic-plus"/></svg> New booking</a></div>
-<form class="panel filter-bar wrap-filters" method="get"><div class="search-input"><svg class="icon"><use href="#ic-search"/></svg><input name="q" value="{{ filters.q|default:'' }}" placeholder="Reference, patient, doctor or phone" aria-label="Search appointments"></div><select name="status" class="field-control"><option value="">All statuses</option><option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Awaiting payment</option><option value="confirmed" {% if filters.status == 'confirmed' %}selected{% endif %}>Confirmed</option><option value="completed" {% if filters.status == 'completed' %}selected{% endif %}>Completed</option><option value="cancelled" {% if filters.status == 'cancelled' %}selected{% endif %}>Cancelled</option><option value="no_show" {% if filters.status == 'no_show' %}selected{% endif %}>No-show</option><option value="expired" {% if filters.status == 'expired' %}selected{% endif %}>Expired</option></select><select name="payment" class="field-control"><option value="">All payments</option><option value="paid" {% if filters.payment == 'paid' %}selected{% endif %}>Paid</option><option value="unpaid" {% if filters.payment == 'unpaid' %}selected{% endif %}>Unpaid</option><option value="refund_pending" {% if filters.payment == 'refund_pending' %}selected{% endif %}>Refund pending</option><option value="refunded" {% if filters.payment == 'refunded' %}selected{% endif %}>Refunded</option></select>{% if doctor_options %}<select name="doctor" class="field-control"><option value="">All doctors</option>{% for d in doctor_options %}<option value="{{ d.pk }}" {% if filters.doctor == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.user.display_name }}</option>{% endfor %}</select>{% endif %}<input class="field-control date-filter green-datepicker" type="text" name="date" aria-label="Filter date" placeholder="Filter date" value="{{ filters.date|default:'' }}" autocomplete="off" data-datepicker="true"><select class="field-control" name="sort" aria-label="Sort appointments"><option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Newest booked</option><option value="date_asc" {% if filters.sort == 'date_asc' %}selected{% endif %}>Date: earliest</option><option value="date_desc" {% if filters.sort == 'date_desc' %}selected{% endif %}>Date: latest</option><option value="patient" {% if filters.sort == 'patient' %}selected{% endif %}>Patient A–Z</option><option value="fee_asc" {% if filters.sort == 'fee_asc' %}selected{% endif %}>Fee: low to high</option><option value="fee_desc" {% if filters.sort == 'fee_desc' %}selected{% endif %}>Fee: high to low</option></select><button class="button button-primary" type="submit"><svg class="icon"><use href="#ic-filter"/></svg> Apply</button><a class="button button-light" href="{% url 'appointments' %}">Reset</a></form>
-<div class="panel"><div class="panel-header"><div><h2>Appointment records</h2><p>Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} records</p></div></div>{% if user.role != 'patient' %}<form method="post" action="{% url 'appointment_bulk' %}" id="bulk-form">{% csrf_token %}<div class="bulk-toolbar"><span><b id="selected-count">0</b> selected</span><select name="action" class="field-control" required><option value="">Select bulk action</option><option value="cash">Record cash payment</option><option value="completed">Mark completed</option><option value="no_show">Mark no-show</option>{% if user.role != 'receptionist' %}<option value="doctor_cancel">Cancel by doctor (full refund)</option>{% endif %}</select><button class="button button-outline button-sm" type="submit" data-confirm="Apply this change to all selected appointments?">Apply to selected</button></div>{% endif %}
-<div class="table-wrap"><table class="data-table"><thead><tr>{% if user.role != 'patient' %}<th class="checkbox-col"><input type="checkbox" data-check-all aria-label="Select all"></th>{% endif %}<th>Reference / patient</th><th>Doctor</th><th>Appointment</th><th>Visit</th><th>Fee</th><th>Payment</th><th>Status</th><th></th></tr></thead><tbody>{% for a in appointments %}<tr>{% if user.role != 'patient' %}<td><input type="checkbox" name="selected" class="bulk-check" value="{{ a.pk }}" aria-label="Select {{ a.reference }}"></td>{% endif %}<td><a class="table-primary" href="{% url 'appointment_detail' a.pk %}">{{ a.reference }}</a><small class="table-sub">{{ a.patient_name }} · {{ a.guest_phone }}{% if a.created_by and a.created_by.role != 'patient' %} · <span style="color:#104b42;font-weight:600;">Booked by {{ a.created_by.display_name }} ({{ a.created_by.get_role_display }})</span>{% endif %}</small></td><td><span>Dr. {{ a.doctor.user.display_name }}</span><small class="table-sub">{{ a.doctor.department.name }}</small></td><td><span>{{ a.slot.date|date:'d M Y' }}</span><small class="table-sub">{{ a.slot.start_time|time:'g:i A' }}</small></td><td>{{ a.get_visit_type_display }}</td><td><b>৳{{ a.fee|floatformat:0 }}</b></td><td><span class="status status-{{ a.payment_status }}">{{ a.get_payment_status_display }}</span></td><td><span class="status status-{{ a.status }}">{{ a.get_status_display }}</span></td><td><a class="table-action" href="{% url 'appointment_detail' a.pk %}">Details</a></td></tr>{% empty %}<tr><td colspan="9" class="table-empty">No appointments match these filters.</td></tr>{% endfor %}</tbody></table></div>{% if user.role != 'patient' %}</form>{% endif %}
-{% if page_obj.has_other_pages %}<nav class="pagination" aria-label="Appointment record pages"><span class="pagination-count">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span><div class="pagination-links">{% if page_obj.has_previous %}<a class="button button-light button-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}{% if page_obj.has_next %}<a class="button button-outline button-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>{% endif %}</div></nav>{% endif %}</div>
+{% if user.role == 'patient' %}
+<!-- ========================================================
+     PATIENT EXCEL-STYLE APPOINTMENTS MANAGEMENT SHEET
+     ======================================================== -->
+<div class="patient-sheet-container">
+  <!-- Clean Header -->
+  <div class="sheet-heading-bar">
+    <div>
+      <span class="sheet-eyebrow">PATIENT APPOINTMENT DESK</span>
+      <h1 class="sheet-main-title">My Appointments</h1>
+      <p class="sheet-subtitle">Manage consultations, view sequential serial numbers, track status, and cancel appointments with automated refund processing.</p>
+    </div>
+    <div class="sheet-header-actions">
+      <a class="button button-primary" href="{% url 'doctor_directory' %}">
+        <svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors
+      </a>
+    </div>
+  </div>
+
+  <!-- Excel Toolbar / Filter Bar -->
+  <div class="sheet-toolbar-panel panel">
+    <form method="get" class="sheet-toolbar-form" id="patient-sheet-filter-form">
+      <div class="sheet-search-wrap">
+        <svg class="icon search-icon"><use href="#ic-search"/></svg>
+        <input type="text" name="q" value="{{ filters.q|default:'' }}"
+               id="sheet-search-input"
+               class="sheet-search-input"
+               placeholder="Search by doctor name, appointment ref #, or department..."
+               aria-label="Search appointments">
+        {% if filters.q %}
+          <a href="{% url 'appointments' %}" class="sheet-search-clear" title="Clear search">✕</a>
+        {% endif %}
+      </div>
+
+      <div class="sheet-sort-wrap">
+        <label for="sheet-sort-select" class="sheet-sort-label">Order:</label>
+        <select name="sort" id="sheet-sort-select" class="sheet-sort-select" onchange="this.form.submit()">
+          <option value="oldest" {% if active_sort == 'oldest' %}selected{% endif %}>Oldest to Newest</option>
+          <option value="newest" {% if active_sort == 'newest' %}selected{% endif %}>Newest to Oldest</option>
+        </select>
+      </div>
+
+      <button type="submit" class="button button-outline button-sm">
+        <svg class="icon"><use href="#ic-filter"/></svg> Filter
+      </button>
+
+      {% if filters.q or active_sort != 'oldest' %}
+        <a class="button button-light button-sm" href="{% url 'appointments' %}">Reset</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Excel Sheet Grid Container -->
+  <div class="sheet-table-card panel">
+    <div class="sheet-card-meta">
+      <span class="sheet-records-count">
+        <svg class="icon"><use href="#ic-clipboard"/></svg>
+        Showing <b>{{ page_obj.start_index|default:'0' }}–{{ page_obj.end_index|default:'0' }}</b> of <b>{{ page_obj.paginator.count|default:'0' }}</b> appointment records
+      </span>
+      <span class="sheet-hint-tag">Excel View · Live Status</span>
+    </div>
+
+    <div class="excel-table-scroll">
+      <table class="excel-sheet-table" id="patient-appointments-table">
+        <thead>
+          <tr>
+            <th class="col-ref">Ref #</th>
+            <th class="col-doc">Doctor & Department</th>
+            <th class="col-date">Date & Time</th>
+            <th class="col-room">Chamber / Room</th>
+            <th class="col-serial">Serial #</th>
+            <th class="col-fee">Fee & Visit Type</th>
+            <th class="col-payment">Payment Status</th>
+            <th class="col-status">Appointment Status</th>
+            <th class="col-actions">Manage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in appointments %}
+          <tr class="sheet-row {% if a.status == 'cancelled' %}row-cancelled{% elif a.status == 'completed' %}row-completed{% endif %}">
+            <!-- 1. Ref # -->
+            <td class="cell-mono cell-ref">
+              <a href="{% url 'appointment_detail' a.pk %}" class="ref-link" title="View details for {{ a.reference }}">
+                {{ a.reference }}
+              </a>
+            </td>
+
+            <!-- 2. Doctor & Department -->
+            <td class="cell-doctor">
+              <div class="sheet-doc-block">
+                <strong class="sheet-doc-name">
+                  <a href="{% url 'doctor_detail' a.doctor.pk %}">{{ a.doctor.full_doctor_title }}</a>
+                </strong>
+                <span class="sheet-dept-badge">{{ a.doctor.department.name }}</span>
+              </div>
+            </td>
+
+            <!-- 3. Date & Time -->
+            <td class="cell-datetime">
+              <div class="sheet-date-block">
+                <span class="sheet-date-text">{{ a.slot.date|date:'d M Y' }} ({{ a.slot.date|date:'D' }})</span>
+                <span class="sheet-time-text">{{ a.slot.start_time|time:'g:i A' }} – {{ a.slot.end_time|time:'g:i A' }}</span>
+              </div>
+            </td>
+
+            <!-- 4. Room -->
+            <td class="cell-room">
+              <span class="sheet-room-pill">{{ a.doctor.room_number|default:'Room 707' }}</span>
+            </td>
+
+            <!-- 5. Serial # -->
+            <td class="cell-serial">
+              <span class="sheet-serial-badge">#{{ a.serial_number }}</span>
+            </td>
+
+            <!-- 6. Fee & Visit Type -->
+            <td class="cell-fee">
+              <div class="sheet-fee-block">
+                <b class="sheet-fee-num">৳{{ a.fee|floatformat:0 }}</b>
+                <span class="sheet-visit-type">{{ a.get_visit_type_display }}</span>
+              </div>
+            </td>
+
+            <!-- 7. Payment Status & Method -->
+            <td class="cell-payment">
+              <div class="sheet-payment-block">
+                {% if a.payment_status == 'paid' %}
+                  <span class="payment-badge payment-paid">✓ Paid</span>
+                {% elif a.payment_status == 'refund_pending' %}
+                  <span class="payment-badge payment-refund-pending">⏳ Refund Pending</span>
+                {% elif a.payment_status == 'refunded' %}
+                  <span class="payment-badge payment-refunded">↺ Refunded</span>
+                {% elif a.payment_status == 'partially_refunded' %}
+                  <span class="payment-badge payment-refunded">↺ Part Refund</span>
+                {% else %}
+                  <span class="payment-badge payment-unpaid">✕ Unpaid</span>
+                {% endif %}
+                <small class="payment-method-text">{{ a.get_payment_method_display }}</small>
+              </div>
+            </td>
+
+            <!-- 8. Appointment Status (Completed / Done, Confirmed, Cancelled, etc.) -->
+            <td class="cell-status">
+              {% if a.status == 'completed' %}
+                <span class="appt-status-badge status-done">
+                  <svg class="icon"><use href="#ic-check"/></svg> Done / Attended
+                </span>
+              {% elif a.status == 'confirmed' %}
+                <span class="appt-status-badge status-confirmed">
+                  <svg class="icon"><use href="#ic-calendar"/></svg> Confirmed
+                </span>
+              {% elif a.status == 'cancelled' %}
+                <span class="appt-status-badge status-cancelled">
+                  <svg class="icon"><use href="#ic-x"/></svg> Cancelled
+                </span>
+                {% if a.cancellation_reason %}
+                  <small class="cancel-reason-snippet" title="{{ a.cancellation_reason }}">Reason: {{ a.cancellation_reason|truncatechars:28 }}</small>
+                {% endif %}
+              {% elif a.status == 'pending' %}
+                <span class="appt-status-badge status-pending">
+                  <svg class="icon"><use href="#ic-clock"/></svg> Awaiting Payment
+                </span>
+              {% elif a.status == 'no_show' %}
+                <span class="appt-status-badge status-noshow">
+                  Did Not Attend
+                </span>
+              {% else %}
+                <span class="appt-status-badge status-other">{{ a.get_status_display }}</span>
+              {% endif %}
+            </td>
+
+            <!-- 9. Manage Actions -->
+            <td class="cell-actions">
+              <div class="sheet-actions-wrap">
+                <a href="{% url 'appointment_detail' a.pk %}" class="button button-light button-xs" title="View details and print slip">
+                  Details / Slip
+                </a>
+                {% if a.status == 'confirmed' or a.status == 'pending' %}
+                  <button type="button"
+                          class="button button-danger-light button-xs btn-open-cancel"
+                          data-appt-ref="{{ a.reference }}"
+                          data-appt-doctor="{{ a.doctor.full_doctor_title }}"
+                          data-appt-fee="{{ a.fee|floatformat:0 }}"
+                          data-appt-paid="{% if a.payment_status == 'paid' %}true{% else %}false{% endif %}"
+                          data-appt-cancel-url="{% url 'appointment_cancel' a.pk %}">
+                    Cancel & Refund
+                  </button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="table-empty sheet-empty">
+              <div class="empty-state">
+                <span class="empty-icon"><svg class="icon"><use href="#ic-calendar"/></svg></span>
+                <h3>No appointments found</h3>
+                <p>You have not booked any appointments matching this search.</p>
+                <a class="button button-primary button-sm" href="{% url 'doctor_directory' %}">
+                  Find a Doctor & Consult
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <nav class="pagination sheet-pagination" aria-label="Appointment record pages">
+      <span class="pagination-count">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <div class="pagination-links">
+        {% if page_obj.has_previous %}
+          <a class="button button-light button-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">‹ Previous</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="button button-outline button-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next ›</a>
+        {% endif %}
+      </div>
+    </nav>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ========================================================
+     PATIENT CANCELLATION & REFUND REQUEST MODAL
+     ======================================================== -->
+<div id="patient-cancel-modal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-cancel-title">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <svg class="icon modal-alert-icon"><use href="#ic-alert"/></svg>
+        <h3 id="modal-cancel-title">Cancel Appointment & Request Refund</h3>
+      </div>
+      <button type="button" class="modal-close-btn" id="modal-cancel-close-btn" aria-label="Close dialog">✕</button>
+    </div>
+
+    <form method="post" id="modal-cancel-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'appointments' %}">
+
+      <div class="modal-body">
+        <div class="modal-meta-box">
+          <div class="modal-meta-row">
+            <span>Appointment Reference:</span>
+            <strong id="modal-target-ref" class="text-mono">GH-00000000</strong>
+          </div>
+          <div class="modal-meta-row">
+            <span>Specialist Doctor:</span>
+            <strong id="modal-target-doc">Dr. Specialist</strong>
+          </div>
+          <div class="modal-meta-row">
+            <span>Consultation Fee:</span>
+            <strong id="modal-target-fee">৳0</strong>
+          </div>
+        </div>
+
+        <div id="modal-refund-notice" class="alert-box alert-info" style="margin: 14px 0;">
+          <p><strong>Refund Guarantee:</strong> Because this appointment is recorded as <b>Paid</b>, your cancellation will automatically submit a formal refund claim to hospital administration. Status will show <b>Refund Pending</b> until verified and disbursed as <b>Refunded</b>.</p>
+        </div>
+
+        <div class="form-group" style="margin-top: 12px;">
+          <label for="cancel-reason-textarea">
+            Reason for Cancellation / Refund Request <span class="required">*</span>
+          </label>
+          <textarea name="reason" id="cancel-reason-textarea" rows="3" class="field-control"
+                    placeholder="Please let us know why you are cancelling (e.g. Schedule conflict, unwell, doctor rescheduling)..."
+                    required></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="button button-light" id="modal-keep-btn">Keep Appointment</button>
+        <button type="submit" class="button button-danger">Confirm Cancellation & Refund</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% else %}
+<!-- ========================================================
+     STAFF / DOCTOR / ADMIN APPOINTMENTS MANAGEMENT
+     ======================================================== -->
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">APPOINTMENT MANAGEMENT DESK</p>
+    <h1>Appointments</h1>
+    <p>Search, filter, record payments, and manage consultation records for all assigned doctors.</p>
+  </div>
+  <a class="button button-primary" href="{% url 'staff_book' %}">
+    <svg class="icon"><use href="#ic-plus"/></svg> Register Booking
+  </a>
+</div>
+
+<form class="panel filter-bar wrap-filters" method="get">
+  <div class="search-input">
+    <svg class="icon"><use href="#ic-search"/></svg>
+    <input name="q" value="{{ filters.q|default:'' }}" placeholder="Reference, patient, doctor or phone" aria-label="Search appointments">
+  </div>
+  <select name="status" class="field-control">
+    <option value="">All statuses</option>
+    <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Awaiting payment</option>
+    <option value="confirmed" {% if filters.status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+    <option value="completed" {% if filters.status == 'completed' %}selected{% endif %}>Completed</option>
+    <option value="cancelled" {% if filters.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+    <option value="no_show" {% if filters.status == 'no_show' %}selected{% endif %}>No-show</option>
+    <option value="expired" {% if filters.status == 'expired' %}selected{% endif %}>Expired</option>
+  </select>
+  <select name="payment" class="field-control">
+    <option value="">All payments</option>
+    <option value="paid" {% if filters.payment == 'paid' %}selected{% endif %}>Paid</option>
+    <option value="unpaid" {% if filters.payment == 'unpaid' %}selected{% endif %}>Unpaid</option>
+    <option value="refund_pending" {% if filters.payment == 'refund_pending' %}selected{% endif %}>Refund pending</option>
+    <option value="refunded" {% if filters.payment == 'refunded' %}selected{% endif %}>Refunded</option>
+  </select>
+  {% if doctor_options %}
+  <select name="doctor" class="field-control">
+    <option value="">All doctors</option>
+    {% for d in doctor_options %}
+      <option value="{{ d.pk }}" {% if filters.doctor == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.user.display_name }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+  <input class="field-control date-filter green-datepicker" type="text" name="date" aria-label="Filter date" placeholder="Filter date" value="{{ filters.date|default:'' }}" autocomplete="off" data-datepicker="true">
+  <select class="field-control" name="sort" aria-label="Sort appointments">
+    <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Newest booked</option>
+    <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Oldest booked</option>
+    <option value="date_asc" {% if filters.sort == 'date_asc' %}selected{% endif %}>Date: earliest</option>
+    <option value="date_desc" {% if filters.sort == 'date_desc' %}selected{% endif %}>Date: latest</option>
+    <option value="patient" {% if filters.sort == 'patient' %}selected{% endif %}>Patient A–Z</option>
+    <option value="fee_asc" {% if filters.sort == 'fee_asc' %}selected{% endif %}>Fee: low to high</option>
+    <option value="fee_desc" {% if filters.sort == 'fee_desc' %}selected{% endif %}>Fee: high to low</option>
+  </select>
+  <button class="button button-primary" type="submit"><svg class="icon"><use href="#ic-filter"/></svg> Apply</button>
+  <a class="button button-light" href="{% url 'appointments' %}">Reset</a>
+</form>
+
+<div class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>Appointment records</h2>
+      <p>Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} records</p>
+    </div>
+  </div>
+  <form method="post" action="{% url 'appointment_bulk' %}" id="bulk-form">
+    {% csrf_token %}
+    <div class="bulk-toolbar">
+      <span><b id="selected-count">0</b> selected</span>
+      <select name="action" class="field-control" required>
+        <option value="">Select bulk action</option>
+        <option value="cash">Record cash payment</option>
+        <option value="completed">Mark completed</option>
+        <option value="no_show">Mark no-show</option>
+        {% if user.role != 'receptionist' %}
+          <option value="doctor_cancel">Cancel by doctor (full refund)</option>
+        {% endif %}
+      </select>
+      <button class="button button-outline button-sm" type="submit" data-confirm="Apply this change to all selected appointments?">Apply to selected</button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="checkbox-col"><input type="checkbox" data-check-all aria-label="Select all"></th>
+            <th>Reference / patient</th>
+            <th>Doctor</th>
+            <th>Appointment</th>
+            <th>Visit</th>
+            <th>Fee</th>
+            <th>Payment</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in appointments %}
+          <tr>
+            <td><input type="checkbox" name="selected" class="bulk-check" value="{{ a.pk }}" aria-label="Select {{ a.reference }}"></td>
+            <td>
+              <a class="table-primary" href="{% url 'appointment_detail' a.pk %}">{{ a.reference }}</a>
+              <small class="table-sub">{{ a.patient_name }} · {{ a.guest_phone }}{% if a.created_by and a.created_by.role != 'patient' %} · <span style="color:#104b42;font-weight:600;">Booked by {{ a.created_by.display_name }} ({{ a.created_by.get_role_display }})</span>{% endif %}</small>
+            </td>
+            <td><span>Dr. {{ a.doctor.user.display_name }}</span><small class="table-sub">{{ a.doctor.department.name }}</small></td>
+            <td><span>{{ a.slot.date|date:'d M Y' }}</span><small class="table-sub">{{ a.slot.start_time|time:'g:i A' }}</small></td>
+            <td>{{ a.get_visit_type_display }}</td>
+            <td><b>৳{{ a.fee|floatformat:0 }}</b></td>
+            <td><span class="status status-{{ a.payment_status }}">{{ a.get_payment_status_display }}</span></td>
+            <td><span class="status status-{{ a.status }}">{{ a.get_status_display }}</span></td>
+            <td><a class="table-action" href="{% url 'appointment_detail' a.pk %}">Details</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="9" class="table-empty">No appointments match these filters.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+
+  {% if page_obj.has_other_pages %}
+  <nav class="pagination" aria-label="Appointment record pages">
+    <span class="pagination-count">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    <div class="pagination-links">
+      {% if page_obj.has_previous %}
+        <a class="button button-light button-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+        <a class="button button-outline button-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+      {% endif %}
+    </div>
+  </nav>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

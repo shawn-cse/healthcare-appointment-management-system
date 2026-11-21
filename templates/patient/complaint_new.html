@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% block title %}Complaints & Support | Green Hospital{% endblock %}
+
+{% block content %}
+<div class="patient-complaint-container">
+  <div class="page-heading">
+    <div>
+      <a class="back-link" href="{% url 'complaints' %}">‹ Back to Support & Concerns</a>
+      <p class="eyebrow">HELP & GRIEVANCE DESK</p>
+      <h1>Submit a Request or File a Complaint</h1>
+      <p>Choose whether you need general patient assistance or wish to lodge a formal hospital grievance.</p>
+    </div>
+  </div>
+
+  <div class="complaint-card panel padded-panel">
+    <!-- Two Options Mode Switcher -->
+    <div class="concern-type-selector" id="concern-type-tabs">
+      <button type="button" class="type-pill-btn active" id="pill-support" data-target-mode="support">
+        <svg class="icon"><use href="#ic-help"/></svg>
+        <div class="pill-text-wrap">
+          <strong>General Support & Help</strong>
+          <small>Ask questions, inquire about timings, reports, or services</small>
+        </div>
+      </button>
+
+      <button type="button" class="type-pill-btn" id="pill-complaint" data-target-mode="complaint">
+        <svg class="icon"><use href="#ic-alert"/></svg>
+        <div class="pill-text-wrap">
+          <strong>Formal Complaint / Grievance</strong>
+          <small>Lodge an issue regarding doctors, hospital facilities, or staff</small>
+        </div>
+      </button>
+    </div>
+
+    <form method="post" class="smart-form" id="patient-concern-form" style="margin-top: 24px;">
+      {% csrf_token %}
+
+      <!-- Hidden or dynamic category input -->
+      <div class="form-group" id="complaint-category-group" style="display: none;">
+        <label for="complaint-category-select">
+          Complaint Category <span class="required">*</span>
+        </label>
+        <select name="category" id="complaint-category-select" class="field-control">
+          <option value="doctor">Doctor & Consultation</option>
+          <option value="hospital">Hospital Facilities & Cleanliness</option>
+          <option value="staff">Staff & Reception Desk</option>
+          <option value="billing">Billing & Payment</option>
+          <option value="other">Other Grievance</option>
+        </select>
+        <small class="help-text">Select what this complaint is regarding.</small>
+      </div>
+
+      <!-- Optional Appointment Link -->
+      {% if patient_appointments %}
+      <div class="form-group" id="complaint-appt-group" style="display: none;">
+        <label for="complaint-appt-select">Related Appointment (Optional)</label>
+        <select name="appointment" id="complaint-appt-select" class="field-control">
+          <option value="">None / Not linked to a specific appointment</option>
+          {% for appt in patient_appointments %}
+          <option value="{{ appt.pk }}">{{ appt.reference }} — Dr. {{ appt.doctor.user.display_name }} ({{ appt.slot.date|date:'d M Y' }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <!-- Subject Box -->
+      <div class="form-group">
+        <label for="concern-subject-input">
+          <span id="subject-label-text">Subject</span> <span class="required">*</span>
+        </label>
+        <input type="text" name="subject" id="concern-subject-input" class="field-control"
+               placeholder="Brief summary of your inquiry..." maxlength="150" required>
+      </div>
+
+      <!-- Details / Message Box -->
+      <div class="form-group">
+        <label for="concern-message-input">
+          <span id="details-label-text">Description / Details</span> <span class="required">*</span>
+        </label>
+        <textarea name="message" id="concern-message-input" rows="5" class="field-control"
+                  placeholder="Provide full details so our team can help you efficiently..." required></textarea>
+      </div>
+
+      <!-- Guarantee / Tracking Notice -->
+      <div class="alert-box alert-info" id="tracking-notice-box" style="margin: 16px 0;">
+        <svg class="icon"><use href="#ic-check"/></svg>
+        <div>
+          <b id="notice-heading">Direct Hospital Escalation:</b>
+          <p id="notice-body">Submitting this request will automatically generate a tracking ticket (Status: <b>Complaint Generated</b>). Hospital management reviews each case directly and provides an official response upon resolution (<b>Issue Solved</b>).</p>
+        </div>
+      </div>
+
+      <div class="form-actions-row">
+        <button type="submit" class="button button-primary button-lg" id="concern-submit-btn">
+          Submit Support Request <svg class="icon"><use href="#ic-arrow"/></svg>
+        </button>
+        <a href="{% url 'complaints' %}" class="button button-light">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const btnSupport = document.getElementById('pill-support');
+  const btnComplaint = document.getElementById('pill-complaint');
+  const catGroup = document.getElementById('complaint-category-group');
+  const catSelect = document.getElementById('complaint-category-select');
+  const apptGroup = document.getElementById('complaint-appt-group');
+  const subjectLabel = document.getElementById('subject-label-text');
+  const subjectInput = document.getElementById('concern-subject-input');
+  const detailsLabel = document.getElementById('details-label-text');
+  const detailsInput = document.getElementById('concern-message-input');
+  const submitBtn = document.getElementById('concern-submit-btn');
+  const form = document.getElementById('patient-concern-form');
+
+  let activeMode = 'support';
+
+  function setMode(mode) {
+    activeMode = mode;
+    if (mode === 'support') {
+      btnSupport.classList.add('active');
+      btnComplaint.classList.remove('active');
+      catGroup.style.display = 'none';
+      if (apptGroup) apptGroup.style.display = 'none';
+
+      // Set category to support
+      let hiddenCat = form.querySelector('input[name="category"][type="hidden"]');
+      if (!hiddenCat) {
+        hiddenCat = document.createElement('input');
+        hiddenCat.type = 'hidden';
+        hiddenCat.name = 'category';
+        form.appendChild(hiddenCat);
+      }
+      hiddenCat.value = 'support';
+      catSelect.disabled = true;
+
+      subjectLabel.textContent = 'Support Question / Subject';
+      subjectInput.placeholder = 'e.g. Inquiring about test report delivery or doctor consultation timing...';
+      detailsLabel.textContent = 'Help Details';
+      detailsInput.placeholder = 'Please describe the question or assistance you need...';
+      submitBtn.innerHTML = 'Submit Support Request <svg class="icon"><use href="#ic-arrow"/></svg>';
+    } else {
+      btnComplaint.classList.add('active');
+      btnSupport.classList.remove('active');
+      catGroup.style.display = 'block';
+      if (apptGroup) apptGroup.style.display = 'block';
+
+      const hiddenCat = form.querySelector('input[name="category"][type="hidden"]');
+      if (hiddenCat) hiddenCat.remove();
+      catSelect.disabled = false;
+
+      subjectLabel.textContent = 'Complaint Subject';
+      subjectInput.placeholder = 'e.g. Significant consultation delay at chamber, staff behaviour, billing discrepancy...';
+      detailsLabel.textContent = 'Grievance / Incident Details';
+      detailsInput.placeholder = 'Please provide full details of what occurred so hospital administration can investigate...';
+      submitBtn.innerHTML = 'File Official Complaint <svg class="icon"><use href="#ic-arrow"/></svg>';
+    }
+  }
+
+  btnSupport.addEventListener('click', function() { setMode('support'); });
+  btnComplaint.addEventListener('click', function() { setMode('complaint'); });
+
+  // Default initialize to support
+  setMode('support');
+});
+</script>
+{% endblock %}

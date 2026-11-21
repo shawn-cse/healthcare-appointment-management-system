@@ -281,4 +281,134 @@
       }
     }
   }
+
+  // --- Modern Floating Toast Notifications (Top-Right 3s Auto-Dismiss) ---
+  const toastContainer = doc.getElementById('toast-container');
+  function initToast(toastCard, duration = 3000) {
+    if (!toastCard) return;
+    const closeBtn = toastCard.querySelector('[data-toast-close]');
+    let timer = null;
+
+    function dismiss() {
+      if (timer) clearTimeout(timer);
+      toastCard.classList.add('toast-dismissing');
+      setTimeout(() => {
+        if (toastCard.parentElement) {
+          toastCard.remove();
+        }
+      }, 300);
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', dismiss);
+    }
+
+    if (duration > 0) {
+      timer = setTimeout(dismiss, duration);
+    }
+  }
+
+  if (toastContainer) {
+    const serverToasts = toastContainer.querySelectorAll('.toast-card');
+    serverToasts.forEach(toast => {
+      const customDuration = parseInt(toast.dataset.autoDismiss, 10) || 3000;
+      initToast(toast, customDuration);
+    });
+  }
+
+  // Expose global showToast for dynamic user actions
+  window.showToast = function(message, type = 'info', duration = 3000) {
+    let container = doc.getElementById('toast-container');
+    if (!container) {
+      container = doc.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'toast-container';
+      doc.body.appendChild(container);
+    }
+
+    const toast = doc.createElement('div');
+    toast.className = `toast-card toast-${type}`;
+    toast.setAttribute('role', 'alert');
+
+    let iconId = 'ic-help';
+    let title = 'Information';
+    if (type === 'error' || type === 'danger') {
+      iconId = 'ic-alert';
+      title = 'Notice / Error';
+    } else if (type === 'success') {
+      iconId = 'ic-check';
+      title = 'Success';
+    } else if (type === 'warning') {
+      iconId = 'ic-alert';
+      title = 'Attention';
+    }
+
+    toast.innerHTML = `
+      <div class="toast-icon-wrap">
+        <svg class="icon"><use href="#${iconId}"/></svg>
+      </div>
+      <div class="toast-body">
+        <span class="toast-badge-title">${title}</span>
+        <p class="toast-msg-text">${message}</p>
+      </div>
+      <button type="button" class="toast-dismiss-btn" aria-label="Dismiss notification" data-toast-close>✕</button>
+      <div class="toast-progress-track"><div class="toast-progress-bar"></div></div>
+    `;
+
+    container.appendChild(toast);
+    initToast(toast, duration);
+  };
+
+  // --- Patient Excel Appointments Sheet: Cancellation & Refund Modal ---
+  const cancelModal = doc.getElementById('patient-cancel-modal');
+  if (cancelModal) {
+    const modalTargetRef = doc.getElementById('modal-target-ref');
+    const modalTargetDoc = doc.getElementById('modal-target-doc');
+    const modalTargetFee = doc.getElementById('modal-target-fee');
+    const modalRefundNotice = doc.getElementById('modal-refund-notice');
+    const modalForm = doc.getElementById('modal-cancel-form');
+    const reasonInput = doc.getElementById('cancel-reason-textarea');
+    const closeBtn = doc.getElementById('modal-cancel-close-btn');
+    const keepBtn = doc.getElementById('modal-keep-btn');
+
+    function closeModal() {
+      cancelModal.style.display = 'none';
+      if (reasonInput) reasonInput.value = '';
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (keepBtn) keepBtn.addEventListener('click', closeModal);
+
+    cancelModal.addEventListener('click', (e) => {
+      if (e.target === cancelModal) closeModal();
+    });
+
+    doc.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && cancelModal.style.display !== 'none') {
+        closeModal();
+      }
+    });
+
+    const openCancelButtons = doc.querySelectorAll('.btn-open-cancel');
+    openCancelButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ref = btn.dataset.apptRef || '';
+        const doctor = btn.dataset.apptDoctor || '';
+        const fee = btn.dataset.apptFee || '0';
+        const isPaid = btn.dataset.apptPaid === 'true';
+        const cancelUrl = btn.dataset.apptCancelUrl || '';
+
+        if (modalTargetRef) modalTargetRef.textContent = ref;
+        if (modalTargetDoc) modalTargetDoc.textContent = doctor;
+        if (modalTargetFee) modalTargetFee.textContent = `৳${fee}`;
+        if (modalRefundNotice) {
+          modalRefundNotice.style.display = isPaid ? 'block' : 'none';
+        }
+        if (modalForm) modalForm.action = cancelUrl;
+
+        cancelModal.style.display = 'flex';
+        if (reasonInput) reasonInput.focus();
+      });
+    });
+  }
 })();

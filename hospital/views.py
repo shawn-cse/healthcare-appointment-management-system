@@ -251,6 +251,12 @@ def doctor_detail(request, pk):
 
     now = timezone.now()
     is_staff = request.user.is_authenticated and request.user.role in ('doctor', 'receptionist', 'admin')
+    for s in upcoming_slots:
+        if is_staff:
+            s.booking_open = s.remaining > 0 and local_start(s) > now
+        else:
+            s.booking_open = s.remaining > 0 and local_start(s) >= now + timedelta(hours=doc.booking_notice_hours) and local_start(s) <= now + timedelta(days=doc.booking_advance_days)
+
     for s in slots:
         if is_staff:
             s.booking_open = s.remaining > 0 and local_start(s) > now
@@ -359,7 +365,7 @@ def patient_book(request, slot_id):
 
 
 def visible_appointments(user):
-    qs = Appointment.objects.select_related('patient', 'slot__doctor__user', 'slot__doctor__department', 'slot__doctor__chamber', 'created_by')
+    qs = Appointment.objects.select_related('patient', 'slot__doctor__user', 'slot__doctor__department', 'slot__doctor__chamber', 'created_by').prefetch_related('payments')
     if user.role == 'patient':
         return qs.filter(patient=user)
     if user.role == 'admin':
@@ -385,19 +391,21 @@ def appointments(request):
     if doc.isdigit(): qs = qs.filter(slot__doctor_id=int(doc))
     if q:
         qs = qs.filter(Q(reference__icontains=q)|Q(guest_name__icontains=q)|Q(guest_phone__icontains=q)|
-                       Q(slot__doctor__user__first_name__icontains=q)|Q(slot__doctor__user__last_name__icontains=q))
+                       Q(slot__doctor__user__first_name__icontains=q)|Q(slot__doctor__user__last_name__icontains=q)|
+                       Q(slot__doctor__department__name__icontains=q))
     sorting = {'newest':'-created_at','oldest':'created_at','date_asc':'slot__date',
                'date_desc':'-slot__date','patient':'guest_name','fee_asc':'fee',
                'fee_desc':'-fee','status':'status'}
-    sort=request.GET.get('sort','newest')
-    qs=qs.order_by(sorting.get(sort,'-created_at'),'pk')
+    default_sort = 'oldest' if request.user.role == 'patient' else 'newest'
+    sort = request.GET.get('sort', default_sort)
+    qs = qs.order_by(sorting.get(sort, '-created_at' if default_sort == 'newest' else 'created_at'), 'pk')
     page = Paginator(qs, 25).get_page(request.GET.get('page'))
     query = request.GET.copy()
     query.pop('page', None)
     return render(request, 'shared/appointments.html', {'appointments':page, 'page_obj':page,
                   'page_query':query.urlencode(),
                   'doctor_options':managed_doctors(request.user) if request.user.role!='patient' else None,
-                  'filters':request.GET})
+                  'filters':request.GET, 'active_sort': sort})
 
 
 @login_required
@@ -414,8 +422,9 @@ def appointment_detail(request,pk):
 def appointment_cancel(request,pk):
     appt = get_object_or_404(visible_appointments(request.user), pk=pk)
     by_doctor = request.POST.get('actor_type') == 'doctor' and request.user.role in ('doctor','admin')
+    next_url = request.POST.get('next') or reverse('appointment_detail', args=[pk])
     return try_action(request, lambda: cancel_appointment(appt, request.user, by_doctor=by_doctor,
-                      reason=request.POST.get('reason','')[:500]), reverse('appointment_detail',args=[pk]),
+                      reason=request.POST.get('reason','')[:500]), next_url,
                       'Appointment cancelled. Any eligible refund has been queued for review.')
 
 
@@ -895,19 +904,28 @@ def departments(request):
 
 @role_required('patient')
 def complaints(request):
-    return render(request,'patient/complaints.html',{'complaints':Complaint.objects.filter(patient=request.user)})
+    return render(request, 'patient/complaints.html', {
+        'complaints': Complaint.objects.filter(patient=request.user).order_by('-created_at')
+    })
 
 
 @role_required('patient')
 def complaint_new(request):
-    form=ComplaintForm(request.POST or None,patient=request.user)
-    if request.method=='POST' and form.is_valid():
-        obj=form.save(commit=False);obj.patient=request.user;obj.save()
-        log(request.user,'complaint.submitted',obj.pk)
-        messages.success(request,'Your complaint has been submitted. Updates will appear in your portal.')
+    form = ComplaintForm(request.POST or None, patient=request.user)
+    if request.method == 'POST' and form.is_valid():
+        obj = form.save(commit=False)
+        obj.patient = request.user
+        obj.status = 'submitted'
+        obj.save()
+        log(request.user, 'complaint.submitted', obj.pk)
+        messages.success(request, 'Your request/complaint has been logged. Updates will appear in your portal.')
         return redirect('complaints')
-    return render(request,'shared/form.html',{'form':form,'page_title':'Submit a concern',
-         'page_desc':'Tell us what happened so the hospital team can review it.', 'submit_label':'Submit complaint'})
+    patient_appts = Appointment.objects.filter(patient=request.user).select_related('slot__doctor__user').order_by('-created_at')[:20]
+    return render(request, 'patient/complaint_new.html', {
+        'form': form,
+        'patient_appointments': patient_appts,
+        'page_title': 'Complaints & Support',
+    })
 
 
 @role_required('admin','receptionist','doctor')
