@@ -83,7 +83,7 @@ class Chamber(models.Model):
     floor = models.CharField(max_length=50, blank=True, default="3rd Floor")
     description = models.CharField(max_length=255, blank=True, default="Building 1, chamber 302", help_text="e.g. Building 1, chamber 302")
     address = models.CharField(max_length=255, default="Plot 1, Section 10, Mirpur, Dhaka-1216")
-    contact_number = models.CharField(max_length=120, default="+88096100016211, +16211")
+    contact_number = models.CharField(max_length=120, default="+88096100016211")
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='chambers')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -207,7 +207,7 @@ class DoctorProfile(models.Model):
     def active_contact(self):
         if self.chamber:
             return self.chamber.contact_number
-        return self.contact_number or '+88096100016211, +16211'
+        return self.contact_number or '+88096100016211'
 
     @property
     def assigned_days_list(self):

@@ -488,7 +488,7 @@ class ChamberForm(forms.ModelForm, FormStyleMixin):
             'description': forms.TextInput(attrs={'placeholder': 'e.g. Building 1, chamber 302'}),
             'name': forms.TextInput(attrs={'placeholder': 'e.g. Mirpur Central Outpatient Wing'}),
             'address': forms.TextInput(attrs={'placeholder': 'e.g. Plot 1, Section 10, Mirpur, Dhaka-1216'}),
-            'contact_number': forms.TextInput(attrs={'placeholder': 'e.g. +88096100016211, +16211'}),
+            'contact_number': forms.TextInput(attrs={'placeholder': 'e.g. +88096100016211'}),
         }
         labels = {
             'building': 'Building / Wing',
@@ -497,7 +497,7 @@ class ChamberForm(forms.ModelForm, FormStyleMixin):
             'description': 'Room Description (e.g. Building 1, chamber 302)',
             'name': 'Center / Chamber Name',
             'address': 'Chamber Address (Mirpur, Dhaka)',
-            'contact_number': 'Hotline Numbers (+88096100016211, +16211)',
+            'contact_number': 'Hotline Number (+88096100016211)',
             'department': 'Primary Department (optional)',
             'is_active': 'Active for Consultations',
         }
@@ -608,7 +608,7 @@ class ChamberForm(forms.ModelForm, FormStyleMixin):
             'description': forms.TextInput(attrs={'placeholder': 'e.g. Building 1, chamber 302'}),
             'name': forms.TextInput(attrs={'placeholder': 'e.g. Mirpur Central Outpatient Wing'}),
             'address': forms.TextInput(attrs={'placeholder': 'e.g. Plot 1, Section 10, Mirpur, Dhaka-1216'}),
-            'contact_number': forms.TextInput(attrs={'placeholder': 'e.g. +88096100016211, +16211'}),
+            'contact_number': forms.TextInput(attrs={'placeholder': 'e.g. +88096100016211'}),
         }
         labels = {
             'building': 'Building / Wing',
@@ -617,7 +617,7 @@ class ChamberForm(forms.ModelForm, FormStyleMixin):
             'description': 'Room Description (e.g. Building 1, chamber 302)',
             'name': 'Center / Chamber Name',
             'address': 'Chamber Address (Mirpur, Dhaka)',
-            'contact_number': 'Hotline Numbers (+88096100016211, +16211)',
+            'contact_number': 'Hotline Number (+88096100016211)',
             'department': 'Primary Department (optional)',
             'is_active': 'Active for Consultations',
         }

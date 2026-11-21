@@ -72,7 +72,7 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 HOSPITAL_NAME = os.environ.get('HOSPITAL_NAME', 'Green Hospital')
-HOSPITAL_PHONE = os.environ.get('HOSPITAL_PHONE', '0900000000')
+HOSPITAL_PHONE = os.environ.get('HOSPITAL_PHONE', '+88096100016211')
 HOSPITAL_ADDRESS = os.environ.get('HOSPITAL_ADDRESS', 'Dhaka, Bangladesh')
 PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', 'http://localhost:8000').rstrip('/')
 SSLCOMMERZ_STORE_ID = os.environ.get('SSLCOMMERZ_STORE_ID', '')

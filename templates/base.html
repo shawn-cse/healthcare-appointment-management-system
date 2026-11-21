@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link href="{% static 'css/app.css' %}?v=20261121_35" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}?v=20261121_36" rel="stylesheet">
   <link href="{% static 'css/calendar.css' %}?v=20261121_30" rel="stylesheet">
 </head>
 <body class="{% if user.is_authenticated %}app-layout{% else %}public-layout{% endif %}">
@@ -234,11 +234,11 @@
   <div class="container header-top-inner">
     <div class="top-info-item">
       <svg class="icon" aria-hidden="true"><use href="#ic-phone"/></svg>
-      <span class="top-info-text">24/7 Hotline: <a href="tel:+88096100016211" class="top-bar-hotline"><strong>+88096100016211</strong></a>, <a href="tel:16211" class="top-bar-hotline"><strong>+16211</strong></a></span>
+      <span class="top-info-text">24/7 Hotline: <a href="tel:+88096100016211" class="top-bar-hotline"><strong>+88096100016211</strong></a></span>
     </div>
     <div class="top-info-item hidden-mobile">
       <svg class="icon" aria-hidden="true"><use href="#ic-clock"/></svg>
-      <span class="top-info-text">OPD Consultation: <strong>8:00 AM – 10:00 PM Daily</strong></span>
+      <span class="top-info-text">OPD Clinics: <strong>8:00 AM – 10:00 PM</strong> · Emergency: <strong>24/7</strong></span>
     </div>
     <div class="top-info-item hidden-mobile">
       <svg class="icon" aria-hidden="true"><use href="#ic-map-pin"/></svg>
@@ -348,14 +348,14 @@
           <svg class="icon"><use href="#ic-phone"/></svg>
           <div>
             <b>24/7 Hotlines & Appointments</b>
-            <p><b>+88096100016211</b>, <b>+16211</b>, {{ hospital_phone }}</p>
+            <p><a href="tel:+88096100016211"><b>+88096100016211</b></a></p>
           </div>
         </div>
         <div class="footer-contact-item">
           <svg class="icon"><use href="#ic-clock"/></svg>
           <div>
             <b>Visiting Hours</b>
-            <p>Morning & Evening Outpatient Clinics (8 AM – 10 PM)</p>
+            <p>Morning & Evening Outpatient Clinics (8 AM – 10 PM) · Emergency 24 Hours</p>
           </div>
         </div>
       </div>
