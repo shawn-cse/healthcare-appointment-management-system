@@ -22,31 +22,34 @@
             <svg class="icon"><use href="#ic-filter"/></svg>
             <h3>Search & Filters</h3>
           </div>
-          {% if selected_department or selected_gender or query or selected_sort != 'name' %}
-            <a href="{% url 'doctor_directory' %}" class="filter-reset-link" id="reset-all-filters">Reset All</a>
-          {% endif %}
+          <button type="button" class="filter-reset-link" id="reset-all-filters">Reset All</button>
         </div>
 
-        <form method="get" id="directory-filter-form" class="directory-filter-form">
+        <form method="get" id="directory-filter-form" class="directory-filter-form" onsubmit="return false;">
           <!-- 1. Search Box Inside Left Filter Box -->
           <div class="filter-group">
-            <label for="left-doctor-search-input" class="filter-group-title">Search Doctor</label>
+            <div class="filter-label-row">
+              <label for="left-doctor-search-input" class="filter-group-title">Search Doctor</label>
+              <button type="button" class="quick-clear-link" id="clear-search-text" style="display:none;">Clear</button>
+            </div>
             <div class="filter-search-box">
               <svg class="icon search-icon"><use href="#ic-search"/></svg>
               <input type="text" name="q" id="left-doctor-search-input"
                      class="filter-search-input"
-                     placeholder="Search doctor, qualification, room..."
-                     value="{{ query }}" autocomplete="off">
-              {% if query %}
-                <a href="{% url 'doctor_directory' %}" class="filter-clear-btn" title="Clear text">✕</a>
-              {% endif %}
+                     placeholder="Search doctor name, specialty, room..."
+                     value="{{ query }}" autocomplete="off" spellcheck="false">
+              <button type="button" id="search-clear-btn" class="clear-search-btn" style="display:none;" title="Clear search">✕</button>
             </div>
+            <small class="search-tip-hint">Live search on every keystroke</small>
           </div>
 
-          <!-- 2. Department Dropdown -->
+          <!-- 2. Department Filter: Dropdown + Multi-Select Quick Chips -->
           <div class="filter-group">
-            <label for="filter-department-select" class="filter-group-title">Specialty Department</label>
-            <select name="department" id="filter-department-select" class="field-control filter-select" onchange="this.form.submit()">
+            <div class="filter-label-row">
+              <label for="filter-department-select" class="filter-group-title">Specialty Department</label>
+              <span class="active-dept-count-badge" id="active-dept-count" style="display:none;">0 selected</span>
+            </div>
+            <select name="department" id="filter-department-select" class="field-control filter-select">
               <option value="">All Departments ({{ total_doctors_count }} Doctors)</option>
               {% for dep in departments %}
               <option value="{{ dep.pk }}" {% if selected_department == dep.pk|stringformat:'s' %}selected{% endif %}>
@@ -54,31 +57,53 @@
               </option>
               {% endfor %}
             </select>
+
+            <div class="dept-quick-pills-label">Or select multiple departments:</div>
+            <div class="dept-pills-scroll-container" id="dept-pills-wrap">
+              <button type="button" class="dept-pill-chip active" data-dept-id="">All</button>
+              {% for dep in departments %}
+              <button type="button" class="dept-pill-chip" data-dept-id="{{ dep.pk }}">
+                {{ dep.name }} <span class="pill-count">{{ dep.doc_count }}</span>
+              </button>
+              {% endfor %}
+            </div>
           </div>
 
-          <!-- 3. Gender Dropdown -->
+          <!-- 3. Doctor Gender: Selective Multi/Single Buttons -->
           <div class="filter-group">
-            <label for="filter-gender-select" class="filter-group-title">Doctor Gender</label>
-            <select name="gender" id="filter-gender-select" class="field-control filter-select" onchange="this.form.submit()">
-              <option value="" {% if not selected_gender %}selected{% endif %}>All Doctors</option>
-              <option value="female" {% if selected_gender == 'female' %}selected{% endif %}>Female Specialists</option>
-              <option value="male" {% if selected_gender == 'male' %}selected{% endif %}>Male Specialists</option>
+            <label class="filter-group-title">Doctor Gender</label>
+            <div class="gender-selective-buttons" id="gender-filter-group">
+              <button type="button" class="gender-pill-btn {% if not selected_gender or selected_gender == 'all' %}active{% endif %}" data-gender="all">
+                <span class="check-icon">✓</span> Both / All
+              </button>
+              <button type="button" class="gender-pill-btn {% if selected_gender == 'male' %}active{% endif %}" data-gender="male">
+                <span class="check-icon">✓</span> Male
+              </button>
+              <button type="button" class="gender-pill-btn {% if selected_gender == 'female' %}active{% endif %}" data-gender="female">
+                <span class="check-icon">✓</span> Female
+              </button>
+            </div>
+            <select name="gender" id="filter-gender-select" class="field-control filter-select" style="display:none;">
+              <option value="">All Doctors</option>
+              <option value="male" {% if selected_gender == 'male' %}selected{% endif %}>Male</option>
+              <option value="female" {% if selected_gender == 'female' %}selected{% endif %}>Female</option>
             </select>
           </div>
 
-          <!-- 4. Consultation Fee Sort Dropdown -->
+          <!-- 4. Consultation Fee & Name Sort Dropdown -->
           <div class="filter-group">
             <label for="filter-sort-select" class="filter-group-title">Sort By</label>
-            <select name="sort" id="filter-sort-select" class="field-control filter-select" onchange="this.form.submit()">
+            <select name="sort" id="filter-sort-select" class="field-control filter-select">
               <option value="name" {% if selected_sort == 'name' or not selected_sort %}selected{% endif %}>Doctor Name (A – Z)</option>
+              <option value="name_desc" {% if selected_sort == 'name_desc' %}selected{% endif %}>Doctor Name (Z – A)</option>
               <option value="fee_asc" {% if selected_sort == 'fee_asc' %}selected{% endif %}>Consultation Fee: Low to High</option>
               <option value="fee_desc" {% if selected_sort == 'fee_desc' %}selected{% endif %}>Consultation Fee: High to Low</option>
               <option value="experience" {% if selected_sort == 'experience' %}selected{% endif %}>Experience (Seniority)</option>
             </select>
           </div>
 
-          <button type="submit" class="button button-primary button-full" style="margin-top: 10px;">
-            <svg class="icon"><use href="#ic-filter"/></svg> Apply Filters
+          <button type="button" id="reset-all-filters-btn" class="button button-outline button-full" style="margin-top: 10px;">
+            <svg class="icon"><use href="#ic-filter"/></svg> Reset All Filters
           </button>
         </form>
       </div>
@@ -88,9 +113,9 @@
     <main class="directory-main">
       <!-- Live Results Summary Bar -->
       <div class="results-meta-bar">
-        <span class="results-text">
-          Showing <b>{{ doctors|length }}</b> specialist doctor{{ doctors|length|pluralize }}
-          {% if query %} matching "<b>{{ query }}</b>"{% endif %}
+        <span class="results-text" id="live-results-text">
+          Showing <b id="visible-count">{{ doctors|length }}</b> of <b>{{ total_doctors_count }}</b> specialist doctors
+          <span id="matching-query-text" {% if not query %}style="display:none;"{% endif %}>matching "<b id="display-query-val">{{ query }}</b>"</span>
         </span>
         <span class="online-booking-indicator"><span class="pulse-dot"></span> Online Serial Active</span>
       </div>
@@ -104,6 +129,9 @@
                  data-dept-id="{{ d.department.pk }}"
                  data-qual="{{ d.qualifications|lower }}"
                  data-room="{{ d.room_number|lower }}"
+                 data-designation="{{ d.designation|lower }}"
+                 data-bmdc="{{ d.registration_number|lower }}"
+                 data-rec="{{ d.assigned_receptionist_name|lower }}"
                  data-fee="{{ d.initial_fee }}"
                  data-gender="{{ d.gender }}"
                  data-exp="{{ d.experience_years }}">
@@ -205,8 +233,276 @@
           <a class="button button-outline" href="{% url 'doctor_directory' %}">View All Doctors</a>
         </div>
         {% endfor %}
+
+        <!-- Client-Side Live Empty State -->
+        <div class="panel empty-state full-grid" id="no-doctors-client" style="display: none;">
+          <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
+          <h3>No doctors found matching your filters</h3>
+          <p id="no-doctors-detail">Try adjusting your search query, or clear your department and gender filters.</p>
+          <button type="button" class="button button-outline" id="clear-all-empty-btn">
+            <svg class="icon"><use href="#ic-filter"/></svg> Clear All Filters
+          </button>
+        </div>
       </div>
     </main>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('left-doctor-search-input');
+  const clearBtn = document.getElementById('search-clear-btn');
+  const clearTextLink = document.getElementById('clear-search-text');
+  const deptSelect = document.getElementById('filter-department-select');
+  const deptChips = Array.from(document.querySelectorAll('.dept-pill-chip'));
+  const activeDeptBadge = document.getElementById('active-dept-count');
+  const genderBtns = Array.from(document.querySelectorAll('.gender-pill-btn'));
+  const sortSelect = document.getElementById('filter-sort-select');
+  const cardsContainer = document.getElementById('doctor-cards-grid');
+  const resetBtn = document.getElementById('reset-all-filters-btn');
+  const resetLink = document.getElementById('reset-all-filters');
+  const clientEmpty = document.getElementById('no-doctors-client');
+  const emptyClearBtn = document.getElementById('clear-all-empty-btn');
+  const visibleCountEl = document.getElementById('visible-count');
+  const matchingQueryWrap = document.getElementById('matching-query-text');
+  const displayQueryVal = document.getElementById('display-query-val');
+
+  if (!cardsContainer) return;
+
+  const cards = Array.from(cardsContainer.querySelectorAll('.doctor-card'));
+
+  let activeGender = 'all';
+  const initialActiveGenderBtn = genderBtns.find(b => b.classList.contains('active'));
+  if (initialActiveGenderBtn) {
+    activeGender = initialActiveGenderBtn.dataset.gender || 'all';
+  }
+
+  let selectedDepts = new Set();
+  if (deptSelect && deptSelect.value) {
+    selectedDepts.add(deptSelect.value);
+    const matchingChip = deptChips.find(c => c.dataset.deptId === deptSelect.value);
+    if (matchingChip) {
+      deptChips.forEach(c => c.classList.remove('active'));
+      matchingChip.classList.add('active');
+    }
+  }
+
+  function updateDeptUI() {
+    if (selectedDepts.size === 0) {
+      deptChips.forEach(c => c.classList.toggle('active', c.dataset.deptId === ''));
+      if (deptSelect) deptSelect.value = '';
+      if (activeDeptBadge) activeDeptBadge.style.display = 'none';
+    } else {
+      const allChip = deptChips.find(c => c.dataset.deptId === '');
+      if (allChip) allChip.classList.remove('active');
+
+      deptChips.forEach(c => {
+        if (c.dataset.deptId) {
+          c.classList.toggle('active', selectedDepts.has(c.dataset.deptId));
+        }
+      });
+
+      if (selectedDepts.size === 1 && deptSelect) {
+        deptSelect.value = Array.from(selectedDepts)[0];
+      } else if (deptSelect) {
+        deptSelect.value = '';
+      }
+
+      if (activeDeptBadge) {
+        activeDeptBadge.textContent = `${selectedDepts.size} selected`;
+        activeDeptBadge.style.display = 'inline-block';
+      }
+    }
+  }
+
+  function filterAndSortDoctors() {
+    const rawQuery = (searchInput ? searchInput.value : '').trim();
+    const query = rawQuery.toLowerCase();
+    const terms = query.split(/\s+/).filter(Boolean);
+    const sortVal = sortSelect ? sortSelect.value : 'name';
+
+    const hasQuery = Boolean(rawQuery);
+    if (clearBtn) clearBtn.style.display = hasQuery ? 'grid' : 'none';
+    if (clearTextLink) clearTextLink.style.display = hasQuery ? 'inline' : 'none';
+
+    let visibleCards = [];
+
+    cards.forEach(card => {
+      const name = card.dataset.name || '';
+      const dept = card.dataset.dept || '';
+      const deptId = card.dataset.deptId || '';
+      const qual = card.dataset.qual || '';
+      const room = card.dataset.room || '';
+      const designation = card.dataset.designation || '';
+      const bmdc = card.dataset.bmdc || '';
+      const rec = card.dataset.rec || '';
+      const gender = card.dataset.gender || '';
+
+      const haystack = (name + ' ' + dept + ' ' + qual + ' ' + room + ' ' + designation + ' ' + bmdc + ' ' + rec).toLowerCase();
+
+      // 1. Text Query Matching (every term must match)
+      let matchesQuery = true;
+      if (terms.length > 0) {
+        matchesQuery = terms.every(term => haystack.includes(term));
+      }
+
+      // 2. Department Matching (multiple selection supported)
+      let matchesDept = true;
+      if (selectedDepts.size > 0) {
+        matchesDept = selectedDepts.has(deptId);
+      }
+
+      // 3. Gender Matching (all / male / female)
+      let matchesGender = true;
+      if (activeGender && activeGender !== 'all') {
+        matchesGender = (gender === activeGender);
+      }
+
+      if (matchesQuery && matchesDept && matchesGender) {
+        card.style.display = '';
+        visibleCards.push(card);
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    // Sort visible cards
+    visibleCards.sort((a, b) => {
+      if (sortVal === 'fee_asc') {
+        return (parseFloat(a.dataset.fee) || 0) - (parseFloat(b.dataset.fee) || 0);
+      } else if (sortVal === 'fee_desc') {
+        return (parseFloat(b.dataset.fee) || 0) - (parseFloat(a.dataset.fee) || 0);
+      } else if (sortVal === 'experience') {
+        return (parseInt(b.dataset.exp, 10) || 0) - (parseInt(a.dataset.exp, 10) || 0);
+      } else if (sortVal === 'name_desc') {
+        return (b.dataset.name || '').localeCompare(a.dataset.name || '');
+      } else {
+        return (a.dataset.name || '').localeCompare(b.dataset.name || '');
+      }
+    });
+
+    // Re-append in sorted order
+    visibleCards.forEach(card => cardsContainer.appendChild(card));
+
+    // Update results counter
+    if (visibleCountEl) {
+      visibleCountEl.textContent = visibleCards.length;
+    }
+    if (matchingQueryWrap && displayQueryVal) {
+      if (hasQuery) {
+        displayQueryVal.textContent = rawQuery;
+        matchingQueryWrap.style.display = 'inline';
+      } else {
+        matchingQueryWrap.style.display = 'none';
+      }
+    }
+
+    // Toggle Empty State
+    if (clientEmpty) {
+      clientEmpty.style.display = (visibleCards.length === 0) ? 'block' : 'none';
+      if (visibleCards.length === 0) {
+        cardsContainer.appendChild(clientEmpty);
+      }
+    }
+
+    // Update URL query string smoothly with replaceState
+    const params = new URLSearchParams();
+    if (rawQuery) params.set('q', rawQuery);
+    if (selectedDepts.size === 1) {
+      params.set('department', Array.from(selectedDepts)[0]);
+    } else if (selectedDepts.size > 1) {
+      selectedDepts.forEach(id => params.append('department', id));
+    }
+    if (activeGender && activeGender !== 'all') params.set('gender', activeGender);
+    if (sortVal && sortVal !== 'name') params.set('sort', sortVal);
+
+    const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+    window.history.replaceState(null, '', newUrl);
+  }
+
+  // --- Search Input Listeners (Instant on every keystroke) ---
+  if (searchInput) {
+    searchInput.addEventListener('input', filterAndSortDoctors);
+    searchInput.addEventListener('keyup', (e) => {
+      if (e.key === 'Escape') {
+        searchInput.value = '';
+        filterAndSortDoctors();
+      }
+    });
+  }
+
+  function clearSearchInput() {
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.focus();
+      filterAndSortDoctors();
+    }
+  }
+  if (clearBtn) clearBtn.addEventListener('click', clearSearchInput);
+  if (clearTextLink) clearTextLink.addEventListener('click', clearSearchInput);
+
+  // --- Department Dropdown Listener ---
+  if (deptSelect) {
+    deptSelect.addEventListener('change', function() {
+      selectedDepts.clear();
+      if (this.value) {
+        selectedDepts.add(this.value);
+      }
+      updateDeptUI();
+      filterAndSortDoctors();
+    });
+  }
+
+  // --- Department Chips Listeners (Multi-Select Support) ---
+  deptChips.forEach(chip => {
+    chip.addEventListener('click', function() {
+      const deptId = this.dataset.deptId;
+      if (!deptId) {
+        selectedDepts.clear();
+      } else {
+        if (selectedDepts.has(deptId)) {
+          selectedDepts.delete(deptId);
+        } else {
+          selectedDepts.add(deptId);
+        }
+      }
+      updateDeptUI();
+      filterAndSortDoctors();
+    });
+  });
+
+  // --- Gender Selective Buttons Listeners ---
+  genderBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      genderBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      activeGender = this.dataset.gender || 'all';
+      filterAndSortDoctors();
+    });
+  });
+
+  // --- Sort Dropdown Listener ---
+  if (sortSelect) {
+    sortSelect.addEventListener('change', filterAndSortDoctors);
+  }
+
+  // --- Reset All Filters ---
+  function resetAll() {
+    if (searchInput) searchInput.value = '';
+    selectedDepts.clear();
+    updateDeptUI();
+    activeGender = 'all';
+    genderBtns.forEach(b => b.classList.toggle('active', b.dataset.gender === 'all'));
+    if (sortSelect) sortSelect.value = 'name';
+    filterAndSortDoctors();
+  }
+
+  if (resetBtn) resetBtn.addEventListener('click', resetAll);
+  if (resetLink) resetLink.addEventListener('click', (e) => { e.preventDefault(); resetAll(); });
+  if (emptyClearBtn) emptyClearBtn.addEventListener('click', resetAll);
+
+  // Initial run on page load
+  filterAndSortDoctors();
+});
+</script>
 {% endblock %}

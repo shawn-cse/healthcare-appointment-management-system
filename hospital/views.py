@@ -171,15 +171,23 @@ def profile(request):
 
 
 def doctor_directory(request):
-    department = request.GET.get('department', '')
-    gender = request.GET.get('gender', '')
+    dept_raw = request.GET.getlist('department')
+    if not dept_raw and request.GET.get('department'):
+        dept_raw = [request.GET.get('department')]
+    dept_ids = [int(d) for d in dept_raw if str(d).isdigit()]
+
+    gender_raw = request.GET.getlist('gender')
+    if not gender_raw and request.GET.get('gender'):
+        gender_raw = [request.GET.get('gender')]
+    genders = [g.lower() for g in gender_raw if g.lower() in ('male', 'female')]
+
     q = request.GET.get('q', '').strip()
     sort = request.GET.get('sort', 'name')
     doctors = DoctorProfile.objects.filter(is_available=True, user__is_active=True).select_related('user', 'department', 'chamber').prefetch_related('weekly')
-    if department.isdigit():
-        doctors = doctors.filter(department_id=int(department))
-    if gender in ('male', 'female'):
-        doctors = doctors.filter(gender=gender)
+    if dept_ids:
+        doctors = doctors.filter(department_id__in=dept_ids)
+    if len(genders) == 1:
+        doctors = doctors.filter(gender=genders[0])
     if q:
         doctors = doctors.filter(
             Q(user__first_name__icontains=q) |
@@ -196,6 +204,8 @@ def doctor_directory(request):
         doctors = doctors.order_by('-initial_fee')
     elif sort == 'experience':
         doctors = doctors.order_by('-experience_years')
+    elif sort == 'name_desc':
+        doctors = doctors.order_by('-user__first_name', '-user__last_name')
     elif sort == 'department':
         doctors = doctors.order_by('department__name', 'user__first_name')
     else:
@@ -210,8 +220,9 @@ def doctor_directory(request):
     return render(request, 'patient/doctors.html', {
         'doctors': doctors,
         'departments': dept_list,
-        'selected_department': department,
-        'selected_gender': gender,
+        'selected_department': str(dept_ids[0]) if len(dept_ids) == 1 else '',
+        'selected_departments': [str(d) for d in dept_ids],
+        'selected_gender': genders[0] if len(genders) == 1 else 'all',
         'query': q,
         'selected_sort': sort,
         'total_doctors_count': total_count,
