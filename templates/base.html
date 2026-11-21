@@ -229,16 +229,16 @@
 <div class="header-top-bar">
   <div class="container header-top-inner">
     <div class="top-info-item">
-      <svg class="icon"><use href="#ic-phone"/></svg>
-      <span>24/7 Hotline: <a href="tel:+88096100016211" style="color:inherit;text-decoration:none;"><b>+88096100016211</b></a>, <a href="tel:16211" style="color:inherit;text-decoration:none;"><b>+16211</b></a></span>
+      <svg class="icon" aria-hidden="true"><use href="#ic-phone"/></svg>
+      <span class="top-info-text">24/7 Hotline: <a href="tel:+88096100016211" class="top-bar-hotline"><strong>+88096100016211</strong></a>, <a href="tel:16211" class="top-bar-hotline"><strong>+16211</strong></a></span>
     </div>
     <div class="top-info-item hidden-mobile">
-      <svg class="icon"><use href="#ic-clock"/></svg>
-      <span>OPD Consultation: 8:00 AM – 10:00 PM Daily</span>
+      <svg class="icon" aria-hidden="true"><use href="#ic-clock"/></svg>
+      <span class="top-info-text">OPD Consultation: <strong>8:00 AM – 10:00 PM Daily</strong></span>
     </div>
     <div class="top-info-item hidden-mobile">
-      <svg class="icon"><use href="#ic-map-pin"/></svg>
-      <span>Mirpur-10, Dhaka</span>
+      <svg class="icon" aria-hidden="true"><use href="#ic-map-pin"/></svg>
+      <span class="top-info-text"><strong>Mirpur-10, Dhaka</strong></span>
     </div>
   </div>
 </div>
@@ -282,8 +282,7 @@
 
 {% if user.is_authenticated %}
     <footer class="app-footer">
-      <span>© {% now 'Y' %} Green Hospital, Mirpur, Dhaka. All rights reserved.</span>
-      <span>24/7 Hotline: +88096100016211, +16211 · Chamber: Section 10, Mirpur, Dhaka</span>
+      <span>© {% now 'Y' %} Green Hospital. Clinical Care & Patient Management System.</span>
     </footer>
   </main>
 </div>

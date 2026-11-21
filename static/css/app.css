@@ -3001,11 +3001,12 @@ input[type="checkbox"] {
    ========================================================================== */
 
 .header-top-bar {
-  background: #092a24;
-  color: #d1ebd0;
-  font-size: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid #14463c;
+  background: #062b20 !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  padding: 9px 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
 }
 
 .header-top-inner {
@@ -3016,19 +3017,38 @@ input[type="checkbox"] {
 }
 
 .top-info-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  color: #ffffff !important;
+}
+
+.top-info-item span,
+.header-top-bar span {
+  color: #ffffff !important;
 }
 
 .top-info-item .icon {
-  width: 15px;
-  height: 15px;
-  color: #41be7f;
+  width: 16px !important;
+  height: 16px !important;
+  color: #34d399 !important;
 }
 
-.top-info-item b {
-  color: #ffffff;
+.top-info-item b,
+.header-top-bar b {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.header-top-bar a {
+  color: #86efac !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+  font-weight: 700 !important;
+}
+
+.header-top-bar a:hover {
+  color: #ffffff !important;
 }
 
 .public-header {
@@ -8110,7 +8130,8 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.02em;
 }
 
-p, li, span, label {
+/* Scoped typography for readable prose - never blanket span */
+p, .form-group label, .field-label {
   color: #334155;
 }
 
@@ -8127,10 +8148,11 @@ b, strong {
 /* 2. Public Navigation Links Hover (Home, Find Doctors, Departments) */
 .public-links {
   gap: 12px !important;
+  align-items: center !important;
 }
 
 .public-links a:not(.hotline-nav-link) {
-  font-size: 14.5px !important;
+  font-size: 15px !important;
   font-weight: 600 !important;
   color: #1e293b !important;
   padding: 8px 16px !important;
@@ -8140,18 +8162,47 @@ b, strong {
   display: inline-flex !important;
   align-items: center !important;
   text-decoration: none !important;
+  border: 1.5px solid transparent !important;
 }
 
 .public-links a:not(.hotline-nav-link):hover {
   color: #064e3b !important;
   background: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15) !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.18) !important;
 }
 
 .public-links a:not(.hotline-nav-link):active {
   transform: translateY(0) !important;
   box-shadow: none !important;
+}
+
+.public-links .hotline-nav-link {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #065f46 !important;
+  background: #f0fdf4 !important;
+  border: 1.5px solid #86efac !important;
+  padding: 8px 16px !important;
+  border-radius: 9999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  text-decoration: none !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.public-links .hotline-nav-link:hover {
+  background: #0d5c46 !important;
+  color: #ffffff !important;
+  border-color: #0d5c46 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(13, 92, 70, 0.25) !important;
+}
+
+.public-links .hotline-nav-link:hover .icon {
+  color: #ffffff !important;
 }
 
 /* Public Header Brand Hover */
@@ -8174,7 +8225,15 @@ b, strong {
   border-color: #0d5c46 !important;
   color: #0d5c46 !important;
   font-weight: 700 !important;
+  font-size: 14px !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  text-decoration: none !important;
 }
 
 .public-header-actions .button-outline:hover {
@@ -8185,6 +8244,10 @@ b, strong {
   box-shadow: 0 8px 20px rgba(13, 92, 70, 0.28) !important;
 }
 
+.public-header-actions .button-outline:hover .icon {
+  color: #ffffff !important;
+}
+
 .public-header-actions .button-outline:active {
   transform: translateY(0) !important;
 }
@@ -8193,12 +8256,22 @@ b, strong {
   background: #0d5c46 !important;
   color: #ffffff !important;
   font-weight: 700 !important;
+  font-size: 14px !important;
+  padding: 8px 18px !important;
+  border-radius: 8px !important;
+  border: 1.5px solid #0d5c46 !important;
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
   box-shadow: 0 4px 14px rgba(13, 92, 70, 0.25) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  text-decoration: none !important;
 }
 
 .public-header-actions .button-primary:hover {
   background: #07382b !important;
+  border-color: #07382b !important;
+  color: #ffffff !important;
   transform: translateY(-2px) !important;
   box-shadow: 0 8px 24px rgba(7, 56, 43, 0.38) !important;
 }
@@ -8289,12 +8362,62 @@ b, strong {
   transform: scale(1.08) !important;
 }
 
-/* 8. Top Announcement Bar Hover */
-.header-top-bar a:hover {
+/* 8. Top Announcement Bar - High Contrast Bright White Guarantee */
+.header-top-bar {
+  background: #062b20 !important;
   color: #ffffff !important;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  padding: 9px 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+  position: relative !important;
+  z-index: 50 !important;
 }
 
-.header-top-bar .icon {
+.header-top-bar,
+.header-top-bar *,
+.header-top-inner,
+.header-top-inner *,
+.top-info-item,
+.top-info-item *,
+.top-info-text,
+.top-info-text * {
+  color: #ffffff !important;
+}
+
+.header-top-bar .icon,
+.top-info-item .icon {
+  width: 16px !important;
+  height: 16px !important;
   color: #34d399 !important;
+  stroke: #34d399 !important;
+  fill: none !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+.header-top-bar strong,
+.header-top-bar b,
+.top-info-item strong,
+.top-info-item b {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.header-top-bar a,
+.header-top-bar a.top-bar-hotline,
+.top-bar-hotline,
+.header-top-bar a:visited {
+  color: #86efac !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+  font-weight: 700 !important;
+  transition: all 0.2s ease !important;
+}
+
+.header-top-bar a:hover,
+.header-top-bar a.top-bar-hotline:hover,
+.top-bar-hotline:hover {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(134, 239, 172, 0.8) !important;
 }
