@@ -88,10 +88,6 @@
               <option value="experience" {% if selected_sort == 'experience' %}selected{% endif %}>Experience (Seniority)</option>
             </select>
           </div>
-
-          <button type="button" id="reset-all-filters-btn" class="button button-outline button-full" style="margin-top: 10px;">
-            <svg class="icon"><use href="#ic-filter"/></svg> Reset All Filters
-          </button>
         </form>
       </div>
     </aside>
@@ -278,7 +274,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const genderFemaleCheck = document.getElementById('gender-check-female');
   const sortSelect = document.getElementById('filter-sort-select');
   const cardsContainer = document.getElementById('doctor-cards-grid');
-  const resetBtn = document.getElementById('reset-all-filters-btn');
   const resetLink = document.getElementById('reset-all-filters');
   const clientEmpty = document.getElementById('no-doctors-client');
   const emptyClearBtn = document.getElementById('clear-all-empty-btn');
@@ -462,7 +457,6 @@ document.addEventListener('DOMContentLoaded', function() {
     filterAndSortDoctors();
   }
 
-  if (resetBtn) resetBtn.addEventListener('click', resetAll);
   if (resetLink) resetLink.addEventListener('click', (e) => { e.preventDefault(); resetAll(); });
   if (emptyClearBtn) emptyClearBtn.addEventListener('click', resetAll);
 
