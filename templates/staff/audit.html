@@ -175,7 +175,7 @@
             <!-- Target Record -->
             <td class="audit-target-cell">
               {% if e.formatted_target.is_appointment %}
-                <a href="{% url 'appointment_detail' e.formatted_target.ref %}" class="audit-target-link" title="View appointment details">
+                <a href="{% url 'appointments' %}?q={{ e.formatted_target.ref }}" class="audit-target-link" title="Find appointment in directory">
                   <svg class="icon"><use href="#ic-clipboard"/></svg>
                   <span>{{ e.formatted_target.ref }}</span>
                 </a>
