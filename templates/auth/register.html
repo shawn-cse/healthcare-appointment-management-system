@@ -1,3 +1,39 @@
 {% extends 'base.html' %}
-{% block title %}Patient registration{% endblock %}
-{% block public_content %}<div class="auth-background"><div class="container register-container"><div class="register-intro"><p class="eyebrow">JOIN GREEN HOSPITAL</p><h1>Care begins here.</h1><p>Create an account to book specialist appointments, manage upcoming visits and receive service updates.</p><div class="register-note"><svg class="icon"><use href="#ic-check"/></svg> Your date of birth is required. NID, address and email are optional.</div></div><div class="panel padded-panel register-panel"><h2>Create patient account</h2><p>Already registered? <a href="{% url 'login_screen' 'patient' %}">Sign in</a></p><form method="post" class="smart-form">{% csrf_token %}{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}{% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}<div class="form-grid">{% for field in form %}<div class="form-group {% if field.name == 'address' %}form-span{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }} {% if field.field.required %}<span class="required">*</span>{% endif %}</label>{{ field }}{% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}{% if field.errors %}<small class="error-text">{{ field.errors|join:' ' }}</small>{% endif %}</div>{% endfor %}</div><button class="button button-primary button-full" type="submit">Create my account <svg class="icon"><use href="#ic-arrow"/></svg></button></form></div></div></div>{% endblock %}
+{% block title %}Patient registration | Green Hospital Dhaka{% endblock %}
+{% block public_content %}
+<div class="auth-background">
+  <div class="container register-container">
+    <div class="register-intro">
+      <p class="eyebrow">JOIN GREEN HOSPITAL</p>
+      <h1>Care begins here.</h1>
+      <p>Create an account to book specialist appointments, manage upcoming visits and receive service updates.</p>
+    </div>
+    <div class="panel padded-panel register-panel">
+      <h2>Create patient account</h2>
+      <p>Already registered? <a href="{% url 'login_screen' 'patient' %}">Sign in</a></p>
+      <form method="post" class="smart-form">
+        {% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        {% if form.non_field_errors %}
+          <div class="form-errors">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <div class="form-grid">
+          {% for field in form %}
+            <div class="form-group {% if field.name == 'address' %}form-span{% endif %}">
+              <label for="{{ field.id_for_label }}">
+                {{ field.label }} {% if field.field.required %}<span class="required">*</span>{% endif %}
+              </label>
+              {{ field }}
+              {% if field.help_text %}<small class="help-text">{{ field.help_text }}</small>{% endif %}
+              {% if field.errors %}<small class="error-text">{{ field.errors|join:' ' }}</small>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <button class="button button-primary button-full" type="submit">
+          Create my account <svg class="icon"><use href="#ic-arrow"/></svg>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
