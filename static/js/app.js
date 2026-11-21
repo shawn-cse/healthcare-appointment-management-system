@@ -216,21 +216,42 @@
   // --- Real-Time Instant Department Search ---
   const depSearch = doc.getElementById('department-live-search');
   const depContainer = doc.getElementById('departments-container');
+  const depClearBtn = doc.getElementById('dept-search-clear');
+  const depEmpty = doc.getElementById('dept-no-results');
+  const depQueryDisplay = doc.getElementById('dept-query-display');
 
   if (depSearch && depContainer) {
     const depCards = Array.from(depContainer.querySelectorAll('.department-showcase-card'));
-    depSearch.addEventListener('input', () => {
+    const filterDeps = () => {
       const q = depSearch.value.trim().toLowerCase();
+      let matches = 0;
       depCards.forEach(card => {
         const name = card.dataset.depName || '';
         const desc = card.dataset.depDesc || '';
         if (!q || name.includes(q) || desc.includes(q)) {
           card.style.display = '';
+          matches++;
         } else {
           card.style.display = 'none';
         }
       });
-    });
+      if (depClearBtn) {
+        depClearBtn.style.display = q ? 'inline-flex' : 'none';
+      }
+      if (depEmpty) {
+        depEmpty.style.display = (matches === 0) ? 'block' : 'none';
+        if (depQueryDisplay) depQueryDisplay.textContent = depSearch.value.trim();
+      }
+    };
+
+    depSearch.addEventListener('input', filterDeps);
+    if (depClearBtn) {
+      depClearBtn.addEventListener('click', () => {
+        depSearch.value = '';
+        filterDeps();
+        depSearch.focus();
+      });
+    }
   }
 
   // --- Public Mobile Navigation Drawer ---
