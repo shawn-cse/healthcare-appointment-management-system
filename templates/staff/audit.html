@@ -2,63 +2,12 @@
 {% block title %}Activity Log | Green Hospital Workspace{% endblock %}
 {% block content %}
 <div class="audit-log-page container-fluid">
-  <!-- Page Header -->
+  <!-- Clean Page Header -->
   <div class="page-heading">
     <div>
-      <p class="eyebrow">COMPLIANCE & AUDIT TRAIL</p>
-      <h1>Hospital Activity & Audit Log</h1>
-      <p>Tamper-evident record of appointments, payments, refunds, schedules, and administrative operations.</p>
-    </div>
-    <div class="heading-actions">
-      <a class="button button-outline" href="?export=csv{% if category_filter != 'all' %}&category={{ category_filter }}{% endif %}{% if actor_filter != 'all' %}&actor={{ actor_filter }}{% endif %}{% if date_filter != 'all' %}&date={{ date_filter }}{% endif %}{% if query %}&q={{ query }}{% endif %}">
-        <svg class="icon"><use href="#ic-download"/></svg> Export CSV
-      </a>
-      <button type="button" class="button button-outline" onclick="window.print()">
-        <svg class="icon"><use href="#ic-clipboard"/></svg> Print View
-      </button>
-    </div>
-  </div>
-
-  <!-- Dynamic KPI Metrics Row -->
-  <div class="audit-kpi-grid">
-    <div class="panel audit-kpi-card">
-      <div class="audit-kpi-icon icon-kpi-today">
-        <svg class="icon"><use href="#ic-clock"/></svg>
-      </div>
-      <div>
-        <div class="audit-kpi-value">{{ stats.today }}</div>
-        <div class="audit-kpi-label">Actions Today</div>
-      </div>
-    </div>
-
-    <div class="panel audit-kpi-card">
-      <div class="audit-kpi-icon icon-kpi-booking">
-        <svg class="icon"><use href="#ic-calendar"/></svg>
-      </div>
-      <div>
-        <div class="audit-kpi-value">{{ stats.bookings }}</div>
-        <div class="audit-kpi-label">Booking Events</div>
-      </div>
-    </div>
-
-    <div class="panel audit-kpi-card">
-      <div class="audit-kpi-icon icon-kpi-finance">
-        <svg class="icon"><use href="#ic-wallet"/></svg>
-      </div>
-      <div>
-        <div class="audit-kpi-value">{{ stats.finance }}</div>
-        <div class="audit-kpi-label">Financial Records</div>
-      </div>
-    </div>
-
-    <div class="panel audit-kpi-card">
-      <div class="audit-kpi-icon icon-kpi-total">
-        <svg class="icon"><use href="#ic-clipboard"/></svg>
-      </div>
-      <div>
-        <div class="audit-kpi-value">{{ stats.total }}</div>
-        <div class="audit-kpi-label">Total Audit Trail</div>
-      </div>
+      <p class="eyebrow">COMPLIANCE & ACCOUNTABILITY</p>
+      <h1>Activity log</h1>
+      <p>Audit trail of important bookings, payment, schedule and account actions.</p>
     </div>
   </div>
 
@@ -117,13 +66,32 @@
 
   <!-- Activity Table -->
   <div class="panel audit-table-panel">
+    <!-- Print Only Clean Report Header -->
+    <div class="print-only audit-print-header">
+      <div class="print-brand-row">
+        <h2>Green Hospital — Activity & Audit Log</h2>
+        <span class="print-tag">Compliance Trail</span>
+      </div>
+      <p class="print-meta">Location: Mirpur, Dhaka · Helpline: +88096100016211 · Total Logged: {{ page_obj.paginator.count }} events · Printed on {% now "d M Y, h:i A" %}</p>
+    </div>
+
     <div class="audit-table-meta-bar">
-      <span class="small-muted" id="audit-count-indicator">
-        Showing <b>{{ events|length }}</b> of <b>{{ page_obj.paginator.count }}</b> recorded events
-      </span>
-      <span class="audit-live-status">
-        <span class="pulse-dot"></span> Real-Time Auditing Active
-      </span>
+      <div class="audit-meta-left">
+        <span class="small-muted" id="audit-count-indicator">
+          Showing <b>{{ events|length }}</b> of <b>{{ page_obj.paginator.count }}</b> recorded events
+        </span>
+        <span class="audit-live-status">
+          <span class="pulse-dot"></span> Real-Time Auditing Active
+        </span>
+      </div>
+      <div class="audit-table-actions">
+        <a class="button button-outline button-xs" href="?export=csv{% if category_filter != 'all' %}&category={{ category_filter }}{% endif %}{% if actor_filter != 'all' %}&actor={{ actor_filter }}{% endif %}{% if date_filter != 'all' %}&date={{ date_filter }}{% endif %}{% if query %}&q={{ query }}{% endif %}" title="Export activity log as CSV">
+          <svg class="icon"><use href="#ic-download"/></svg> Export CSV
+        </a>
+        <button type="button" class="button button-outline button-xs" onclick="window.print()" title="Print only the log table">
+          <svg class="icon"><use href="#ic-clipboard"/></svg> Print Log
+        </button>
+      </div>
     </div>
 
     <div class="table-wrap">

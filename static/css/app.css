@@ -9610,9 +9610,51 @@ b, strong {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  padding: 12px 18px;
   border-bottom: 1px solid #f1f5f9;
   background: #fafcfb;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.audit-meta-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.audit-table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audit-table-actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.audit-table-actions .button:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.audit-table-actions .button .icon {
+  width: 13px;
+  height: 13px;
 }
 
 .audit-live-status {
@@ -9803,4 +9845,223 @@ b, strong {
   background: #e0f2fe;
   color: #0369a1;
   border-color: #bae6fd;
+}
+
+/* ==========================================================================
+   REPORT & TABLE TOOLBARS
+   ========================================================================== */
+.print-only {
+  display: none !important;
+}
+
+.panel-header.report-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   DEDICATED PRINT STYLESHEET: "Just print the log / table"
+   ========================================================================== */
+@media print {
+  /* Hide all dashboard chrome, navigation, headers, footers, filters and action buttons */
+  .sidebar,
+  .topbar,
+  .app-header,
+  .app-footer,
+  .mobile-nav,
+  .page-heading,
+  .audit-filter-panel,
+  .filter-bar,
+  .metric-grid,
+  .report-row,
+  .audit-kpi-grid,
+  .audit-live-status,
+  .audit-table-actions,
+  .table-actions,
+  .bulk-toolbar,
+  .pagination,
+  .audit-pagination-bar,
+  .sheet-pagination,
+  .button,
+  .btn,
+  .heading-actions,
+  .modal-backdrop,
+  .form-tip,
+  #audit-filter-form {
+    display: none !important;
+  }
+
+  /* Reset global layout containers to clean printable document */
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-size: 10pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  .app-shell,
+  .main-content,
+  .container,
+  .container-fluid,
+  .audit-log-page,
+  .patient-sheet-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .panel,
+  .audit-table-panel,
+  .report-table-panel {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  .table-wrap {
+    overflow: visible !important;
+    border: none !important;
+  }
+
+  /* Display clean print header */
+  .print-only {
+    display: block !important;
+    margin-bottom: 16px !important;
+    padding-bottom: 12px !important;
+    border-bottom: 2px solid #0f766e !important;
+  }
+
+  .print-brand-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 4px !important;
+  }
+
+  .print-brand-row h2 {
+    font-size: 16pt !important;
+    font-weight: 800 !important;
+    color: #064e3b !important;
+    margin: 0 !important;
+  }
+
+  .print-tag {
+    display: inline-block !important;
+    font-size: 8pt !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding: 2px 6px !important;
+    border: 1px solid #064e3b !important;
+    border-radius: 4px !important;
+    color: #064e3b !important;
+  }
+
+  .print-meta {
+    font-size: 8.5pt !important;
+    color: #4b5563 !important;
+    margin: 0 !important;
+  }
+
+  /* Audit & Report Tables in Print */
+  .data-table,
+  .audit-data-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 8.5pt !important;
+  }
+
+  .data-table th,
+  .audit-data-table th {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+    font-weight: 700 !important;
+    border-top: 1px solid #d1d5db !important;
+    border-bottom: 2px solid #9ca3af !important;
+    padding: 6px 8px !important;
+    text-align: left !important;
+    font-size: 8pt !important;
+    text-transform: uppercase !important;
+  }
+
+  .data-table td,
+  .audit-data-table td {
+    padding: 6px 8px !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    color: #1f2937 !important;
+    vertical-align: top !important;
+  }
+
+  .audit-avatar-circle {
+    display: none !important;
+  }
+
+  .audit-actor-wrap {
+    gap: 0 !important;
+  }
+
+  .audit-action-badge,
+  .audit-role-badge,
+  .status {
+    border: 1px solid #cbd5e1 !important;
+    background: transparent !important;
+    color: #111827 !important;
+    padding: 1px 4px !important;
+    font-size: 7.5pt !important;
+  }
+
+  .audit-target-link {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    color: #0f766e !important;
+    font-weight: 700 !important;
+  }
+
+  .audit-target-link .icon {
+    display: none !important;
+  }
+
+  /* Page break rules */
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+  }
+
+  @page {
+    margin: 1.2cm 1cm;
+    size: auto;
+  }
 }

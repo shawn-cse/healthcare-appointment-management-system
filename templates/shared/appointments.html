@@ -342,10 +342,23 @@
 </form>
 
 <div class="panel">
+  <!-- Print Only Clean Report Header -->
+  <div class="print-only appointment-print-header">
+    <div class="print-brand-row">
+      <h2>Green Hospital — Appointment Registry</h2>
+      <span class="print-tag">Hospital Records</span>
+    </div>
+    <p class="print-meta">Location: Mirpur, Dhaka · Helpline: +88096100016211 · Total Records: {{ page_obj.paginator.count }} · Printed on {% now "d M Y, h:i A" %}</p>
+  </div>
   <div class="panel-header">
     <div>
       <h2>Appointment records</h2>
       <p>Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} records</p>
+    </div>
+    <div class="table-actions">
+      <button type="button" class="button button-outline button-sm" onclick="window.print()" title="Print appointment records table">
+        <svg class="icon"><use href="#ic-clipboard"/></svg> Print List
+      </button>
     </div>
   </div>
   <form method="post" action="{% url 'appointment_bulk' %}" id="bulk-form">
