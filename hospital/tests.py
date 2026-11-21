@@ -287,12 +287,17 @@ class AppointmentSystemTests(TestCase):
         self.assertContains(response, 'Specialized Medical Departments')
 
     def test_doctor_profile_displays_chamber_details_and_schedules(self):
-        # Doctor Profile is accessible without authentication
-        response = self.client.get(reverse('doctor_detail', args=[self.doc.pk]))
+        # Doctor Profile is accessible via semantic slug without authentication
+        response = self.client.get(reverse('doctor_detail', args=[self.doc.profile_slug]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'MAKE APPOINTMENT')
         self.assertContains(response, 'Room')
         self.assertContains(response, 'SCHEDULE')
+        self.assertNotContains(response, 'Address')
+
+        # Backward compatibility with PK also works
+        response_pk = self.client.get(reverse('doctor_detail', args=[self.doc.pk]))
+        self.assertEqual(response_pk.status_code, 200)
 
     def test_unauthenticated_user_booking_redirects_to_login(self):
         # Trying to book directly without authentication redirects to login with next param

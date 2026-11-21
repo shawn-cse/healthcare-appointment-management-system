@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-heading">
   <div>
-    <a class="back-link" href="{% url 'doctor_detail' doctor.pk %}?date={{ slot.date|date:'Y-m-d' }}">‹ Back to Doctor Profile & Slots</a>
+    <a class="back-link" href="{% url 'doctor_detail' doctor.profile_slug %}?date={{ slot.date|date:'Y-m-d' }}">‹ Back to Doctor Profile & Slots</a>
     <p class="eyebrow">{% if is_staff_booking %}HOSPITAL STAFF ASSISTED BOOKING{% else %}BOOK CONSULTATION{% endif %}</p>
     <h1>{% if is_staff_booking %}Book Consultation on Behalf of Patient{% else %}Confirm your appointment{% endif %}</h1>
     <p>{% if is_staff_booking %}Registering an appointment for a walk-in patient or telephone caller.{% else %}Review your consultation details before reserving the time.{% endif %}</p>
@@ -69,11 +69,6 @@
     <div class="details-row">
       <span>Room Number</span>
       <b class="highlight-room-badge">{{ doctor.active_room }}</b>
-    </div>
-
-    <div class="details-row">
-      <span>Chamber Address</span>
-      <b>{{ doctor.active_address }}</b>
     </div>
 
     <div class="details-row">

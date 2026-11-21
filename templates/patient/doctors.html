@@ -122,7 +122,7 @@
                 <span class="bmdc-tag">{{ d.bmdc_display }}</span>
               </div>
               <h2 class="doctor-name-heading">
-                <a href="{% url 'doctor_detail' d.pk %}">{{ d.full_doctor_title }}</a>
+                <a href="{% url 'doctor_detail' d.profile_slug %}">{{ d.full_doctor_title }}</a>
               </h2>
               <p class="doctor-designation-text">{{ d.designation }}</p>
             </div>
@@ -192,7 +192,7 @@
 
           <!-- Card Bottom Actions: Single Make Appointment Button -->
           <div class="doctor-card-bottom">
-            <a href="{% url 'doctor_detail' d.pk %}" class="button button-primary button-full appt-action-btn">
+            <a href="{% url 'doctor_detail' d.profile_slug %}" class="button button-primary button-full appt-action-btn">
               Make Appointment <svg class="icon"><use href="#ic-arrow"/></svg>
             </a>
           </div>

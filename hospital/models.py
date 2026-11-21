@@ -6,6 +6,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator, RegexVa
 from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
+from django.utils.text import slugify
 
 money_min = MinValueValidator(Decimal('0'))
 phone_validator = RegexValidator(r'^\+?[0-9]{10,15}$', 'Enter a valid phone number (10–15 digits).')
@@ -228,6 +229,29 @@ class DoctorProfile(models.Model):
     def assigned_days_text(self):
         d = self.assigned_days_display
         return ', '.join(d) if d else 'Unscheduled'
+
+    @property
+    def profile_slug(self):
+        first = slugify(self.user.first_name).strip() if self.user and self.user.first_name else ''
+        last = slugify(self.user.last_name).strip() if self.user and self.user.last_name else ''
+        if first:
+            # If first name is unique among active doctors, use first name
+            other_same_first = DoctorProfile.objects.filter(
+                user__first_name__iexact=self.user.first_name,
+                user__is_active=True
+            ).exclude(pk=self.pk).exists()
+            if not other_same_first:
+                return first
+            # If first name matches another doctor, use first-last
+            if last:
+                return f"{first}-{last}"
+        if self.user and self.user.username:
+            return slugify(self.user.username).replace('_', '-')
+        return str(self.pk)
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+        return reverse('doctor_detail', args=[self.profile_slug])
 
     def save(self, *args, **kwargs):
         if self.chamber:

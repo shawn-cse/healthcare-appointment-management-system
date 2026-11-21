@@ -225,11 +225,61 @@ def public_departments(request):
     return render(request, 'public/departments.html', {'departments': deps})
 
 
-def doctor_detail(request, pk):
-    doc = get_object_or_404(
-        DoctorProfile.objects.select_related('user', 'department', 'chamber').prefetch_related('weekly', 'receptionists'),
-        pk=pk, user__is_active=True
-    )
+def resolve_doctor(identifier):
+    if not identifier:
+        return None
+    ident_str = str(identifier).strip()
+    qs = DoctorProfile.objects.select_related('user', 'department', 'chamber').prefetch_related('weekly', 'receptionists').filter(user__is_active=True)
+
+    # 1. By integer PK
+    if ident_str.isdigit():
+        doc = qs.filter(pk=int(ident_str)).first()
+        if doc:
+            return doc
+
+    ident_clean = ident_str.lower()
+    ident_under = ident_clean.replace('-', '_')
+    ident_dash = ident_clean.replace('_', '-')
+
+    # 2. Match username exact (or with hyphen/underscore swapped)
+    doc = qs.filter(
+        Q(user__username__iexact=ident_clean) |
+        Q(user__username__iexact=ident_under) |
+        Q(user__username__iexact=ident_dash)
+    ).first()
+    if doc:
+        return doc
+
+    # 3. Match full name (e.g. "adnan-faruq")
+    parts = ident_dash.split('-')
+    if len(parts) >= 2:
+        f_part = parts[0]
+        l_part = ' '.join(parts[1:])
+        doc = qs.filter(user__first_name__iexact=f_part, user__last_name__iexact=l_part).first()
+        if doc:
+            return doc
+        doc = qs.filter(user__first_name__iexact=f_part, user__last_name__icontains=parts[-1]).first()
+        if doc:
+            return doc
+
+    # 4. Match unique first name (e.g. "adnan" or "karim")
+    matches = list(qs.filter(user__first_name__iexact=ident_clean))
+    if len(matches) == 1:
+        return matches[0]
+
+    # 5. Match unique last name
+    matches = list(qs.filter(user__last_name__iexact=ident_clean))
+    if len(matches) == 1:
+        return matches[0]
+
+    return None
+
+
+def doctor_detail(request, identifier=None, pk=None):
+    ident = identifier if identifier is not None else pk
+    doc = resolve_doctor(ident)
+    if not doc:
+        raise Http404("Specialist doctor not found.")
     # Ensure recurring weekly consultation slots exist
     materialize_weekly(doc, days=45)
 
@@ -299,7 +349,7 @@ def patient_book(request, slot_id):
         valid_slot(slot, is_staff_booking=is_staff_booking)
     except ValidationError as exc:
         messages.error(request, '; '.join(exc.messages))
-        return redirect('doctor_detail', pk=slot.doctor_id)
+        return redirect('doctor_detail', identifier=slot.doctor.profile_slug)
 
     if is_staff_booking:
         form = StaffAssistedBookingForm(request.POST or None)

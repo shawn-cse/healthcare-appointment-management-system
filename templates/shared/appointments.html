@@ -93,7 +93,7 @@
             <td class="cell-doctor">
               <div class="sheet-doc-block">
                 <strong class="sheet-doc-name">
-                  <a href="{% url 'doctor_detail' a.doctor.pk %}">{{ a.doctor.full_doctor_title }}</a>
+                  <a href="{% url 'doctor_detail' a.doctor.profile_slug %}">{{ a.doctor.full_doctor_title }}</a>
                 </strong>
                 <span class="sheet-dept-badge">{{ a.doctor.department.name }}</span>
               </div>
