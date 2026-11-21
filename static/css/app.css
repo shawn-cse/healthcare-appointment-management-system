@@ -6039,19 +6039,59 @@ input[type="checkbox"] {
   align-items: start;
 }
 
-@media (max-width: 992px) {
-  .directory-layout {
-    grid-template-columns: 1fr;
-  }
+/* Sidebar Filters - Sticky to prevent moving and leaving an empty gap on scroll */
+.directory-sidebar {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 90px;
+  align-self: start;
+  z-index: 8;
 }
 
-/* Sidebar Filters */
+.public-layout .directory-sidebar {
+  top: 96px;
+}
+
+.app-layout .directory-sidebar {
+  top: 90px;
+}
+
 .directory-sidebar .filter-panel {
   background: #ffffff;
   border: 1px solid #dceede;
   border-radius: 14px;
   padding: 20px;
   box-shadow: 0 3px 14px rgba(10, 48, 38, 0.04);
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.directory-sidebar .filter-panel::-webkit-scrollbar {
+  width: 5px;
+}
+
+.directory-sidebar .filter-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.directory-sidebar .filter-panel::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+@media (max-width: 992px) {
+  .directory-layout {
+    grid-template-columns: 1fr;
+  }
+  .directory-sidebar {
+    position: static;
+    top: auto;
+  }
+  .directory-sidebar .filter-panel {
+    max-height: none;
+    overflow-y: visible;
+  }
 }
 
 .filter-header {
