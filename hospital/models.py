@@ -444,3 +444,107 @@ class AuditEvent(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+    ACTION_MAP = {
+        'appointment.created': ('Booking Created', 'Booking', 'status-confirmed', 'ic-calendar'),
+        'appointment.confirmed': ('Booking Confirmed', 'Booking', 'status-confirmed', 'ic-check'),
+        'appointment.completed': ('Consultation Completed', 'Booking', 'status-completed', 'ic-check'),
+        'appointment.cancelled': ('Booking Cancelled', 'Booking', 'status-cancelled', 'ic-x'),
+        'appointment.expired': ('Booking Expired', 'Booking', 'status-expired', 'ic-clock'),
+        'appointment.patient_linked': ('Patient Account Linked', 'Booking', 'status-info', 'ic-user'),
+        'payment.cash_verified': ('Cash Payment Verified', 'Finance', 'status-confirmed', 'ic-wallet'),
+        'payment.gateway_verified': ('Online Payment Confirmed', 'Finance', 'status-confirmed', 'ic-wallet'),
+        'payment.gateway_started': ('Online Payment Initiated', 'Finance', 'status-info', 'ic-wallet'),
+        'refund.approved': ('Refund Approved', 'Finance', 'status-purple', 'ic-wallet'),
+        'refund.cash_disbursed': ('Cash Refund Paid', 'Finance', 'status-purple', 'ic-wallet'),
+        'refund.gateway_submitted': ('Gateway Refund Sent', 'Finance', 'status-purple', 'ic-wallet'),
+        'refund.gateway_confirmed': ('Gateway Refund Settled', 'Finance', 'status-purple', 'ic-wallet'),
+        'patient.registered': ('Patient Registered', 'Account', 'status-info', 'ic-user'),
+        'profile.updated': ('Profile Information Updated', 'Account', 'status-info', 'ic-user'),
+        'staff.saved': ('Staff Account Saved', 'Account', 'status-info', 'ic-users'),
+        'schedule.updated': ('Schedule Updated', 'Schedule', 'status-teal', 'ic-calendar'),
+        'schedule.weekly_removed': ('Weekly Slot Removed', 'Schedule', 'status-cancelled', 'ic-calendar'),
+        'schedule.copied': ('Schedule Cloned', 'Schedule', 'status-info', 'ic-calendar'),
+        'slot.saved': ('Consultation Slot Saved', 'Schedule', 'status-teal', 'ic-calendar'),
+        'slot.open_changed': ('Slot Availability Toggled', 'Schedule', 'status-amber', 'ic-calendar'),
+        'chamber.saved': ('Chamber Location Updated', 'Management', 'status-info', 'ic-building'),
+        'chamber.deleted': ('Chamber Removed', 'Management', 'status-cancelled', 'ic-building'),
+        'department.created': ('Department Created', 'Management', 'status-info', 'ic-building'),
+        'doctor.rules_updated': ('Doctor Practice Rules Saved', 'Management', 'status-teal', 'ic-settings'),
+        'hospital.policy_defaults': ('Hospital Policy Updated', 'Management', 'status-teal', 'ic-settings'),
+        'complaint.submitted': ('Patient Feedback Logged', 'Feedback', 'status-amber', 'ic-alert'),
+        'complaint.updated': ('Feedback Status Updated', 'Feedback', 'status-teal', 'ic-alert'),
+        'report.exported': ('Financial Report Exported', 'Analytics', 'status-slate', 'ic-chart'),
+    }
+
+    @property
+    def action_label(self):
+        item = self.ACTION_MAP.get(self.action)
+        if item:
+            return item[0]
+        return self.action.replace('.', ' · ').replace('_', ' ').title()
+
+    @property
+    def action_category(self):
+        item = self.ACTION_MAP.get(self.action)
+        if item:
+            return item[1]
+        return self.action.split('.')[0].capitalize() if '.' in self.action else 'System'
+
+    @property
+    def action_badge_class(self):
+        item = self.ACTION_MAP.get(self.action)
+        return item[2] if item else 'status-slate'
+
+    @property
+    def action_icon(self):
+        item = self.ACTION_MAP.get(self.action)
+        return item[3] if item else 'ic-activity'
+
+    @property
+    def actor_info(self):
+        if not self.actor:
+            return {
+                'name': 'System Automation',
+                'role': 'Automated Task',
+                'initial': 'SYS',
+                'is_system': True,
+                'role_class': 'role-pill-system'
+            }
+        role_label = {
+            'admin': 'Admin',
+            'doctor': 'Doctor',
+            'receptionist': 'Reception',
+            'patient': 'Patient'
+        }.get(self.actor.role, self.actor.role.title())
+        first = (self.actor.first_name or '')[:1].upper()
+        last = (self.actor.last_name or '')[:1].upper()
+        initial = (first + last) if (first or last) else self.actor.username[:2].upper()
+        return {
+            'name': self.actor.display_name,
+            'role': role_label,
+            'initial': initial,
+            'is_system': False,
+            'role_class': f'role-pill-{self.actor.role}'
+        }
+
+    @property
+    def formatted_target(self):
+        t = str(self.target or '').strip()
+        if t.startswith('GH-'):
+            return {'is_appointment': True, 'label': t, 'ref': t}
+        return {'is_appointment': False, 'label': t or '—', 'ref': ''}
+
+    @property
+    def clean_detail(self):
+        d = str(self.detail or '').strip()
+        if not d:
+            return 'Action completed successfully.'
+        if 'doctor_side=' in d:
+            parts = [p.strip() for p in d.split(';') if p.strip()]
+            reason_part = next((p.replace('reason=', '').strip() for p in parts if p.startswith('reason=')), '')
+            by = 'Doctor cancellation' if 'doctor_side=True' in d else 'Patient cancellation'
+            return f"{by} ({reason_part})" if reason_part else by
+        if ' BDT' in d:
+            return d.replace(' BDT', ' ৳')
+        return d

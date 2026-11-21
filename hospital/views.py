@@ -1220,7 +1220,94 @@ def export_excel(request):
 
 @role_required('admin')
 def audit_log(request):
-    return render(request,'staff/audit.html',{'events':AuditEvent.objects.select_related('actor')[:250]})
+    qs = AuditEvent.objects.select_related('actor').all()
+    today = timezone.localdate()
+
+    # CSV Export
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="green_hospital_activity_log_{today}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Timestamp', 'Performer Name', 'Performer Role', 'Action Code', 'Action Label', 'Target Record', 'Details'])
+        for e in qs[:1000]:
+            actor_name = e.actor.display_name if e.actor else 'System Automation'
+            actor_role = e.actor.role if e.actor else 'system'
+            writer.writerow([
+                e.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                actor_name,
+                actor_role,
+                e.action,
+                e.action_label,
+                e.target,
+                e.clean_detail
+            ])
+        return response
+
+    q = request.GET.get('q', '').strip()
+    if q:
+        qs = qs.filter(
+            Q(action__icontains=q) |
+            Q(target__icontains=q) |
+            Q(detail__icontains=q) |
+            Q(actor__first_name__icontains=q) |
+            Q(actor__last_name__icontains=q) |
+            Q(actor__username__icontains=q)
+        )
+
+    category = request.GET.get('category', 'all').strip().lower()
+    if category == 'booking':
+        qs = qs.filter(action__istartswith='appointment')
+    elif category == 'finance':
+        qs = qs.filter(Q(action__istartswith='payment') | Q(action__istartswith='refund'))
+    elif category == 'schedule':
+        qs = qs.filter(Q(action__istartswith='schedule') | Q(action__istartswith='slot'))
+    elif category == 'account':
+        qs = qs.filter(Q(action__istartswith='patient') | Q(action__istartswith='staff') | Q(action__istartswith='profile'))
+    elif category == 'management':
+        qs = qs.filter(Q(action__istartswith='chamber') | Q(action__istartswith='department') | Q(action__istartswith='hospital') | Q(action__istartswith='doctor') | Q(action__istartswith='complaint'))
+
+    actor_filter = request.GET.get('actor', 'all').strip().lower()
+    if actor_filter == 'system':
+        qs = qs.filter(actor__isnull=True)
+    elif actor_filter in ('admin', 'doctor', 'receptionist', 'patient'):
+        qs = qs.filter(actor__role=actor_filter)
+
+    date_filter = request.GET.get('date', 'all').strip().lower()
+    if date_filter == 'today':
+        qs = qs.filter(created_at__date=today)
+    elif date_filter == '7d':
+        qs = qs.filter(created_at__date__gte=today - timedelta(days=7))
+    elif date_filter == '30d':
+        qs = qs.filter(created_at__date__gte=today - timedelta(days=30))
+
+    total_events = AuditEvent.objects.count()
+    booking_count = AuditEvent.objects.filter(action__istartswith='appointment').count()
+    finance_count = AuditEvent.objects.filter(Q(action__istartswith='payment') | Q(action__istartswith='refund')).count()
+    today_count = AuditEvent.objects.filter(created_at__date=today).count()
+
+    stats = {
+        'total': total_events,
+        'today': today_count,
+        'bookings': booking_count,
+        'finance': finance_count,
+    }
+
+    paginator = Paginator(qs, 30)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+
+    return render(request, 'staff/audit.html', {
+        'events': page_obj,
+        'page_obj': page_obj,
+        'stats': stats,
+        'query': q,
+        'category_filter': category,
+        'actor_filter': actor_filter,
+        'date_filter': date_filter,
+        'page_query': query_params.urlencode(),
+    })
 
 
 def health(request):
