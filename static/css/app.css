@@ -4,30 +4,30 @@
    ========================================================================== */
 
 :root {
-  --forest: #0e4a3e;
-  --forest-dark: #0a352c;
-  --forest-light: #166151;
-  --forest-surface: #edf7f2;
-  --mint: #e6f6ee;
-  --lime: #b8e5bc;
-  --ink: #112824;
-  --ink-secondary: #27443c;
-  --muted: #3f5d54;
-  --muted-light: #527369;
-  --line: #d6e4dc;
-  --line-strong: #bfd5c8;
-  --bg: #f4f8f6;
+  --forest: #0d5c46;
+  --forest-dark: #07382b;
+  --forest-light: #127559;
+  --forest-surface: #edf8f3;
+  --mint: #e6f7ef;
+  --lime: #a7e4b5;
+  --ink: #0f172a;           /* Sharp, high-contrast slate-900 */
+  --ink-secondary: #1e293b; /* Deep readable slate-800 */
+  --muted: #475569;         /* Slate-600: strong accessible contrast */
+  --muted-light: #64748b;   /* Slate-500: crisp subtext */
+  --line: #cbd5e1;          /* Slate-300: crisp borders */
+  --line-strong: #94a3b8;   /* Slate-400 */
+  --bg: #f8fafc;            /* Clean crisp neutral canvas */
   --white: #ffffff;
-  --amber: #b06f0e;
-  --blue: #2462a8;
-  --red: #a82e2e;
-  --shadow-sm: 0 4px 12px rgba(14, 74, 62, 0.04);
-  --shadow-md: 0 8px 24px rgba(14, 74, 62, 0.08);
-  --shadow-lg: 0 16px 36px rgba(14, 74, 62, 0.12);
-  --shadow-hover: 0 20px 42px rgba(14, 74, 62, 0.14);
+  --amber: #b45309;
+  --blue: #0369a1;
+  --red: #dc2626;
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 8px 20px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 16px 36px rgba(15, 23, 42, 0.12);
+  --shadow-hover: 0 20px 42px rgba(13, 92, 70, 0.16);
   --rad-sm: 8px;
-  --rad: 16px;
-  --rad-lg: 22px;
+  --rad: 14px;
+  --rad-lg: 20px;
   --side: 260px;
 }
 
@@ -47,26 +47,27 @@ html {
 
 body {
   margin: 0;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--ink);
   background-color: var(--bg);
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 14.5px;
+  font-weight: 450;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3 {
-  font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
-  color: #0c2b23;
+  font-family: 'Outfit', 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: #07382b;
   letter-spacing: -0.02em;
   font-weight: 700;
   line-height: 1.25;
 }
 
 h4, h5, h6 {
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  color: #0c2b23;
+  font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: #0f172a;
   letter-spacing: -0.01em;
   font-weight: 600;
   line-height: 1.35;
@@ -265,64 +266,89 @@ img {
 .button .icon {
   width: 17px;
   height: 17px;
-  transition: transform 0.2s ease;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .button:hover .icon {
-  transform: translateX(2px);
+  transform: translateX(3px);
 }
 
 .button-primary {
-  background: var(--forest);
+  background: #0d5c46;
   color: #ffffff !important;
-  box-shadow: 0 6px 18px rgba(14, 74, 62, 0.20);
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(13, 92, 70, 0.22);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .button-primary:hover {
-  background: #156252;
+  background: #07382b !important;
   color: #ffffff !important;
-  box-shadow: 0 10px 26px rgba(14, 74, 62, 0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(7, 56, 43, 0.32);
+}
+
+.button-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(7, 56, 43, 0.2);
 }
 
 .button-outline {
   background: #ffffff;
-  border: 1.5px solid #14594c;
-  color: #14594c !important;
-  box-shadow: var(--shadow-sm);
+  border: 1.5px solid #0d5c46;
+  color: #0d5c46 !important;
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .button-outline:hover {
-  background: #eef8f2;
-  color: #0b3d33 !important;
-  border-color: #0b3d33;
-  box-shadow: 0 6px 18px rgba(14, 74, 62, 0.12);
+  background: #0d5c46 !important;
+  color: #ffffff !important;
+  border-color: #0d5c46 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(13, 92, 70, 0.25);
+}
+
+.button-outline:active {
+  transform: translateY(0);
 }
 
 .button-light {
-  background: #eaf4ee;
-  color: #0f4a3e !important;
-  border: 1px solid #cbe4d5;
+  background: #edf8f3;
+  color: #094031 !important;
+  border: 1.5px solid #c2ebd5;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .button-light:hover {
-  background: #d5ecd8;
-  color: #082d25 !important;
-  border-color: #b3dac2;
-  box-shadow: 0 4px 14px rgba(14, 74, 62, 0.08);
+  background: #dcfce7 !important;
+  color: #065f46 !important;
+  border-color: #86efac !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(13, 92, 70, 0.12);
 }
 
 .button-white {
   background: #ffffff;
-  color: #104b42 !important;
-  border: 1px solid #d4e5dc;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  color: #0d5c46 !important;
+  border: 1.5px solid #cbd5e1;
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .button-white:hover {
-  background: #f4fbf7;
-  color: #0a3a31 !important;
-  border-color: #a7d3bb;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  background: #ffffff !important;
+  color: #07382b !important;
+  border-color: #10b981 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.18);
 }
 
 .button-danger-outline {
@@ -2632,20 +2658,22 @@ input[type="checkbox"] {
 
 .portal-card {
   background: #ffffff;
-  border: 1.5px solid #dce8e0;
+  border: 2px solid #e2e8f0;
   border-radius: 20px;
   padding: 34px;
   display: block;
   color: var(--ink);
-  transition: transform 0.22s, box-shadow 0.22s, border-color 0.22s;
-  box-shadow: var(--shadow-sm);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+  text-decoration: none;
 }
 
 .portal-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-6px);
   color: var(--ink);
-  box-shadow: 0 20px 45px rgba(22, 91, 69, 0.12);
-  border-color: #6bb991;
+  background: #ffffff;
+  border-color: #10b981;
+  box-shadow: 0 20px 40px -10px rgba(16, 185, 129, 0.22), 0 0 0 2px #10b981;
 }
 
 .portal-icon {
@@ -2658,6 +2686,7 @@ input[type="checkbox"] {
   color: #1e7552;
   margin-bottom: 26px;
   border: 1px solid #cee8d6;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .portal-icon .icon {
@@ -2671,10 +2700,18 @@ input[type="checkbox"] {
   border-color: #cbe0f5;
 }
 
+.portal-card:hover .portal-icon {
+  transform: scale(1.1);
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  color: #047857;
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.20);
+}
+
 .portal-tag {
-  font-size: 10.5px;
-  letter-spacing: 0.17em;
-  color: #1c6d50;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: #0d5c46;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -2686,26 +2723,26 @@ input[type="checkbox"] {
 }
 
 .portal-card p {
-  font-size: 13px;
-  line-height: 1.75;
+  font-size: 13.5px;
+  line-height: 1.7;
   min-height: 65px;
-  color: #48665c;
+  color: #475569;
 }
 
 .portal-link {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #104b42;
-  font-weight: 800;
-  font-size: 12.8px;
+  color: #0d5c46;
+  font-weight: 700;
+  font-size: 13.5px;
   margin-top: 25px;
-  transition: all 0.18s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .portal-card:hover .portal-link {
-  color: #176d57;
-  transform: translateX(4px);
+  color: #047857;
+  transform: translateX(6px);
 }
 
 .auth-bottom {
@@ -3014,37 +3051,54 @@ input[type="checkbox"] {
 
 .public-links {
   display: flex;
-  gap: 24px;
+  gap: 16px;
   align-items: center;
 }
 
 .public-links a {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #2e4d44;
-  transition: all 0.18s ease;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 4px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  text-decoration: none;
 }
 
 .public-links a:hover {
-  color: #104b42;
-  transform: translateY(-1px);
+  color: #064e3b;
+  background: #edf8f3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(13, 92, 70, 0.10);
+}
+
+.public-links a:active {
+  transform: translateY(0);
 }
 
 .hotline-nav-link {
-  color: #104b42 !important;
-  background: #edf7f2;
-  padding: 6px 14px !important;
-  border-radius: 100px;
-  font-weight: 800 !important;
-  border: 1px solid #cae8d7;
+  color: #065f46 !important;
+  background: #edf8f3 !important;
+  padding: 8px 16px !important;
+  border-radius: 100px !important;
+  font-weight: 700 !important;
+  border: 1.5px solid #a7f3d0 !important;
+  box-shadow: 0 2px 6px rgba(13, 92, 70, 0.06);
 }
 
 .hotline-nav-link:hover {
-  background: #d9f0e2 !important;
+  background: #10b981 !important;
+  color: #ffffff !important;
+  border-color: #10b981 !important;
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.30) !important;
+}
+
+.hotline-nav-link:active {
+  transform: translateY(0) scale(1) !important;
 }
 
 .public-header-actions {
@@ -8031,4 +8085,216 @@ button.profile-trigger:hover,
   background: #f1f5f9;
   padding: 8px;
   border-radius: 6px;
+}
+
+/* ==========================================================================
+   COMPREHENSIVE HIGH-VISIBILITY TYPOGRAPHY & INTERACTIVE TACTILE HOVER SYSTEM
+   ========================================================================== */
+
+/* 1. Global High-Contrast Typography */
+body, input, button, select, textarea {
+  font-family: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  color: #0f172a;
+  background-color: #f8fafc;
+}
+
+/* Ensure all headings are crisp, dark and legible */
+h1, h2, h3, h4, h5, h6 {
+  color: #07382b;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+p, li, span, label {
+  color: #334155;
+}
+
+b, strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.text-muted, .small-muted, small {
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* 2. Public Navigation Links Hover (Home, Find Doctors, Departments) */
+.public-links {
+  gap: 12px !important;
+}
+
+.public-links a:not(.hotline-nav-link) {
+  font-size: 14.5px !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  background: transparent;
+  display: inline-flex !important;
+  align-items: center !important;
+  text-decoration: none !important;
+}
+
+.public-links a:not(.hotline-nav-link):hover {
+  color: #064e3b !important;
+  background: #ecfdf5 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15) !important;
+}
+
+.public-links a:not(.hotline-nav-link):active {
+  transform: translateY(0) !important;
+  box-shadow: none !important;
+}
+
+/* Public Header Brand Hover */
+.brand {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none !important;
+}
+
+.brand:hover {
+  transform: scale(1.02);
+}
+
+.brand:hover strong {
+  color: #064e3b;
+}
+
+/* 3. Header Action Buttons Hover Effects */
+.public-header-actions .button-outline {
+  border-width: 2px !important;
+  border-color: #0d5c46 !important;
+  color: #0d5c46 !important;
+  font-weight: 700 !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.public-header-actions .button-outline:hover {
+  background: #0d5c46 !important;
+  color: #ffffff !important;
+  border-color: #0d5c46 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 20px rgba(13, 92, 70, 0.28) !important;
+}
+
+.public-header-actions .button-outline:active {
+  transform: translateY(0) !important;
+}
+
+.public-header-actions .button-primary {
+  background: #0d5c46 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 4px 14px rgba(13, 92, 70, 0.25) !important;
+}
+
+.public-header-actions .button-primary:hover {
+  background: #07382b !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(7, 56, 43, 0.38) !important;
+}
+
+.public-header-actions .button-primary:active {
+  transform: translateY(0) !important;
+}
+
+/* 4. Authenticated Sidebar Navigation Links Hover */
+.nav-list a {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 10px 14px !important;
+  color: #334155 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  text-decoration: none !important;
+}
+
+.nav-list a:hover {
+  background: #eef8f3 !important;
+  color: #064e3b !important;
+  transform: translateX(4px) !important;
+  box-shadow: 0 2px 8px rgba(13, 92, 70, 0.08) !important;
+}
+
+.nav-list a.active {
+  background: #0d5c46 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 12px rgba(13, 92, 70, 0.25) !important;
+}
+
+.nav-list a.active .icon {
+  color: #ffffff !important;
+}
+
+/* 5. Doctor Directory Cards & Buttons Hover */
+.doctor-card {
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease, border-color 0.24s ease !important;
+  border: 1.5px solid #e2e8f0 !important;
+}
+
+.doctor-card:hover {
+  transform: translateY(-4px) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 16px 36px rgba(13, 92, 70, 0.12) !important;
+}
+
+.doctor-card .button-outline:hover {
+  background: #0d5c46 !important;
+  color: #ffffff !important;
+  border-color: #0d5c46 !important;
+  transform: translateY(-1px) !important;
+}
+
+.doctor-card .appt-action-btn:hover {
+  background: #07382b !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 20px rgba(13, 92, 70, 0.32) !important;
+}
+
+/* 6. Form Controls Focus & Interactive Feedback */
+.field-control:focus, .filter-select:focus, input:focus, select:focus, textarea:focus {
+  outline: none !important;
+  border-color: #0d5c46 !important;
+  box-shadow: 0 0 0 3px rgba(13, 92, 70, 0.15) !important;
+  background-color: #ffffff !important;
+}
+
+/* 7. Department Showcase Tiles Hover (Home & Departments Page) */
+.department-tile {
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border: 1.5px solid #e2e8f0 !important;
+}
+
+.department-tile:hover {
+  transform: translateY(-4px) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 14px 30px rgba(13, 92, 70, 0.12) !important;
+}
+
+.department-tile:hover .department-tile-icon {
+  background: #d1fae5 !important;
+  color: #047857 !important;
+  transform: scale(1.08) !important;
+}
+
+/* 8. Top Announcement Bar Hover */
+.header-top-bar a:hover {
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+.header-top-bar .icon {
+  color: #34d399 !important;
 }

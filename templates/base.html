@@ -8,7 +8,7 @@
   <title>{% block title %}Green Hospital{% endblock %} | Green Hospital Dhaka</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
   <link href="{% static 'css/app.css' %}" rel="stylesheet">
   <link href="{% static 'css/calendar.css' %}" rel="stylesheet">
 </head>
@@ -32,7 +32,8 @@
 <symbol id="ic-x" viewBox="0 0 24 24"><path d="M5 5 19 19M19 5 5 19"/></symbol>
 <symbol id="ic-log-out" viewBox="0 0 24 24"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5m4-4 4-4-4-4m-4 4h12"/></symbol>
 <symbol id="ic-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 1 1 5 2l-2 2v1m0 3h.01"/></symbol>
-<symbol id="ic-building" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 7v8m-4-4h8M9 21v-4h6v4"/></symbol>
+<symbol id="ic-building" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2.5"/><path d="M9 6h2m2 0h2M9 10h2m2 0h2M9 14h2m2 0h2M10 22v-4h4v4"/></symbol>
+<symbol id="ic-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 5.25-8 12-8 12s-8-6.75-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
 <symbol id="ic-activity" viewBox="0 0 24 24"><path d="M2 12h4l3-7 5 14 3-7h5"/></symbol>
 <symbol id="ic-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8L3 5Z"/></symbol>
 <symbol id="ic-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 18v3h16v-3"/></symbol>
@@ -236,7 +237,7 @@
       <span>OPD Consultation: 8:00 AM – 10:00 PM Daily</span>
     </div>
     <div class="top-info-item hidden-mobile">
-      <svg class="icon"><use href="#ic-building"/></svg>
+      <svg class="icon"><use href="#ic-map-pin"/></svg>
       <span>Mirpur-10, Dhaka</span>
     </div>
   </div>
@@ -337,7 +338,7 @@
       <div class="footer-col">
         <h4 class="footer-heading">Contact & Location</h4>
         <div class="footer-contact-item">
-          <svg class="icon"><use href="#ic-building"/></svg>
+          <svg class="icon"><use href="#ic-map-pin"/></svg>
           <div>
             <b>Main Hospital & Chambers</b>
             <p>Plot 1, Section 10, Mirpur, Dhaka - 1216</p>
