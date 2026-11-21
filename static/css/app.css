@@ -6177,139 +6177,98 @@ input[type="checkbox"] {
   color: #0c3328;
 }
 
-.search-tip-hint {
-  display: block;
-  font-size: 11px;
-  color: #66887c;
-  margin-top: 5px;
-  font-style: italic;
-}
-
-.active-dept-count-badge {
-  font-size: 10.5px;
-  font-weight: 700;
-  background: #e4f4ec;
-  color: #12553b;
-  border: 1px solid #c2ebcf;
-  padding: 1px 7px;
-  border-radius: 999px;
-}
-
-.dept-quick-pills-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: #55786b;
-  margin-top: 10px;
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.dept-pills-scroll-container {
+.dept-checkbox-list,
+.gender-checkbox-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  max-height: 160px;
+  flex-direction: column;
+  gap: 3px;
+  background: #ffffff;
+  border: 1.5px solid #dceede;
+  border-radius: 10px;
+  padding: 6px;
+}
+
+.dept-checkbox-list {
+  max-height: 190px;
   overflow-y: auto;
-  padding-right: 2px;
 }
 
-.dept-pills-scroll-container::-webkit-scrollbar {
-  width: 4px;
+.dept-checkbox-list::-webkit-scrollbar {
+  width: 5px;
 }
 
-.dept-pills-scroll-container::-webkit-scrollbar-thumb {
-  background: #c3ded0;
+.dept-checkbox-list::-webkit-scrollbar-thumb {
+  background: #c2e0d1;
   border-radius: 4px;
 }
 
-.dept-pill-chip {
-  border: 1px solid #d4eae0;
-  background: #ffffff;
-  color: #2b5547;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.dept-pill-chip:hover {
-  background: #f0f8f4;
-  border-color: #2b9d6a;
-  color: #0d382b;
-}
-
-.dept-pill-chip.active {
-  background: #156448;
-  border-color: #156448;
-  color: #ffffff;
-  font-weight: 700;
-}
-
-.dept-pill-chip .pill-count {
-  font-size: 9.5px;
-  opacity: 0.85;
-  background: rgba(0, 0, 0, 0.06);
-  padding: 0 4px;
-  border-radius: 999px;
-}
-
-.dept-pill-chip.active .pill-count {
-  background: rgba(255, 255, 255, 0.22);
-  color: #ffffff;
-}
-
-.gender-selective-buttons {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
-  gap: 5px;
-  background: #f1f7f4;
-  padding: 4px;
-  border-radius: 10px;
-  border: 1px solid #d5ece0;
-}
-
-.gender-pill-btn {
-  border: none;
-  background: transparent;
-  padding: 8px 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #43695b;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: all 0.16s ease;
+.filter-check-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  font-size: 13px;
+  color: #27483e;
 }
 
-.gender-pill-btn:hover {
-  background: #e2f2ea;
+.filter-check-row:hover {
+  background: #f2f9f5;
   color: #0c3629;
 }
 
-.gender-pill-btn.active {
-  background: #156448;
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(21, 100, 72, 0.25);
+.filter-check-row input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
 }
 
-.gender-pill-btn .check-icon {
-  font-size: 11px;
+.custom-check-box {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #a8d5be;
+  border-radius: 5px;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
+  box-shadow: 0 1px 3px rgba(10, 48, 38, 0.05);
+}
+
+.filter-check-row:hover .custom-check-box {
+  border-color: #2b9d6a;
+}
+
+.check-tick-icon {
+  width: 12px;
+  height: 12px;
   display: none;
 }
 
-.gender-pill-btn.active .check-icon {
-  display: inline;
+.filter-check-row input[type="checkbox"]:checked + .custom-check-box {
+  background: #156448;
+  border-color: #156448;
+  box-shadow: 0 2px 6px rgba(21, 100, 72, 0.28);
+}
+
+.filter-check-row input[type="checkbox"]:checked + .custom-check-box .check-tick-icon {
+  display: block;
+}
+
+.filter-check-row input[type="checkbox"]:checked ~ .check-label-text {
+  font-weight: 700;
+  color: #0c3629;
+}
+
+.check-label-text {
+  flex: 1;
+  line-height: 1.35;
 }
 
 /* Directory Main */

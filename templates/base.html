@@ -6,11 +6,13 @@
   <meta name="theme-color" content="#0d4c3f">
   <meta name="description" content="Green Hospital - Leading multi-specialty healthcare, doctor consultation and diagnostic center in Dhaka, Bangladesh.">
   <title>{% block title %}Green Hospital{% endblock %} | Green Hospital Dhaka</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}?v=20261121">
+  <link rel="alternate icon" href="{% static 'favicon.svg' %}?v=20261121">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
-  <link href="{% static 'css/app.css' %}" rel="stylesheet">
-  <link href="{% static 'css/calendar.css' %}" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}?v=20261121_18" rel="stylesheet">
+  <link href="{% static 'css/calendar.css' %}?v=20261121_18" rel="stylesheet">
 </head>
 <body class="{% if user.is_authenticated %}app-layout{% else %}public-layout{% endif %}">
 <svg xmlns="http://www.w3.org/2000/svg" class="svg-sprite" aria-hidden="true">
@@ -32,7 +34,7 @@
 <symbol id="ic-x" viewBox="0 0 24 24"><path d="M5 5 19 19M19 5 5 19"/></symbol>
 <symbol id="ic-log-out" viewBox="0 0 24 24"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5m4-4 4-4-4-4m-4 4h12"/></symbol>
 <symbol id="ic-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 1 1 5 2l-2 2v1m0 3h.01"/></symbol>
-<symbol id="ic-building" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2.5"/><path d="M9 6h2m2 0h2M9 10h2m2 0h2M9 14h2m2 0h2M10 22v-4h4v4"/></symbol>
+<symbol id="ic-building" viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 6h2m6 0h2M7 10h2m6 0h2M7 14h2m6 0h2M10 22v-4a2 2 0 0 1 4 0v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 <symbol id="ic-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 5.25-8 12-8 12s-8-6.75-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
 <symbol id="ic-activity" viewBox="0 0 24 24"><path d="M2 12h4l3-7 5 14 3-7h5"/></symbol>
 <symbol id="ic-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8L3 5Z"/></symbol>
@@ -40,10 +42,12 @@
 <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
 <symbol id="ic-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
 <symbol id="ic-hospital-logo" viewBox="0 0 40 40">
-  <rect width="40" height="40" rx="10" fill="#156448"/>
-  <path d="M20 7C14 7 9 12 9 18C9 26 20 33 20 33C20 33 31 26 31 18C31 12 26 7 20 7Z" fill="#0f4632" opacity="0.3"/>
-  <path d="M17 12H23V17H28V23H23V28H17V23H12V17H17V12Z" fill="#ffffff"/>
-  <path d="M23 12C26 12 28 14 28 17C28 17 26 18 23 17C20 16 20 14 23 12Z" fill="#6ee7b7"/>
+  <rect width="40" height="40" rx="10" fill="#0d5c46"/>
+  <rect x="1.5" y="1.5" width="37" height="37" rx="8.5" fill="none" stroke="#34d399" stroke-width="1.2" stroke-opacity="0.3"/>
+  <rect x="11" y="16.5" width="18" height="7" rx="3.5" fill="#ffffff"/>
+  <rect x="16.5" y="11" width="7" height="18" rx="3.5" fill="#ffffff"/>
+  <path d="M12.5 20h3.5l1.8-3.8 3.2 7 2.2-3.2h3.8" fill="none" stroke="#0d5c46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="28.5" cy="11.5" r="2.8" fill="#34d399"/>
 </symbol>
 <symbol id="ic-doc-male" viewBox="0 0 64 64">
   <circle cx="32" cy="32" r="32" fill="#e8f5ee"/>

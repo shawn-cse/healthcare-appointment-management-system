@@ -182,7 +182,7 @@ def doctor_directory(request):
     genders = [g.lower() for g in gender_raw if g.lower() in ('male', 'female')]
 
     q = request.GET.get('q', '').strip()
-    sort = request.GET.get('sort', 'name')
+    sort = request.GET.get('sort', 'default')
     doctors = DoctorProfile.objects.filter(is_available=True, user__is_active=True).select_related('user', 'department', 'chamber').prefetch_related('weekly')
     if dept_ids:
         doctors = doctors.filter(department_id__in=dept_ids)
@@ -204,12 +204,8 @@ def doctor_directory(request):
         doctors = doctors.order_by('-initial_fee')
     elif sort == 'experience':
         doctors = doctors.order_by('-experience_years')
-    elif sort == 'name_desc':
-        doctors = doctors.order_by('-user__first_name', '-user__last_name')
-    elif sort == 'department':
-        doctors = doctors.order_by('department__name', 'user__first_name')
     else:
-        doctors = doctors.order_by('user__first_name', 'user__last_name')
+        doctors = doctors.order_by('id')
 
     dept_list = Department.objects.filter(is_active=True).annotate(
         doc_count=Count('doctors', filter=Q(doctors__user__is_active=True, doctors__is_available=True))

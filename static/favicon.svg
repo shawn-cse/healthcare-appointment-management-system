@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+  <defs>
+    <linearGradient id="gh-badge-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d5c46"/>
+      <stop offset="100%" stop-color="#15805d"/>
+    </linearGradient>
+  </defs>
+  <rect width="40" height="40" rx="10" fill="url(#gh-badge-grad)"/>
+  <rect x="1.5" y="1.5" width="37" height="37" rx="8.5" fill="none" stroke="#34d399" stroke-width="1.2" stroke-opacity="0.3"/>
+  <!-- Modern Medical Hospital Cross with Capsule Ends -->
+  <rect x="11" y="16.5" width="18" height="7" rx="3.5" fill="#ffffff"/>
+  <rect x="16.5" y="11" width="7" height="18" rx="3.5" fill="#ffffff"/>
+  <!-- Vital ECG Pulse Wave Across Center -->
+  <path d="M12.5 20h3.5l1.8-3.8 3.2 7 2.2-3.2h3.8" fill="none" stroke="#0d5c46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Gentle Green Leaf Accent -->
+  <circle cx="28.5" cy="11.5" r="2.8" fill="#34d399"/>
+</svg>

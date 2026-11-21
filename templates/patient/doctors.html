@@ -40,62 +40,50 @@
                      value="{{ query }}" autocomplete="off" spellcheck="false">
               <button type="button" id="search-clear-btn" class="clear-search-btn" style="display:none;" title="Clear search">✕</button>
             </div>
-            <small class="search-tip-hint">Live search on every keystroke</small>
           </div>
 
-          <!-- 2. Department Filter: Dropdown + Multi-Select Quick Chips -->
+          <!-- 2. Specialty Department: Clean Checkbox List (No Numbers) -->
           <div class="filter-group">
             <div class="filter-label-row">
-              <label for="filter-department-select" class="filter-group-title">Specialty Department</label>
-              <span class="active-dept-count-badge" id="active-dept-count" style="display:none;">0 selected</span>
+              <label class="filter-group-title">Specialty Department</label>
+              <button type="button" class="quick-clear-link" id="clear-dept-filter" style="display:none;">Clear</button>
             </div>
-            <select name="department" id="filter-department-select" class="field-control filter-select">
-              <option value="">All Departments ({{ total_doctors_count }} Doctors)</option>
+            <div class="dept-checkbox-list" id="dept-checkbox-container">
               {% for dep in departments %}
-              <option value="{{ dep.pk }}" {% if selected_department == dep.pk|stringformat:'s' %}selected{% endif %}>
-                {{ dep.name }} ({{ dep.doc_count }})
-              </option>
-              {% endfor %}
-            </select>
-
-            <div class="dept-quick-pills-label">Or select multiple departments:</div>
-            <div class="dept-pills-scroll-container" id="dept-pills-wrap">
-              <button type="button" class="dept-pill-chip active" data-dept-id="">All</button>
-              {% for dep in departments %}
-              <button type="button" class="dept-pill-chip" data-dept-id="{{ dep.pk }}">
-                {{ dep.name }} <span class="pill-count">{{ dep.doc_count }}</span>
-              </button>
+              <label class="filter-check-row">
+                <input type="checkbox" name="department" value="{{ dep.pk }}" class="dept-check-input"
+                       {% if dep.pk|stringformat:'s' in selected_departments %}checked{% endif %}>
+                <span class="custom-check-box"><svg class="check-tick-icon" viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="check-label-text">{{ dep.name }}</span>
+              </label>
               {% endfor %}
             </div>
           </div>
 
-          <!-- 3. Doctor Gender: Selective Multi/Single Buttons -->
+          <!-- 3. Doctor Gender: Male or Female Checkboxes -->
           <div class="filter-group">
             <label class="filter-group-title">Doctor Gender</label>
-            <div class="gender-selective-buttons" id="gender-filter-group">
-              <button type="button" class="gender-pill-btn {% if not selected_gender or selected_gender == 'all' %}active{% endif %}" data-gender="all">
-                <span class="check-icon">✓</span> Both / All
-              </button>
-              <button type="button" class="gender-pill-btn {% if selected_gender == 'male' %}active{% endif %}" data-gender="male">
-                <span class="check-icon">✓</span> Male
-              </button>
-              <button type="button" class="gender-pill-btn {% if selected_gender == 'female' %}active{% endif %}" data-gender="female">
-                <span class="check-icon">✓</span> Female
-              </button>
+            <div class="gender-checkbox-list">
+              <label class="filter-check-row">
+                <input type="checkbox" name="gender" value="male" id="gender-check-male" class="gender-check-input"
+                       {% if selected_gender == 'male' %}checked{% endif %}>
+                <span class="custom-check-box"><svg class="check-tick-icon" viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="check-label-text">Male Specialists</span>
+              </label>
+              <label class="filter-check-row">
+                <input type="checkbox" name="gender" value="female" id="gender-check-female" class="gender-check-input"
+                       {% if selected_gender == 'female' %}checked{% endif %}>
+                <span class="custom-check-box"><svg class="check-tick-icon" viewBox="0 0 16 16"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="check-label-text">Female Specialists</span>
+              </label>
             </div>
-            <select name="gender" id="filter-gender-select" class="field-control filter-select" style="display:none;">
-              <option value="">All Doctors</option>
-              <option value="male" {% if selected_gender == 'male' %}selected{% endif %}>Male</option>
-              <option value="female" {% if selected_gender == 'female' %}selected{% endif %}>Female</option>
-            </select>
           </div>
 
-          <!-- 4. Consultation Fee & Name Sort Dropdown -->
+          <!-- 4. Sort By: Consultation Fee & Experience -->
           <div class="filter-group">
             <label for="filter-sort-select" class="filter-group-title">Sort By</label>
             <select name="sort" id="filter-sort-select" class="field-control filter-select">
-              <option value="name" {% if selected_sort == 'name' or not selected_sort %}selected{% endif %}>Doctor Name (A – Z)</option>
-              <option value="name_desc" {% if selected_sort == 'name_desc' %}selected{% endif %}>Doctor Name (Z – A)</option>
+              <option value="default" {% if not selected_sort or selected_sort == 'default' or selected_sort == 'name' %}selected{% endif %}>Default</option>
               <option value="fee_asc" {% if selected_sort == 'fee_asc' %}selected{% endif %}>Consultation Fee: Low to High</option>
               <option value="fee_desc" {% if selected_sort == 'fee_desc' %}selected{% endif %}>Consultation Fee: High to Low</option>
               <option value="experience" {% if selected_sort == 'experience' %}selected{% endif %}>Experience (Seniority)</option>
@@ -253,10 +241,10 @@ document.addEventListener('DOMContentLoaded', function() {
   const searchInput = document.getElementById('left-doctor-search-input');
   const clearBtn = document.getElementById('search-clear-btn');
   const clearTextLink = document.getElementById('clear-search-text');
-  const deptSelect = document.getElementById('filter-department-select');
-  const deptChips = Array.from(document.querySelectorAll('.dept-pill-chip'));
-  const activeDeptBadge = document.getElementById('active-dept-count');
-  const genderBtns = Array.from(document.querySelectorAll('.gender-pill-btn'));
+  const deptCheckboxes = Array.from(document.querySelectorAll('.dept-check-input'));
+  const clearDeptBtn = document.getElementById('clear-dept-filter');
+  const genderMaleCheck = document.getElementById('gender-check-male');
+  const genderFemaleCheck = document.getElementById('gender-check-female');
   const sortSelect = document.getElementById('filter-sort-select');
   const cardsContainer = document.getElementById('doctor-cards-grid');
   const resetBtn = document.getElementById('reset-all-filters-btn');
@@ -270,60 +258,34 @@ document.addEventListener('DOMContentLoaded', function() {
   if (!cardsContainer) return;
 
   const cards = Array.from(cardsContainer.querySelectorAll('.doctor-card'));
-
-  let activeGender = 'all';
-  const initialActiveGenderBtn = genderBtns.find(b => b.classList.contains('active'));
-  if (initialActiveGenderBtn) {
-    activeGender = initialActiveGenderBtn.dataset.gender || 'all';
-  }
-
-  let selectedDepts = new Set();
-  if (deptSelect && deptSelect.value) {
-    selectedDepts.add(deptSelect.value);
-    const matchingChip = deptChips.find(c => c.dataset.deptId === deptSelect.value);
-    if (matchingChip) {
-      deptChips.forEach(c => c.classList.remove('active'));
-      matchingChip.classList.add('active');
-    }
-  }
-
-  function updateDeptUI() {
-    if (selectedDepts.size === 0) {
-      deptChips.forEach(c => c.classList.toggle('active', c.dataset.deptId === ''));
-      if (deptSelect) deptSelect.value = '';
-      if (activeDeptBadge) activeDeptBadge.style.display = 'none';
-    } else {
-      const allChip = deptChips.find(c => c.dataset.deptId === '');
-      if (allChip) allChip.classList.remove('active');
-
-      deptChips.forEach(c => {
-        if (c.dataset.deptId) {
-          c.classList.toggle('active', selectedDepts.has(c.dataset.deptId));
-        }
-      });
-
-      if (selectedDepts.size === 1 && deptSelect) {
-        deptSelect.value = Array.from(selectedDepts)[0];
-      } else if (deptSelect) {
-        deptSelect.value = '';
-      }
-
-      if (activeDeptBadge) {
-        activeDeptBadge.textContent = `${selectedDepts.size} selected`;
-        activeDeptBadge.style.display = 'inline-block';
-      }
-    }
-  }
+  // Record initial order for 'default' sort
+  cards.forEach((c, idx) => { c.dataset.origOrder = idx; });
 
   function filterAndSortDoctors() {
     const rawQuery = (searchInput ? searchInput.value : '').trim();
     const query = rawQuery.toLowerCase();
     const terms = query.split(/\s+/).filter(Boolean);
-    const sortVal = sortSelect ? sortSelect.value : 'name';
+    const sortVal = sortSelect ? sortSelect.value : 'default';
 
     const hasQuery = Boolean(rawQuery);
     if (clearBtn) clearBtn.style.display = hasQuery ? 'grid' : 'none';
     if (clearTextLink) clearTextLink.style.display = hasQuery ? 'inline' : 'none';
+
+    // 1. Department Filter
+    const selectedDepts = deptCheckboxes.filter(cb => cb.checked).map(cb => cb.value);
+    if (clearDeptBtn) {
+      clearDeptBtn.style.display = selectedDepts.length > 0 ? 'inline-block' : 'none';
+    }
+
+    // 2. Gender Filter
+    const maleChecked = genderMaleCheck ? genderMaleCheck.checked : false;
+    const femaleChecked = genderFemaleCheck ? genderFemaleCheck.checked : false;
+    let targetGender = 'all';
+    if (maleChecked && !femaleChecked) {
+      targetGender = 'male';
+    } else if (femaleChecked && !maleChecked) {
+      targetGender = 'female';
+    }
 
     let visibleCards = [];
 
@@ -336,26 +298,26 @@ document.addEventListener('DOMContentLoaded', function() {
       const designation = card.dataset.designation || '';
       const bmdc = card.dataset.bmdc || '';
       const rec = card.dataset.rec || '';
-      const gender = card.dataset.gender || '';
+      const gender = (card.dataset.gender || '').toLowerCase();
 
       const haystack = (name + ' ' + dept + ' ' + qual + ' ' + room + ' ' + designation + ' ' + bmdc + ' ' + rec).toLowerCase();
 
-      // 1. Text Query Matching (every term must match)
+      // Search query match (every term must match)
       let matchesQuery = true;
       if (terms.length > 0) {
         matchesQuery = terms.every(term => haystack.includes(term));
       }
 
-      // 2. Department Matching (multiple selection supported)
+      // Department match
       let matchesDept = true;
-      if (selectedDepts.size > 0) {
-        matchesDept = selectedDepts.has(deptId);
+      if (selectedDepts.length > 0) {
+        matchesDept = selectedDepts.includes(deptId);
       }
 
-      // 3. Gender Matching (all / male / female)
+      // Gender match
       let matchesGender = true;
-      if (activeGender && activeGender !== 'all') {
-        matchesGender = (gender === activeGender);
+      if (targetGender !== 'all') {
+        matchesGender = (gender === targetGender);
       }
 
       if (matchesQuery && matchesDept && matchesGender) {
@@ -366,7 +328,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
 
-    // Sort visible cards
+    // 3. Sorting
     visibleCards.sort((a, b) => {
       if (sortVal === 'fee_asc') {
         return (parseFloat(a.dataset.fee) || 0) - (parseFloat(b.dataset.fee) || 0);
@@ -374,10 +336,9 @@ document.addEventListener('DOMContentLoaded', function() {
         return (parseFloat(b.dataset.fee) || 0) - (parseFloat(a.dataset.fee) || 0);
       } else if (sortVal === 'experience') {
         return (parseInt(b.dataset.exp, 10) || 0) - (parseInt(a.dataset.exp, 10) || 0);
-      } else if (sortVal === 'name_desc') {
-        return (b.dataset.name || '').localeCompare(a.dataset.name || '');
       } else {
-        return (a.dataset.name || '').localeCompare(b.dataset.name || '');
+        // default: original DOM order
+        return (parseInt(a.dataset.origOrder, 10) || 0) - (parseInt(b.dataset.origOrder, 10) || 0);
       }
     });
 
@@ -405,16 +366,14 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
 
-    // Update URL query string smoothly with replaceState
+    // Update URL query string smoothly
     const params = new URLSearchParams();
     if (rawQuery) params.set('q', rawQuery);
-    if (selectedDepts.size === 1) {
-      params.set('department', Array.from(selectedDepts)[0]);
-    } else if (selectedDepts.size > 1) {
+    if (selectedDepts.length > 0) {
       selectedDepts.forEach(id => params.append('department', id));
     }
-    if (activeGender && activeGender !== 'all') params.set('gender', activeGender);
-    if (sortVal && sortVal !== 'name') params.set('sort', sortVal);
+    if (targetGender !== 'all') params.set('gender', targetGender);
+    if (sortVal && sortVal !== 'default') params.set('sort', sortVal);
 
     const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
     window.history.replaceState(null, '', newUrl);
@@ -441,45 +400,21 @@ document.addEventListener('DOMContentLoaded', function() {
   if (clearBtn) clearBtn.addEventListener('click', clearSearchInput);
   if (clearTextLink) clearTextLink.addEventListener('click', clearSearchInput);
 
-  // --- Department Dropdown Listener ---
-  if (deptSelect) {
-    deptSelect.addEventListener('change', function() {
-      selectedDepts.clear();
-      if (this.value) {
-        selectedDepts.add(this.value);
-      }
-      updateDeptUI();
+  // --- Department Checkbox Listeners ---
+  deptCheckboxes.forEach(cb => {
+    cb.addEventListener('change', filterAndSortDoctors);
+  });
+
+  if (clearDeptBtn) {
+    clearDeptBtn.addEventListener('click', function() {
+      deptCheckboxes.forEach(cb => { cb.checked = false; });
       filterAndSortDoctors();
     });
   }
 
-  // --- Department Chips Listeners (Multi-Select Support) ---
-  deptChips.forEach(chip => {
-    chip.addEventListener('click', function() {
-      const deptId = this.dataset.deptId;
-      if (!deptId) {
-        selectedDepts.clear();
-      } else {
-        if (selectedDepts.has(deptId)) {
-          selectedDepts.delete(deptId);
-        } else {
-          selectedDepts.add(deptId);
-        }
-      }
-      updateDeptUI();
-      filterAndSortDoctors();
-    });
-  });
-
-  // --- Gender Selective Buttons Listeners ---
-  genderBtns.forEach(btn => {
-    btn.addEventListener('click', function() {
-      genderBtns.forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      activeGender = this.dataset.gender || 'all';
-      filterAndSortDoctors();
-    });
-  });
+  // --- Gender Checkbox Listeners ---
+  if (genderMaleCheck) genderMaleCheck.addEventListener('change', filterAndSortDoctors);
+  if (genderFemaleCheck) genderFemaleCheck.addEventListener('change', filterAndSortDoctors);
 
   // --- Sort Dropdown Listener ---
   if (sortSelect) {
@@ -489,11 +424,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // --- Reset All Filters ---
   function resetAll() {
     if (searchInput) searchInput.value = '';
-    selectedDepts.clear();
-    updateDeptUI();
-    activeGender = 'all';
-    genderBtns.forEach(b => b.classList.toggle('active', b.dataset.gender === 'all'));
-    if (sortSelect) sortSelect.value = 'name';
+    deptCheckboxes.forEach(cb => { cb.checked = false; });
+    if (genderMaleCheck) genderMaleCheck.checked = false;
+    if (genderFemaleCheck) genderFemaleCheck.checked = false;
+    if (sortSelect) sortSelect.value = 'default';
     filterAndSortDoctors();
   }
 
@@ -501,7 +435,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (resetLink) resetLink.addEventListener('click', (e) => { e.preventDefault(); resetAll(); });
   if (emptyClearBtn) emptyClearBtn.addEventListener('click', resetAll);
 
-  // Initial run on page load
+  // Initial execution
   filterAndSortDoctors();
 });
 </script>

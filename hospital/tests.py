@@ -277,11 +277,16 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Consult Our Specialist Doctors')
 
-        # 2. Search and sort work
-        response = self.client.get(reverse('doctor_directory') + '?q=doctor&sort=fee_asc')
+        # 2. Search, department multi-select, gender and sort work
+        response = self.client.get(reverse('doctor_directory') + '?q=doctor&sort=fee_asc&gender=male')
         self.assertEqual(response.status_code, 200)
 
-        # 3. Public Departments directory is accessible
+        # 3. Favicon is accessible and redirects to SVG
+        fav_response = self.client.get('/favicon.ico')
+        self.assertEqual(fav_response.status_code, 301)
+        self.assertEqual(fav_response.url, '/static/favicon.svg')
+
+        # 4. Public Departments directory is accessible
         response = self.client.get(reverse('public_departments'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Specialized Medical Departments')
