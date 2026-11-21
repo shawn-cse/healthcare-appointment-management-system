@@ -232,21 +232,8 @@ class DoctorProfile(models.Model):
 
     @property
     def profile_slug(self):
-        first = slugify(self.user.first_name).strip() if self.user and self.user.first_name else ''
-        last = slugify(self.user.last_name).strip() if self.user and self.user.last_name else ''
-        if first:
-            # If first name is unique among active doctors, use first name
-            other_same_first = DoctorProfile.objects.filter(
-                user__first_name__iexact=self.user.first_name,
-                user__is_active=True
-            ).exclude(pk=self.pk).exists()
-            if not other_same_first:
-                return first
-            # If first name matches another doctor, use first-last
-            if last:
-                return f"{first}-{last}"
         if self.user and self.user.username:
-            return slugify(self.user.username).replace('_', '-')
+            return self.user.username
         return str(self.pk)
 
     def get_absolute_url(self):

@@ -46,31 +46,37 @@
       </div>
     </div>
 
-    <!-- Quick Chamber, Receptionist & Consultation Fees Strip -->
-    <div class="doctor-info-strip">
-      <div class="info-strip-card">
-        <span class="info-strip-label"><svg class="icon icon-xs"><use href="#ic-building"/></svg> Chamber Room</span>
-        <b class="info-strip-val">{{ doctor.active_room }}{% if doctor.chamber and doctor.chamber.building %}, {{ doctor.chamber.building }}{% endif %}</b>
+    <!-- Clean Chamber & Consultation Meta Bar (3 Balanced Columns) -->
+    <div class="doctor-meta-bar">
+      <div class="meta-bar-item">
+        <span class="meta-bar-label"><svg class="icon icon-xs"><use href="#ic-building"/></svg> Chamber Room</span>
+        <b class="meta-bar-value">{{ doctor.active_room }}{% if doctor.chamber and doctor.chamber.building %}, {{ doctor.chamber.building }}{% endif %}</b>
       </div>
-
-      <div class="info-strip-card">
-        <span class="info-strip-label"><svg class="icon icon-xs"><use href="#ic-user"/></svg> Receptionist</span>
-        <b class="info-strip-val">{{ doctor.assigned_receptionist_name }}</b>
+      <div class="meta-bar-item">
+        <span class="meta-bar-label"><svg class="icon icon-xs"><use href="#ic-user"/></svg> Receptionist</span>
+        <b class="meta-bar-value">{{ doctor.assigned_receptionist_name }}</b>
       </div>
-
-      <div class="info-strip-card">
-        <span class="info-strip-label"><svg class="icon icon-xs"><use href="#ic-phone"/></svg> Helpline</span>
-        <b class="info-strip-val">
-          <a href="tel:+88096100016211" class="helpline-link">{{ doctor.active_contact|default:'+88096100016211' }}</a>
-        </b>
+      <div class="meta-bar-item">
+        <span class="meta-bar-label"><svg class="icon icon-xs"><use href="#ic-phone"/></svg> Helpline</span>
+        <b class="meta-bar-value"><a href="tel:+88096100016211" class="helpline-link">{{ doctor.active_contact|default:'+88096100016211' }}</a></b>
       </div>
+    </div>
 
-      <div class="info-strip-card fee-strip-card">
-        <span class="info-strip-label"><svg class="icon icon-xs"><use href="#ic-wallet"/></svg> Consultation Fees</span>
-        <div class="fee-pill-stack">
-          <span class="fee-pill-item">1st Visit: <strong>Tk. {{ doctor.initial_fee|floatformat:0 }}</strong></span>
-          <span class="fee-pill-item">Follow-up: <strong>Tk. {{ doctor.followup_fee|floatformat:0 }}</strong></span>
-          <span class="fee-pill-item">Report: <strong>Tk. {{ doctor.report_fee|floatformat:0 }}</strong></span>
+    <!-- Consultation Fees Strip (Horizontal & Balanced) -->
+    <div class="doctor-fees-strip">
+      <span class="fees-strip-title"><svg class="icon icon-xs"><use href="#ic-wallet"/></svg> Consultation Fees:</span>
+      <div class="fees-strip-pills">
+        <div class="fee-pill-card">
+          <span class="fee-pill-type">1st Visit:</span>
+          <b class="fee-pill-amount">Tk. {{ doctor.initial_fee|floatformat:0 }}</b>
+        </div>
+        <div class="fee-pill-card">
+          <span class="fee-pill-type">Follow-up (<small>within {{ doctor.followup_within_days }}d</small>):</span>
+          <b class="fee-pill-amount">Tk. {{ doctor.followup_fee|floatformat:0 }}</b>
+        </div>
+        <div class="fee-pill-card">
+          <span class="fee-pill-type">Report Review:</span>
+          <b class="fee-pill-amount">Tk. {{ doctor.report_fee|floatformat:0 }}</b>
         </div>
       </div>
     </div>
@@ -96,10 +102,6 @@
           <div class="session-date-line">{{ sched.upcoming_date|date:"D, d M Y"|default:sched.get_weekday_display }}</div>
           <div class="session-time-line"><svg class="icon icon-xs"><use href="#ic-clock"/></svg> {{ sched.start_time|time:"h:i A" }} – {{ sched.end_time|time:"h:i A" }}</div>
           <div class="session-room-line"><svg class="icon icon-xs"><use href="#ic-building"/></svg> {{ doctor.active_room }}{% if doctor.chamber and doctor.chamber.building %}, {{ doctor.chamber.building }}{% endif %}</div>
-        </div>
-        <div class="session-allocation-block">
-          <span class="session-status-tag">Sequential Serials</span>
-          <small class="session-quota-note">Max {{ doctor.max_patients_per_session|default:30 }} patients/session</small>
         </div>
         <div class="session-action-block">
           {% if sched.slot %}

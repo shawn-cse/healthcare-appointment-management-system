@@ -47,18 +47,18 @@ html {
 
 body {
   margin: 0;
-  font-family: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: var(--ink);
   background-color: var(--bg);
-  font-size: 14.5px;
-  font-weight: 450;
-  line-height: 1.55;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3 {
-  font-family: 'Outfit', 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #07382b;
   letter-spacing: -0.02em;
   font-weight: 700;
@@ -66,7 +66,7 @@ h1, h2, h3 {
 }
 
 h4, h5, h6 {
-  font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #0f172a;
   letter-spacing: -0.01em;
   font-weight: 600;
@@ -246,7 +246,7 @@ img {
   padding: 11px 20px;
   border-radius: 12px;
   font-weight: 800;
-  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 13px;
   letter-spacing: -0.01em;
   border: 1.5px solid transparent;
@@ -1577,7 +1577,7 @@ input[type="checkbox"] {
   display: grid;
   place-items: center;
   background: var(--mint);
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-weight: 800;
   color: var(--forest);
 }
@@ -2398,7 +2398,7 @@ input[type="checkbox"] {
   text-align: center;
   z-index: 1;
   letter-spacing: 0.065em;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 26px;
   font-weight: 800;
   line-height: 1.35;
@@ -5073,7 +5073,7 @@ input[type="checkbox"] {
 .gcal-title-btn {
   background: transparent;
   border: 0;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 15px;
   font-weight: 800;
   color: #0b2b23;
@@ -5097,7 +5097,7 @@ input[type="checkbox"] {
 }
 
 .gcal-decade-title {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 15px;
   font-weight: 800;
   color: #0b2b23;
@@ -6847,56 +6847,50 @@ input[type="checkbox"] {
   flex: 1;
 }
 
-/* 2. Quick Chamber, Receptionist & Consultation Fees Strip */
-.doctor-info-strip {
+/* 2. Clean Chamber & Consultation Meta Bar (3 Balanced Columns) */
+.doctor-meta-bar {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-top: 20px;
-  padding-top: 18px;
+  margin-top: 18px;
+  padding-top: 16px;
   border-top: 1px solid #e8f3ed;
 }
 
-@media (max-width: 900px) {
-  .doctor-info-strip {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 540px) {
-  .doctor-info-strip {
+@media (max-width: 680px) {
+  .doctor-meta-bar {
     grid-template-columns: 1fr;
   }
 }
 
-.info-strip-card {
+.meta-bar-item {
   background: #f7fbf9;
   border: 1px solid #d8ede0;
   border-radius: 10px;
   padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
-.info-strip-label {
+.meta-bar-label {
   font-size: 11px;
   font-weight: 700;
   color: #4f7366;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   display: flex;
   align-items: center;
   gap: 5px;
 }
 
-.info-strip-label .icon {
+.meta-bar-label .icon {
   width: 13px;
   height: 13px;
   color: #156448;
 }
 
-.info-strip-val {
+.meta-bar-value {
   font-size: 13.5px;
   font-weight: 700;
   color: #0b3026;
@@ -6909,30 +6903,55 @@ input[type="checkbox"] {
   text-underline-offset: 2px;
 }
 
-.fee-strip-card {
+/* 3. Consultation Fees Strip (Horizontal & Balanced) */
+.doctor-fees-strip {
+  margin-top: 12px;
   background: #f3faf5;
-  border-color: #c9e9d6;
-}
-
-.fee-pill-stack {
+  border: 1px solid #c9e9d6;
+  border-radius: 10px;
+  padding: 10px 14px;
   display: flex;
+  align-items: center;
+  gap: 14px;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 2px;
 }
 
-.fee-pill-item {
+.fees-strip-title {
   font-size: 11.5px;
-  color: #1e3d33;
+  font-weight: 800;
+  color: #156448;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.fees-strip-pills {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.fee-pill-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: #ffffff;
   border: 1px solid #c2e2cf;
-  padding: 2px 7px;
-  border-radius: 5px;
-  display: inline-block;
-  white-space: nowrap;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
-.fee-pill-item strong {
+.fee-pill-type {
+  color: #335347;
+  font-weight: 600;
+}
+
+.fee-pill-amount {
   color: #0d5c46;
   font-weight: 800;
 }
@@ -7866,7 +7885,7 @@ button.profile-trigger:hover,
 }
 
 .sheet-main-title {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 26px;
   font-weight: 700;
   color: #0b2d23;
