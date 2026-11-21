@@ -21,7 +21,6 @@
       <svg class="icon"><use href="#ic-search"/></svg>
       <input type="text" id="department-live-search" placeholder="Search departments by name or clinical services..." aria-label="Search departments">
     </div>
-    <span class="small-muted" id="department-count">Showing {{ departments|length }} specialized departments</span>
   </div>
 
   <div class="department-showcase-grid" id="departments-container">
@@ -30,9 +29,6 @@
       <div class="department-card-header">
         <span class="dep-icon-circle">
           <svg class="icon"><use href="#ic-activity"/></svg>
-        </span>
-        <span class="dep-specialist-badge">
-          <b>{{ dep.total_doctors }}</b> Specialist{{ dep.total_doctors|pluralize }}
         </span>
       </div>
       <h2>{{ dep.name }}</h2>

@@ -216,26 +216,20 @@
   // --- Real-Time Instant Department Search ---
   const depSearch = doc.getElementById('department-live-search');
   const depContainer = doc.getElementById('departments-container');
-  const depCount = doc.getElementById('department-count');
 
   if (depSearch && depContainer) {
     const depCards = Array.from(depContainer.querySelectorAll('.department-showcase-card'));
     depSearch.addEventListener('input', () => {
       const q = depSearch.value.trim().toLowerCase();
-      let matchCount = 0;
       depCards.forEach(card => {
         const name = card.dataset.depName || '';
         const desc = card.dataset.depDesc || '';
         if (!q || name.includes(q) || desc.includes(q)) {
           card.style.display = '';
-          matchCount++;
         } else {
           card.style.display = 'none';
         }
       });
-      if (depCount) {
-        depCount.textContent = `Showing ${matchCount} specialized department${matchCount === 1 ? '' : 's'}`;
-      }
     });
   }
 

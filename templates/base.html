@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link href="{% static 'css/app.css' %}?v=20261121_37" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}?v=20261121_38" rel="stylesheet">
   <link href="{% static 'css/calendar.css' %}?v=20261121_30" rel="stylesheet">
 </head>
 <body class="{% if user.is_authenticated %}app-layout{% else %}public-layout{% endif %}">
@@ -371,7 +371,7 @@
 </footer>
 {% endif %}
 
-<script src="{% static 'js/calendar.js' %}" defer></script>
-<script src="{% static 'js/app.js' %}" defer></script>
+<script src="{% static 'js/calendar.js' %}?v=20261121_38" defer></script>
+<script src="{% static 'js/app.js' %}?v=20261121_38" defer></script>
 </body>
 </html>
