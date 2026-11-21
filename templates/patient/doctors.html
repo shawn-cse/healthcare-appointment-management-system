@@ -132,30 +132,44 @@
           <div class="doctor-card-middle">
             <div class="doctor-qual-block">
               <span class="qual-label">Degrees & Qualifications:</span>
-              <p class="qual-content">{{ d.qualifications|linebreaksbr|default:'MBBS, Specialist Consultant' }}</p>
-            </div>
-
-            <!-- Room / Chamber -->
-            <div class="doctor-chamber-row">
-              <div class="chamber-info-cell">
-                <span class="cell-label"><svg class="icon icon-xs"><use href="#ic-building"/></svg> Chamber</span>
-                <b class="cell-value room-text">{{ d.room_number|default:'Room 707' }}{% if d.chamber and d.chamber.building %}, {{ d.chamber.building }}{% endif %}</b>
+              <div class="qual-list">
+                {% for line in d.qualifications_list %}
+                  <div class="qual-line">• {{ line }}</div>
+                {% empty %}
+                  <div class="qual-line">• {{ d.qualifications|default:'MBBS, Specialist Consultant' }}</div>
+                {% endfor %}
               </div>
             </div>
 
-            <!-- 3 Distinct Consultation Fees -->
+            <!-- Chamber, Assigned Receptionist & Helpline -->
+            <div class="doctor-chamber-section">
+              <div class="chamber-info-item">
+                <svg class="icon icon-xs"><use href="#ic-building"/></svg>
+                <span>Chamber: <b>{{ d.room_number|default:'Chamber 201' }}{% if d.chamber and d.chamber.building %}, {{ d.chamber.building }}{% elif d.chamber %}, {{ d.chamber.name }}{% endif %}</b></span>
+              </div>
+              <div class="chamber-info-item">
+                <svg class="icon icon-xs"><use href="#ic-user"/></svg>
+                <span>Assigned Receptionist: <b>{{ d.assigned_receptionist_name }}</b></span>
+              </div>
+              <div class="chamber-info-item">
+                <svg class="icon icon-xs"><use href="#ic-phone"/></svg>
+                <span>Helpline: <a href="tel:+88096100016211" class="helpline-link"><b>{{ d.active_contact|default:'+88096100016211, +16211' }}</b></a></span>
+              </div>
+            </div>
+
+            <!-- 3 Distinct Consultation Fees (Tk. Format) -->
             <div class="doctor-fees-grid">
               <div class="fee-tile fee-initial">
                 <span class="fee-tile-label">1st Visit / New</span>
-                <b class="fee-tile-amount">৳{{ d.initial_fee|floatformat:0 }}</b>
+                <b class="fee-tile-amount">Tk. {{ d.initial_fee|floatformat:0 }}</b>
               </div>
               <div class="fee-tile fee-followup">
                 <span class="fee-tile-label">Follow-up (<small>{{ d.followup_within_days }}d</small>)</span>
-                <b class="fee-tile-amount">৳{{ d.followup_fee|floatformat:0 }}</b>
+                <b class="fee-tile-amount">Tk. {{ d.followup_fee|floatformat:0 }}</b>
               </div>
               <div class="fee-tile fee-report">
                 <span class="fee-tile-label">Report Review</span>
-                <b class="fee-tile-amount">৳{{ d.report_fee|floatformat:0 }}</b>
+                <b class="fee-tile-amount">Tk. {{ d.report_fee|floatformat:0 }}</b>
               </div>
             </div>
 
@@ -166,7 +180,7 @@
                 {% for sched in d.weekly.all %}
                   {% if sched.active %}
                   <span class="sched-pill">
-                    <b>{{ sched.get_weekday_display|slice:":3"|upper }}</b> {{ sched.start_time|time:"h:iA" }}–{{ sched.end_time|time:"h:iA" }}
+                    <strong>{{ sched.get_weekday_display|slice:":3"|upper }}</strong> {{ sched.start_time|time:"h:iA" }}–{{ sched.end_time|time:"h:iA" }}
                   </span>
                   {% endif %}
                 {% empty %}
@@ -176,10 +190,9 @@
             </div>
           </div>
 
-          <!-- Card Bottom Actions -->
+          <!-- Card Bottom Actions: Single Make Appointment Button -->
           <div class="doctor-card-bottom">
-            <a href="{% url 'doctor_detail' d.pk %}" class="button button-outline button-sm">View Profile</a>
-            <a href="{% url 'doctor_detail' d.pk %}#appointment-section" class="button button-primary button-sm appt-action-btn">
+            <a href="{% url 'doctor_detail' d.pk %}" class="button button-primary button-full appt-action-btn">
               Make Appointment <svg class="icon"><use href="#ic-arrow"/></svg>
             </a>
           </div>

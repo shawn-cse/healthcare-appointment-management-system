@@ -182,7 +182,17 @@ class DoctorProfile(models.Model):
     @property
     def default_avatar(self):
         return 'ic-doc-female' if self.gender == 'female' else 'ic-doc-male'
-        return f'{prefix} {self.user.display_name}'
+
+    @property
+    def assigned_receptionist_name(self):
+        recs = list(self.receptionists.filter(is_active=True))
+        if recs:
+            rec = recs[self.pk % len(recs)]
+            return rec.get_full_name() or rec.username
+        all_recs = list(User.objects.filter(role='receptionist', is_active=True).order_by('id'))
+        if all_recs:
+            return all_recs[self.pk % len(all_recs)].get_full_name()
+        return 'Front Desk Reception'
 
     @property
     def active_room(self):

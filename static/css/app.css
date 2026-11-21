@@ -6240,77 +6240,111 @@ input[type="checkbox"] {
 }
 
 .doctor-qual-block {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid #0d5c46;
 }
 
 .qual-label {
   font-size: 11px;
   font-weight: 700;
-  color: #6d8e82;
+  color: #0d5c46;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
   display: block;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
-.qual-content {
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: #14382f;
-  margin: 0;
-}
-
-.doctor-institute-row {
+.qual-list {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.qual-line {
   font-size: 12px;
-  color: #4b6b60;
-  margin-bottom: 12px;
+  line-height: 1.4;
+  color: #1e293b;
+  font-weight: 500;
 }
 
-.doctor-institute-row .icon {
-  width: 14px;
-  height: 14px;
-  color: #1f7754;
-  flex-shrink: 0;
-}
-
-.doctor-chamber-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  background: #f7fbf8;
-  border: 1px solid #e1efe5;
+.doctor-chamber-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 9px;
   padding: 10px 12px;
   margin-bottom: 12px;
 }
 
-.chamber-info-cell {
+.chamber-info-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.chamber-info-item .icon {
+  width: 14px;
+  height: 14px;
+  color: #0d5c46;
+  flex-shrink: 0;
+}
+
+.chamber-info-item b {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.chamber-info-item a.helpline-link {
+  color: #0d5c46;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 700;
+}
+
+.doctor-fees-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.fee-tile {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 7px 4px;
+  text-align: center;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
-.cell-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #608275;
+.fee-tile:hover {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.fee-tile-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
   text-transform: uppercase;
   margin-bottom: 2px;
+  line-height: 1.2;
 }
 
-.cell-value {
+.fee-tile-amount {
   font-size: 13.5px;
-}
-
-.room-text {
-  color: #0b3127;
   font-weight: 800;
-}
-
-.fee-text {
-  color: #11684c;
-  font-weight: 800;
+  color: #065f46;
 }
 
 .doctor-schedule-preview {
@@ -6320,36 +6354,42 @@ input[type="checkbox"] {
 .schedule-label {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 11px;
   font-weight: 800;
-  color: #285446;
+  color: #0d5c46;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   margin-bottom: 6px;
 }
 
 .schedule-label .icon {
-  width: 12px;
-  height: 12px;
-  color: #1f7754;
+  width: 13px;
+  height: 13px;
+  color: #0d5c46;
 }
 
 .schedule-pills-wrap {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
 }
 
 .sched-pill {
   font-size: 11px;
-  background: #f1f8f4;
-  border: 1px solid #d4ebdc;
-  color: #134e3a;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
   padding: 3px 8px;
-  border-radius: 5px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.sched-pill b {
-  color: #082d22;
+.sched-pill strong {
+  color: #065f46;
+  font-weight: 800;
 }
 
 .sched-pill-open {
@@ -6358,19 +6398,71 @@ input[type="checkbox"] {
 }
 
 .doctor-card-bottom {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr;
-  gap: 8px;
+  display: block;
   margin-top: auto;
-  padding-top: 14px;
-  border-top: 1px solid #f0f7f2;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
 }
 
-.appt-action-btn {
-  display: inline-flex;
+.doctor-card-bottom .appt-action-btn {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  padding: 10px 16px !important;
+  border-radius: 8px !important;
+  background: #0d5c46 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(13, 92, 70, 0.22) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  text-decoration: none !important;
+  border: 1px solid #0d5c46 !important;
+}
+
+.doctor-card-bottom .appt-action-btn:hover {
+  background: #07382b !important;
+  border-color: #07382b !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 20px rgba(7, 56, 43, 0.35) !important;
+}
+
+/* Session Serial Box on Doctor Detail */
+.session-serial-box {
+  background: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.serial-pill-meta {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.serial-pill-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #047857;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.serial-pill-val {
+  font-size: 15px;
+  font-weight: 800;
+  color: #065f46;
+}
+
+.serial-pill-sub {
+  font-size: 11.5px;
+  color: #475569;
+  display: block;
 }
 
 /* ==========================================================================

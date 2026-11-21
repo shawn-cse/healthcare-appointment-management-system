@@ -120,7 +120,7 @@
             <!-- 6. Fee & Visit Type -->
             <td class="cell-fee">
               <div class="sheet-fee-block">
-                <b class="sheet-fee-num">৳{{ a.fee|floatformat:0 }}</b>
+                <b class="sheet-fee-num">Tk. {{ a.fee|floatformat:0 }}</b>
                 <span class="sheet-visit-type">{{ a.get_visit_type_display }}</span>
               </div>
             </td>
@@ -257,7 +257,7 @@
           </div>
           <div class="modal-meta-row">
             <span>Consultation Fee:</span>
-            <strong id="modal-target-fee">৳0</strong>
+            <strong id="modal-target-fee">Tk. 0</strong>
           </div>
         </div>
 
@@ -390,7 +390,7 @@
             <td><span>Dr. {{ a.doctor.user.display_name }}</span><small class="table-sub">{{ a.doctor.department.name }}</small></td>
             <td><span>{{ a.slot.date|date:'d M Y' }}</span><small class="table-sub">{{ a.slot.start_time|time:'g:i A' }}</small></td>
             <td>{{ a.get_visit_type_display }}</td>
-            <td><b>৳{{ a.fee|floatformat:0 }}</b></td>
+            <td><b>Tk. {{ a.fee|floatformat:0 }}</b></td>
             <td><span class="status status-{{ a.payment_status }}">{{ a.get_payment_status_display }}</span></td>
             <td><span class="status status-{{ a.status }}">{{ a.get_status_display }}</span></td>
             <td><a class="table-action" href="{% url 'appointment_detail' a.pk %}">Details</a></td>

@@ -144,7 +144,7 @@
 
       <div class="price-hero">
         <small>Consultation fee</small>
-        <strong>৳{{ appointment.fee|floatformat:2 }}</strong>
+        <strong>Tk. {{ appointment.fee|floatformat:2 }}</strong>
       </div>
 
       <div class="details-row">
@@ -176,7 +176,7 @@
       <form method="post" action="{% url 'appointment_collect' appointment.pk %}">
         {% csrf_token %}
         <button class="button button-primary button-full" type="submit" data-confirm="Confirm that the full consultation fee was collected in cash?">
-          Record Cash Payment (৳{{ appointment.fee|floatformat:0 }})
+          Record Cash Payment (Tk. {{ appointment.fee|floatformat:0 }})
         </button>
       </form>
       {% endif %}
@@ -221,7 +221,7 @@
       <div class="refund-status">
         <b>Refund request</b>
         <span class="status status-{{ refund_request.status }}">{{ refund_request.get_status_display }}</span>
-        <p>৳{{ refund_request.amount }} · {{ refund_request.get_mode_display }}</p>
+        <p>Tk. {{ refund_request.amount }} · {{ refund_request.get_mode_display }}</p>
       </div>
       {% endif %}
 
@@ -270,7 +270,7 @@
         <tr>
           <td>{{ t.get_kind_display }}</td>
           <td>{{ t.get_method_display }}</td>
-          <td><b>৳{{ t.amount|floatformat:2 }}</b></td>
+          <td><b>Tk. {{ t.amount|floatformat:2 }}</b></td>
           <td>{{ t.handled_by.display_name|default:'System Gateway' }}</td>
           <td><span class="status status-{{ t.status }}">{{ t.get_status_display }}</span></td>
           <td>{{ t.created_at|date:'d M Y, g:i A' }}</td>
