@@ -300,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const sortVal = sortSelect ? sortSelect.value : 'default';
 
     const hasQuery = Boolean(rawQuery);
-    if (clearBtn) clearBtn.style.display = hasQuery ? 'grid' : 'none';
+    if (clearBtn) clearBtn.style.display = hasQuery ? 'inline-flex' : 'none';
     if (clearTextLink) clearTextLink.style.display = hasQuery ? 'inline' : 'none';
 
     // 1. Department Filter
