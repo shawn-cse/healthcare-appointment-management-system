@@ -3992,6 +3992,114 @@ input[type="checkbox"] {
   margin-bottom: 22px;
 }
 
+.weekly-slot-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #ffffff;
+  border: 1.5px solid #d4eae0;
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: 0 2px 8px rgba(16, 75, 66, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.weekly-slot-card:hover {
+  border-color: #2b9d6a;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16, 75, 66, 0.1);
+}
+
+.slot-card-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.slot-meta-block {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.slot-upcoming-date {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #1b6144;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.slot-time-range {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0b2f25;
+}
+
+.slot-room-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: #55776c;
+  font-weight: 600;
+}
+
+.slot-room-info .icon {
+  width: 13px;
+  height: 13px;
+  color: #2b9d6a;
+}
+
+.slot-card-right {
+  flex-shrink: 0;
+}
+
+.slot-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 9px;
+  box-shadow: 0 3px 10px rgba(21, 100, 72, 0.22);
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.slot-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(21, 100, 72, 0.32);
+}
+
+.slot-soon-pill {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #f0f4f2;
+  color: #6a8279;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #dbe5e0;
+}
+
+.schedule-mini-tag {
+  display: inline-block;
+  background: #e6f6ee;
+  color: #16654a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-bottom: 2px;
+}
+
 .schedule-entry-box {
   display: flex;
   align-items: center;

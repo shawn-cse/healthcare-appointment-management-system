@@ -49,8 +49,8 @@
 
         <!-- Big Primary CTA: MAKE APPOINTMENT -->
         <div class="hero-cta-section">
-          <a href="#appointment-section" class="button button-primary button-lg hero-appointment-btn" id="hero-make-appt-btn">
-            Make Appointment <svg class="icon"><use href="#ic-arrow"/></svg>
+          <a href="#weekly-schedule" class="button button-primary button-lg hero-appointment-btn" id="hero-make-appt-btn">
+            MAKE APPOINTMENT <svg class="icon"><use href="#ic-arrow"/></svg>
           </a>
         </div>
       </div>
@@ -120,107 +120,70 @@
       </div>
     </div>
 
-    <!-- Right Column: Weekly Consultation Schedule -->
-    <div class="panel padded-panel doctor-schedule-card">
+    <!-- Right Column: Weekly Consultation Schedule & Booking Mini Cards -->
+    <div class="panel padded-panel doctor-schedule-card" id="weekly-schedule">
       <div class="card-section-title">
         <svg class="icon"><use href="#ic-clock"/></svg>
-        <h3>Weekly Consultation Schedule</h3>
+        <div>
+          <span class="schedule-mini-tag">APPOINTMENT SCHEDULE</span>
+          <h3>Weekly Available Schedule</h3>
+        </div>
       </div>
-      <p class="schedule-intro-text">Regular weekly outpatient consultation sessions:</p>
+      <p class="schedule-intro-text">Select a consultation session below to book your appointment and receive your sequential serial number:</p>
 
       <div class="weekly-schedule-display">
         {% for sched in weekly_schedules %}
-        <a href="#appointment-section" class="schedule-entry-box">
-          <div class="schedule-day-badge">
-            {{ sched.get_weekday_display|slice:":3"|upper }}
+        <div class="weekly-slot-card">
+          <div class="slot-card-left">
+            <div class="schedule-day-badge">
+              {{ sched.get_weekday_display|slice:":3"|upper }}
+            </div>
+            <div class="slot-meta-block">
+              <span class="slot-upcoming-date">{{ sched.upcoming_date|date:"D, d M Y"|default:sched.get_weekday_display }}</span>
+              <strong class="slot-time-range">{{ sched.start_time|time:"h:i A" }} – {{ sched.end_time|time:"h:i A" }}</strong>
+              <small class="slot-room-info"><svg class="icon icon-xs"><use href="#ic-building"/></svg> {{ doctor.room_number|default:'Room 707' }}</small>
+            </div>
           </div>
-          <div class="schedule-time-range">
-            <b>{{ sched.start_time|time:"h:iA" }} – {{ sched.end_time|time:"h:iA" }}</b>
-            <small>Sequential patient serials</small>
+          <div class="slot-card-right">
+            {% if sched.slot %}
+              {% if user.is_authenticated and user.role == 'patient' %}
+                <a href="{% url 'patient_book' sched.slot.pk %}" class="button button-primary button-sm slot-action-btn">
+                  Book Appointment <svg class="icon"><use href="#ic-arrow"/></svg>
+                </a>
+              {% elif user.is_authenticated %}
+                <a href="{% url 'patient_book' sched.slot.pk %}" class="button button-primary button-sm slot-action-btn">
+                  Book Appointment <svg class="icon"><use href="#ic-arrow"/></svg>
+                </a>
+              {% else %}
+                <a href="{% url 'login_screen' 'patient' %}?next={% url 'patient_book' sched.slot.pk %}" class="button button-primary button-sm slot-action-btn">
+                  Book Appointment <svg class="icon"><use href="#ic-arrow"/></svg>
+                </a>
+              {% endif %}
+            {% else %}
+              <span class="slot-soon-pill">Opening Soon</span>
+            {% endif %}
           </div>
-        </a>
+        </div>
         {% empty %}
         <div class="empty-state">
-          <p>Please check upcoming consultation dates below for scheduled clinic sessions.</p>
+          <p>Consultation sessions are being scheduled. For telephone bookings, please contact Green Hospital helpline at <b>{{ doctor.active_contact|default:'+88096100016211' }}</b>.</p>
         </div>
         {% endfor %}
       </div>
 
       <div class="schedule-footer-note">
         <svg class="icon"><use href="#ic-check"/></svg>
-        <span>Patients receive sequential serial numbers on booking and are attended in orderly sequence.</span>
+        <span>Sequential serial numbers are allocated automatically upon booking. Payment can be completed at hospital reception desk or online.</span>
+      </div>
+
+      <div class="booking-help-banner" style="margin-top: 14px;">
+        <svg class="icon"><use href="#ic-phone"/></svg>
+        <div>
+          <b>Need phone booking or emergency serial?</b>
+          <p>Call Green Hospital 24/7 hotline at <b>{{ doctor.active_contact|default:'+88096100016211, +16211' }}</b>.</p>
+        </div>
       </div>
     </div>
   </div>
-
-  <!-- Interactive Consultation Session & Serial Booking Section -->
-  <section class="panel padded-panel appointment-booking-section" id="appointment-section">
-    <div class="section-title-wrap">
-      <div class="title-with-badge">
-        <span class="badge-step">SCHEDULE</span>
-        <h2>Upcoming Consultation Sessions</h2>
-      </div>
-      <p>Room: <b>{{ doctor.room_number|default:'Room 707' }}</b> · First Visit: <b>Tk. {{ doctor.initial_fee|floatformat:0 }}</b> · Sequential Serial Allocation</p>
-    </div>
-
-    <!-- Clean Session Cards Grid -->
-    <div class="simplified-sessions-grid">
-      {% for s in upcoming_slots|slice:":10" %}
-      <div class="session-card-clean panel">
-        <div class="sc-top">
-          <span class="sc-day">{{ s.date|date:'l' }}</span>
-          <strong class="sc-date">{{ s.date|date:'d M Y' }}</strong>
-          <span class="sc-time"><svg class="icon icon-xs"><use href="#ic-clock"/></svg> {{ s.start_time|time:'h:i A' }} – {{ s.end_time|time:'h:i A' }}</span>
-        </div>
-
-        <div class="session-serial-box">
-          <div class="serial-pill-meta">
-            <span class="serial-pill-label">Sequential Allocation</span>
-            <b class="serial-pill-val">Next Available Serial: #{{ s.next_serial_number }}</b>
-          </div>
-          <small class="serial-pill-sub">Automatic serial assigned immediately upon appointment</small>
-        </div>
-
-        <div class="sc-action-row">
-          {% if s.booking_open %}
-            {% if user.is_authenticated and user.role == 'patient' %}
-              <a href="{% url 'patient_book' s.pk %}" class="button button-primary button-full appt-session-btn">
-                Make Appointment (Serial #{{ s.next_serial_number }}) <svg class="icon"><use href="#ic-arrow"/></svg>
-              </a>
-            {% elif user.is_authenticated %}
-              <a href="{% url 'patient_book' s.pk %}" class="button button-primary button-full appt-session-btn">
-                Staff Appointment (Serial #{{ s.next_serial_number }}) <svg class="icon"><use href="#ic-arrow"/></svg>
-              </a>
-            {% else %}
-              <a href="{% url 'login_screen' 'patient' %}?next={% url 'patient_book' s.pk %}" class="button button-primary button-full appt-session-btn">
-                Sign In & Make Appointment (Serial #{{ s.next_serial_number }}) <svg class="icon"><use href="#ic-arrow"/></svg>
-              </a>
-            {% endif %}
-          {% else %}
-            <div class="sc-closed-badge">
-              Online Booking Closed
-            </div>
-          {% endif %}
-        </div>
-      </div>
-      {% empty %}
-      <div class="empty-state panel full-width">
-        <span class="empty-icon"><svg class="icon"><use href="#ic-calendar"/></svg></span>
-        <h3>No upcoming consultation sessions available</h3>
-        <p>Doctor {{ doctor.full_doctor_title }} has no open clinic sessions currently available online.</p>
-        <p class="small-muted">For telephone booking assistance, please contact Green Hospital helpline at <b>{{ doctor.active_contact|default:'+88096100016211' }}</b>.</p>
-      </div>
-      {% endfor %}
-    </div>
-
-    <!-- Booking Assistance Helpline Banner -->
-    <div class="booking-help-banner">
-      <svg class="icon"><use href="#ic-help"/></svg>
-      <div>
-        <b>Need urgent consultation or today’s walk-in serial?</b>
-        <p>Call Green Hospital 24/7 helpline directly at <b>{{ doctor.active_contact|default:'+88096100016211' }}</b>.</p>
-      </div>
-    </div>
-  </section>
 </div>
 {% endblock %}

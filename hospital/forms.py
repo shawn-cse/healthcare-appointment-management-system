@@ -126,7 +126,31 @@ class ProfileForm(forms.ModelForm, FormStyleMixin):
         self.fields['phone'].required = True
         self.fields['first_name'].required = True
         self.fields['username'].required = True
+        if self.instance and self.instance.role == 'doctor' and hasattr(self.instance, 'doctor_profile'):
+            doc = self.instance.doctor_profile
+            self.fields['designation'] = forms.CharField(
+                max_length=200, required=False, initial=doc.designation,
+                label='Doctor Designation / Title',
+                help_text='e.g. Associate Professor, ENT & Head Neck Surgery'
+            )
+            self.fields['qualifications'] = forms.CharField(
+                widget=forms.Textarea(attrs={'rows': 4, 'placeholder': 'MBBS, FCPS (Otolaryngology), FICS (USA)\nMicro-laryngeal Surgery Specialist\nConsultant Otolaryngologist'}),
+                required=False, initial=doc.qualifications,
+                label='Degrees & Qualifications',
+                help_text='One degree or qualification per line (bullet points are automatically formatted).'
+            )
         self.style_fields()
+
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if user.role == 'doctor' and hasattr(user, 'doctor_profile'):
+            doc = user.doctor_profile
+            if 'designation' in self.cleaned_data:
+                doc.designation = self.cleaned_data['designation']
+            if 'qualifications' in self.cleaned_data:
+                doc.qualifications = self.cleaned_data['qualifications']
+            doc.save()
+        return user
     def clean_username(self):
         v = self.cleaned_data.get('username', '').strip()
         if not v:
@@ -159,11 +183,19 @@ class StaffForm(forms.ModelForm, FormStyleMixin):
     new_password = forms.CharField(required=False, widget=forms.PasswordInput(attrs={'autocomplete':'new-password'}),
                                    help_text='Required for new accounts; leave empty when editing to keep current password.')
     department = forms.ModelChoiceField(queryset=Department.objects.filter(is_active=True), required=False,
-                                         label='Doctor department')
+                                         label='Doctor Department')
     assigned_receptionist = forms.ModelChoiceField(queryset=User.objects.filter(role='receptionist',is_active=True),
-                                                    required=False, label='Assigned receptionist')
+                                                    required=False, label='Receptionist',
+                                                    help_text='Select the receptionist responsible for this doctor.')
     chamber = forms.ModelChoiceField(queryset=Chamber.objects.filter(is_active=True), required=False,
                                      label='Chamber & Room Number', help_text='Select the consultation room for this doctor.')
+    designation = forms.CharField(max_length=200, required=False, label='Doctor Designation',
+                                  help_text='e.g. Associate Professor, ENT')
+    qualifications = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3, 'placeholder': 'e.g. MBBS, FCPS, MS'}),
+        required=False, label='Degrees & Qualifications',
+        help_text='Enter qualifications (one per line or comma-separated).'
+    )
     consultation_days = forms.MultipleChoiceField(
         choices=WEEKDAY_CHOICES,
         widget=forms.CheckboxSelectMultiple,
@@ -188,15 +220,26 @@ class StaffForm(forms.ModelForm, FormStyleMixin):
         self.fields['role'].choices = [('doctor','Doctor'),('receptionist','Receptionist'),('admin','Administrator')]
         for key in ('role','first_name','last_name','username','email','phone'):
             self.fields[key].required = True
+        chambers_qs = Chamber.objects.filter(is_active=True).prefetch_related('doctors__user')
+        self.fields['chamber'].queryset = chambers_qs
+        self.fields['chamber'].label_from_instance = lambda c: f"{c.building} · {c.room_number} ({c.floor}) - {c.description} [{'Occupied: ' + ', '.join([d.user.display_name for d in c.doctors.all()]) if c.doctors.exists() else 'Empty / Available'}]"
+
         if not self.instance.pk:
             self.fields['new_password'].required = True
-            chambers_qs = Chamber.objects.filter(is_active=True).prefetch_related('doctors__user')
-            self.fields['chamber'].queryset = chambers_qs
-            self.fields['chamber'].label_from_instance = lambda c: f"{c.building} · {c.room_number} ({c.floor}) - {c.description} [{'Occupied: ' + ', '.join([d.user.display_name for d in c.doctors.all()]) if c.doctors.exists() else 'Empty / Available'}]"
         else:
-            self.fields.pop('department', None)
-            self.fields.pop('assigned_receptionist', None)
-            self.fields.pop('chamber', None)
+            if self.instance.role == 'doctor' and hasattr(self.instance, 'doctor_profile'):
+                doc = self.instance.doctor_profile
+                self.fields['department'].initial = doc.department
+                self.fields['chamber'].initial = doc.chamber
+                self.fields['assigned_receptionist'].initial = doc.receptionists.filter(is_active=True).first()
+                self.fields['designation'].initial = doc.designation
+                self.fields['qualifications'].initial = doc.qualifications
+            else:
+                self.fields.pop('department', None)
+                self.fields.pop('assigned_receptionist', None)
+                self.fields.pop('chamber', None)
+                self.fields.pop('designation', None)
+                self.fields.pop('qualifications', None)
             self.fields.pop('consultation_days', None)
             self.fields.pop('consultation_start_time', None)
             self.fields.pop('consultation_end_time', None)
@@ -239,30 +282,75 @@ class StaffForm(forms.ModelForm, FormStyleMixin):
             user.set_password(self.cleaned_data['new_password'])
         user.is_staff = user.role == 'admin'
         user.is_superuser = user.role == 'admin'
-        if commit: user.save()
+        if commit:
+            user.save()
+            if user.role == 'doctor' and hasattr(user, 'doctor_profile'):
+                doc = user.doctor_profile
+                if 'department' in self.cleaned_data and self.cleaned_data['department']:
+                    doc.department = self.cleaned_data['department']
+                if 'chamber' in self.cleaned_data:
+                    ch = self.cleaned_data['chamber']
+                    doc.chamber = ch
+                    if ch:
+                        doc.room_number = ch.room_number
+                        doc.chamber_address = ch.address
+                        doc.contact_number = ch.contact_number
+                if 'designation' in self.cleaned_data:
+                    doc.designation = self.cleaned_data['designation']
+                if 'qualifications' in self.cleaned_data:
+                    doc.qualifications = self.cleaned_data['qualifications']
+                if 'assigned_receptionist' in self.cleaned_data:
+                    rec = self.cleaned_data['assigned_receptionist']
+                    if rec:
+                        doc.receptionists.set([rec])
+                    else:
+                        doc.receptionists.clear()
+                doc.save()
         return user
 
 
 class DoctorSettingsForm(forms.ModelForm, FormStyleMixin):
+    receptionist = forms.ModelChoiceField(
+        queryset=User.objects.filter(role='receptionist', is_active=True),
+        required=False,
+        label='Receptionist',
+        help_text='Select the receptionist responsible for this doctor’s consultations.'
+    )
+
     class Meta:
         model = DoctorProfile
         fields = ['chamber','department','gender','designation','qualifications','registration_number','experience_years',
                   'biography','initial_fee','followup_fee','followup_within_days','report_fee',
                   'hospital_share_mode','hospital_share_value','booking_notice_hours','booking_advance_days',
                   'payment_policy','payment_deadline_hours','cancel_fee_mode','cancel_fee_value',
-                  'receptionists','is_available']
-        widgets = {'biography':forms.Textarea(attrs={'rows':3})}
+                  'is_available']
+        widgets = {
+            'biography': forms.Textarea(attrs={'rows':3}),
+            'qualifications': forms.Textarea(attrs={'rows': 4, 'placeholder': 'e.g. MBBS, FCPS (Otolaryngology), FICS (USA)\nMicro-laryngeal Surgery Specialist\nConsultant Otolaryngologist'}),
+        }
     def __init__(self, *args, is_admin=False, **kwargs):
         super().__init__(*args, **kwargs)
         if not is_admin:
-            for field in ('chamber','department','gender','registration_number','hospital_share_mode','hospital_share_value','receptionists'):
+            for field in ('chamber','department','gender','registration_number','hospital_share_mode','hospital_share_value','receptionist'):
                 self.fields.pop(field, None)
         else:
-            self.fields['receptionists'].queryset = User.objects.filter(role='receptionist', is_active=True)
+            self.fields['receptionist'].queryset = User.objects.filter(role='receptionist', is_active=True)
+            if self.instance and self.instance.pk:
+                self.fields['receptionist'].initial = self.instance.receptionists.filter(is_active=True).first()
             self.fields['chamber'].queryset = Chamber.objects.filter(is_active=True)
             self.fields['chamber'].required = False
             self.fields['chamber'].label = 'Assigned Chamber & Room'
         self.style_fields()
+
+    def save(self, commit=True):
+        doc = super().save(commit=commit)
+        if commit and 'receptionist' in self.cleaned_data:
+            rec = self.cleaned_data.get('receptionist')
+            if rec:
+                doc.receptionists.set([rec])
+            else:
+                doc.receptionists.clear()
+        return doc
     def clean(self):
         data = super().clean()
         for kind in ('hospital','cancel'):

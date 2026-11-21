@@ -21,8 +21,8 @@
 
       <div class="form-grid">
         {% for field in form %}
-          <div class="form-group {% if field.name in 'department assigned_receptionist chamber consultation_days consultation_start_time consultation_end_time' %}form-span{% endif %}"
-               {% if field.name in 'department assigned_receptionist chamber consultation_days consultation_start_time consultation_end_time' %}data-doctor-onboarding{% endif %}>
+          <div class="form-group {% if field.name in 'department assigned_receptionist chamber designation qualifications consultation_days consultation_start_time consultation_end_time' %}form-span{% endif %}"
+               {% if field.name in 'department assigned_receptionist chamber designation qualifications consultation_days consultation_start_time consultation_end_time' %}data-doctor-onboarding{% endif %}>
             <label for="{{ field.id_for_label }}">
               {{ field.label }}
               {% if field.field.required %}<span class="required">*</span>{% endif %}
