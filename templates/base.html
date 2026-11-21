@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="{% static 'css/app.css' %}?v=20261121_32" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}?v=20261121_33" rel="stylesheet">
   <link href="{% static 'css/calendar.css' %}?v=20261121_30" rel="stylesheet">
 </head>
 <body class="{% if user.is_authenticated %}app-layout{% else %}public-layout{% endif %}">
@@ -258,9 +258,6 @@
       <a href="{% url 'home' %}">Home</a>
       <a href="{% url 'doctor_directory' %}">Find Doctors</a>
       <a href="{% url 'public_departments' %}">Departments</a>
-      <a href="tel:+88096100016211" class="hotline-nav-link">
-        <svg class="icon"><use href="#ic-phone"/></svg> +88096100016211
-      </a>
     </nav>
 
     <div class="public-header-actions">
