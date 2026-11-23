@@ -456,7 +456,7 @@ class AppointmentSystemTests(TestCase):
         self.assertContains(resp_team, reverse('doctor_detail', args=[self.doc.profile_slug]))
         # Excel sheet live search and filter controls
         self.assertContains(resp_team, 'staff-search-input')
-        self.assertContains(resp_team, 'btn-staff-reset')
+        self.assertContains(resp_team, 'Personnel Registry')
         self.assertNotContains(resp_team, 'btn-staff-search')
         self.assertContains(resp_team, 'filter-role-select')
         # Doctor cannot see admin actions

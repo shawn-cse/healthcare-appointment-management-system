@@ -53,16 +53,7 @@
             <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A–Z</option>
             <option value="role" {% if sort == 'role' %}selected{% endif %}>Role</option>
             <option value="username" {% if sort == 'username' %}selected{% endif %}>Username</option>
-            <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Recently Added</option>
           </select>
-        </div>
-
-        <!-- Reset Button Only -->
-        <div class="filter-button-group">
-          <label aria-hidden="true">&nbsp;</label>
-          <a href="{% url 'staff_list' %}" class="btn-reset-filters" id="btn-staff-reset" onclick="resetFilters(event)" title="Reset all filters">
-            <svg class="icon" style="width: 14px; height: 14px;"><use href="#ic-refresh"/></svg> Reset
-          </a>
         </div>
       </div>
     </form>
@@ -74,16 +65,8 @@
     <div class="excel-sheet-header-bar">
       <div class="excel-header-left">
         <div class="sheet-indicator">
-          <span class="live-dot-pulse"></span>
-          <strong>Hospital Personnel Registry</strong> · Showing <span id="staff-live-count">{{ staff|length }}</span> of {{ counts.all }} recorded staff &amp; doctors
+          <strong>Personnel Registry</strong> · Showing <span id="staff-live-count">{{ staff|length }}</span> of {{ counts.all }} members
         </div>
-      </div>
-      <div class="excel-header-right">
-        {% if user.role == 'admin' %}
-          <a class="button button-primary button-sm" href="{% url 'staff_new' %}">
-            <svg class="icon"><use href="#ic-plus"/></svg> Add Doctor or Staff
-          </a>
-        {% endif %}
       </div>
     </div>
 
@@ -279,7 +262,7 @@
                 <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
                 <h3>No matching personnel found</h3>
                 <p>No doctor or staff member matches your search keywords or role filter.</p>
-                <button type="button" class="button button-outline button-sm" onclick="resetFilters(event)">Clear Search</button>
+                <button type="button" class="button button-outline button-sm" onclick="clearSearch()">Clear Search</button>
               </div>
             </td>
           </tr>
@@ -390,16 +373,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  window.resetFilters = function(e) {
-    const hasUrlParams = window.location.search && window.location.search.length > 1;
-    if (hasUrlParams) {
-      // Let link navigate to clean /staff/ to reset server query params
-      return;
-    }
-    if (e) e.preventDefault();
+  window.clearSearch = function() {
     if (searchInput) searchInput.value = '';
     if (roleSelect) roleSelect.value = '';
-    if (sortSelect) sortSelect.value = 'name';
     filterStaffRows();
     if (searchInput) searchInput.focus();
   };
