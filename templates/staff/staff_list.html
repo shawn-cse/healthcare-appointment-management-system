@@ -1,7 +1,243 @@
 {% extends 'base.html' %}
-{% block title %}Staff and doctors{% endblock %}
+{% block title %}Staff & Doctor Directory · Green Hospital{% endblock %}
+
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">ACCESS MANAGEMENT</p><h1>Staff & doctor directory</h1><p>Issue staff accounts, assign permissions and manage clinical profiles.</p></div><a class="button button-primary" href="{% url 'staff_new' %}"><svg class="icon"><use href="#ic-plus"/></svg> Add team member</a></div>
-<form method="get" class="panel filter-bar"><div class="search-input"><svg class="icon"><use href="#ic-search"/></svg><input name="q" value="{{ query }}" placeholder="Search name, username, email or phone"></div><select class="field-control" name="role"><option value="">All roles</option><option value="doctor" {% if role_filter == 'doctor' %}selected{% endif %}>Doctors</option><option value="receptionist" {% if role_filter == 'receptionist' %}selected{% endif %}>Receptionists</option><option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Administrators</option></select><select name="sort" class="field-control" aria-label="Sort staff"><option value="name" {% if sort == 'name' %}selected{% endif %}>Name A–Z</option><option value="username" {% if sort == 'username' %}selected{% endif %}>Username</option><option value="role" {% if sort == 'role' %}selected{% endif %}>Role</option><option value="recent" {% if sort == 'recent' %}selected{% endif %}>Recently added</option></select><button class="button button-primary">Apply</button></form>
-<div class="panel"><div class="panel-header"><div><h2>Registered team members</h2><p>Staff accounts are managed by hospital administrators.</p></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Member</th><th>Role</th><th>Login name</th><th>Phone</th><th>Email</th><th>Account</th><th></th></tr></thead><tbody>{% for person in staff %}<tr><td><div class="person-cell"><span class="avatar avatar-small">{{ person.first_name|first }}{{ person.last_name|first }}</span><b>{{ person.display_name }}</b></div></td><td>{{ person.get_role_display }}</td><td>{{ person.username }}</td><td>{{ person.phone }}</td><td>{{ person.email }}</td><td><span class="status status-{% if person.is_active %}confirmed{% else %}cancelled{% endif %}">{% if person.is_active %}Active{% else %}Inactive{% endif %}</span></td><td><a class="table-action" href="{% url 'staff_edit' person.pk %}">Edit</a>{% if person.role == 'doctor' %}<a class="table-action" href="{% url 'doctor_rules' person.doctor_profile.pk %}">Doctor settings</a>{% endif %}</td></tr>{% empty %}<tr><td colspan="7" class="table-empty">No staff members match the selected filters.</td></tr>{% endfor %}</tbody></table></div>{% if page_obj.has_other_pages %}<nav class="pagination" aria-label="Staff directory pages"><span class="pagination-count">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span><div class="pagination-links">{% if page_obj.has_previous %}<a class="button button-light button-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}{% if page_obj.has_next %}<a class="button button-outline button-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>{% endif %}</div></nav>{% endif %}</div>
+<div class="staff-directory-page">
+  <!-- Page Heading -->
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">HOSPITAL PERSONNEL & CHAMBERS</p>
+      <h1>Staff & Doctor Directory</h1>
+      <p>Consultant profiles, chamber allocations, assigned receptionists, and internal contact information.</p>
+    </div>
+    {% if user.role == 'admin' %}
+    <div class="heading-actions">
+      <a class="button button-primary" href="{% url 'staff_new' %}">
+        <svg class="icon"><use href="#ic-plus"/></svg> Add Team Member
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Filter & Search Bar -->
+  <form method="get" class="panel filter-bar staff-filter-bar">
+    <div class="search-input">
+      <svg class="icon"><use href="#ic-search"/></svg>
+      <input type="text" name="q" value="{{ query }}"
+             placeholder="Search by name, role, department, chamber, room, phone..."
+             autocomplete="off">
+      {% if query %}
+        <a href="?{% if role_filter %}role={{ role_filter }}&amp;{% endif %}{% if sort %}sort={{ sort }}{% endif %}" class="clear-search-btn" title="Clear search">✕</a>
+      {% endif %}
+    </div>
+
+    <select class="field-control" name="role" aria-label="Filter by role" onchange="this.form.submit()">
+      <option value="">All Roles (Doctors & Staff)</option>
+      <option value="doctor" {% if role_filter == 'doctor' %}selected{% endif %}>Doctors & Specialists</option>
+      <option value="receptionist" {% if role_filter == 'receptionist' %}selected{% endif %}>Chamber Receptionists</option>
+      <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Hospital Administrators</option>
+    </select>
+
+    <select name="sort" class="field-control" aria-label="Sort staff" onchange="this.form.submit()">
+      <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A–Z</option>
+      <option value="role" {% if sort == 'role' %}selected{% endif %}>Role</option>
+      <option value="username" {% if sort == 'username' %}selected{% endif %}>Username</option>
+      <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Recently Added</option>
+    </select>
+
+    <button type="submit" class="button button-primary">Apply</button>
+    {% if query or role_filter or sort != 'name' %}
+      <a href="{% url 'staff_list' %}" class="button button-outline" title="Reset all filters">Reset</a>
+    {% endif %}
+  </form>
+
+  <!-- Staff & Doctor Table Panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Hospital Team Directory</h2>
+        <p>Complete directory of physicians, front desk receptionists, and clinical operations staff.</p>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="data-table staff-directory-table">
+        <thead>
+          <tr>
+            <th style="min-width: 220px;">Member & Role</th>
+            <th style="min-width: 170px;">Chamber / Room</th>
+            <th style="min-width: 190px;">Assigned Personnel</th>
+            <th style="min-width: 160px;">Contact Phone</th>
+            <th style="min-width: 160px;">Email / Login</th>
+            <th style="min-width: 90px;">Account</th>
+            <th style="min-width: 130px; text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for person in staff %}
+          <tr>
+            <!-- Member & Role -->
+            <td>
+              <div class="person-cell">
+                <span class="avatar avatar-small">
+                  {% if person.avatar %}
+                    <img src="{{ person.avatar.url }}" alt="{{ person.display_name }}">
+                  {% else %}
+                    {{ person.first_name|first|upper }}{{ person.last_name|first|upper }}
+                  {% endif %}
+                </span>
+                <div class="person-meta-wrap">
+                  <b class="person-name">{{ person.display_name }}</b>
+                  <div class="person-role-tags">
+                    {% if person.role == 'doctor' %}
+                      <span class="badge-cat-support"><svg class="icon"><use href="#ic-stethoscope"/></svg> Doctor</span>
+                      {% if person.doctor_profile and person.doctor_profile.department %}
+                        <span class="dept-sub-tag">{{ person.doctor_profile.department.name }}</span>
+                      {% endif %}
+                    {% elif person.role == 'receptionist' %}
+                      <span class="role-pill-badge"><svg class="icon"><use href="#ic-user"/></svg> Receptionist</span>
+                    {% elif person.role == 'admin' %}
+                      <span class="status-badge status-solved"><svg class="icon"><use href="#ic-settings"/></svg> Administrator</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Chamber / Room -->
+            <td>
+              {% if person.role == 'doctor' and person.doctor_profile %}
+                <div class="cell-chamber-box">
+                  <span class="room-chip">
+                    <svg class="icon"><use href="#ic-building"/></svg>
+                    <b>{{ person.doctor_profile.room_number|default:'Chamber 101' }}</b>
+                  </span>
+                  {% if person.doctor_profile.chamber %}
+                    <small class="muted-text">{{ person.doctor_profile.chamber.building|default:person.doctor_profile.chamber.name }}</small>
+                  {% else %}
+                    <small class="muted-text">Green Hospital Mirpur</small>
+                  {% endif %}
+                </div>
+              {% elif person.role == 'receptionist' %}
+                <div class="cell-chamber-box">
+                  <span class="room-chip">
+                    <svg class="icon"><use href="#ic-building"/></svg> Front Desk / OPD
+                  </span>
+                  <small class="muted-text">Building 1 &amp; 2 Chambers</small>
+                </div>
+              {% else %}
+                <span class="muted-text">Hospital Operations Office</span>
+              {% endif %}
+            </td>
+
+            <!-- Assigned Receptionist / Assigned Doctor(s) -->
+            <td>
+              {% if person.role == 'doctor' and person.doctor_profile %}
+                <div class="person-assoc-box">
+                  <span class="assoc-lbl">Receptionist:</span>
+                  <b>{{ person.doctor_profile.assigned_receptionist_name|default:'Front Desk Reception' }}</b>
+                  {% with rec=person.doctor_profile.receptionists.first %}
+                    {% if rec and rec.phone %}
+                      <small class="muted-text">Tel: <a href="tel:{{ rec.phone }}">{{ rec.phone }}</a></small>
+                    {% endif %}
+                  {% endwith %}
+                </div>
+              {% elif person.role == 'receptionist' %}
+                <div class="person-assoc-box">
+                  <span class="assoc-lbl">Assigned Doctors:</span>
+                  {% for doc in person.assigned_doctors.all|slice:':2' %}
+                    <span class="doc-tag-pill">Dr. {{ doc.user.display_name }} ({{ doc.room_number|default:'Chamber' }})</span>
+                  {% empty %}
+                    <span class="muted-text">OPD Reception Counter</span>
+                  {% endfor %}
+                  {% if person.assigned_doctors.count > 2 %}
+                    <small class="muted-text">+{{ person.assigned_doctors.count|add:'-2' }} more</small>
+                  {% endif %}
+                </div>
+              {% else %}
+                <span class="muted-text">Hospital Administration</span>
+              {% endif %}
+            </td>
+
+            <!-- Phone Number -->
+            <td>
+              {% if person.phone %}
+                <a href="tel:{{ person.phone }}" class="phone-link">
+                  <svg class="icon"><use href="#ic-phone"/></svg>
+                  <b>{{ person.phone }}</b>
+                </a>
+              {% else %}
+                <span class="muted-text">—</span>
+              {% endif %}
+            </td>
+
+            <!-- Email & Username -->
+            <td>
+              <div class="email-user-wrap">
+                {% if person.email %}
+                  <a href="mailto:{{ person.email }}" class="email-link">{{ person.email }}</a>
+                {% endif %}
+                <small class="muted-text">@{{ person.username }}</small>
+              </div>
+            </td>
+
+            <!-- Account Status -->
+            <td>
+              <span class="status status-{% if person.is_active %}confirmed{% else %}cancelled{% endif %}">
+                {% if person.is_active %}Active{% else %}Inactive{% endif %}
+              </span>
+            </td>
+
+            <!-- Action Buttons -->
+            <td style="text-align: right;">
+              <div class="table-actions-group">
+                <!-- For Doctors: Link to view public profile as patient sees it -->
+                {% if person.role == 'doctor' and person.doctor_profile %}
+                  <a class="button button-outline button-xs" href="{% url 'doctor_detail' person.doctor_profile.profile_slug %}" title="View doctor public profile as patient sees it">
+                    <svg class="icon"><use href="#ic-stethoscope"/></svg> Profile
+                  </a>
+                {% endif %}
+
+                <!-- Admin Action Buttons -->
+                {% if user.role == 'admin' %}
+                  <a class="button button-outline button-xs" href="{% url 'staff_edit' person.pk %}" title="Edit staff account">Edit</a>
+                  {% if person.role == 'doctor' and person.doctor_profile %}
+                    <a class="button button-outline button-xs" href="{% url 'doctor_rules' person.doctor_profile.pk %}" title="Doctor rules and fees">Rules</a>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="table-empty">
+              <div class="empty-state">
+                <span class="empty-icon"><svg class="icon"><use href="#ic-users"/></svg></span>
+                <h3>No staff or doctors found</h3>
+                <p>No team members match your selected search or role criteria.</p>
+                <a href="{% url 'staff_list' %}" class="button button-outline button-sm">Clear Filters</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <nav class="pagination" aria-label="Staff directory pages">
+      <span class="pagination-count">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <div class="pagination-links">
+        {% if page_obj.has_previous %}
+          <a class="button button-light button-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="button button-outline button-sm" href="?{% if page_query %}{{ page_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+        {% endif %}
+      </div>
+    </nav>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

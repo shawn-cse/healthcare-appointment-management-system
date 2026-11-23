@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link href="{% static 'css/app.css' %}?v=20261123_06" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}?v=20261123_07" rel="stylesheet">
   <link href="{% static 'css/calendar.css' %}?v=20261121_30" rel="stylesheet">
 </head>
 <body class="{% if user.is_authenticated %}app-layout{% else %}public-layout{% endif %}">
@@ -133,11 +133,17 @@
         <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> My Appointments</a>
         <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Complaints & Support</a>
       {% else %}
-        <a href="{% url 'dashboard' %}" data-nav="dashboard"><svg class="icon"><use href="#ic-grid"/></svg> Overview</a>
-        <a href="{% url 'doctor_directory' %}" data-nav="doctor_directory"><svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors</a>
+        <a href="{% url 'dashboard' %}" data-nav="dashboard"><svg class="icon"><use href="#ic-grid"/></svg> {% if user.role == 'doctor' %}Dashboard{% else %}Overview{% endif %}</a>
+        {% if user.role == 'doctor' %}
+          <a href="{% url 'staff_list' %}" data-nav="staff_list"><svg class="icon"><use href="#ic-users"/></svg> Staff & Doctors</a>
+        {% else %}
+          <a href="{% url 'doctor_directory' %}" data-nav="doctor_directory"><svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors</a>
+        {% endif %}
         <a href="{% url 'public_departments' %}" data-nav="public_departments"><svg class="icon"><use href="#ic-building"/></svg> Departments</a>
         <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> Appointments</a>
-        <a href="{% url 'staff_book' %}" data-nav="staff_book"><svg class="icon"><use href="#ic-plus"/></svg> Register Booking</a>
+        {% if user.role != 'doctor' %}
+          <a href="{% url 'staff_book' %}" data-nav="staff_book"><svg class="icon"><use href="#ic-plus"/></svg> Register Booking</a>
+        {% endif %}
         <a href="{% url 'schedule' %}" data-nav="schedule"><svg class="icon"><use href="#ic-clock"/></svg> Schedules & Slots</a>
         {% if user.role == 'doctor' %}
           <a href="{% url 'doctor_rules' user.doctor_profile.pk %}" data-nav="doctor_rules"><svg class="icon"><use href="#ic-settings"/></svg> Fees & Booking Rules</a>

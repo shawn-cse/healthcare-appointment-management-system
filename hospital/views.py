@@ -739,23 +739,47 @@ def policy(request):
         'submit_label':'Save policy'})
 
 
-@role_required('admin')
+@role_required('admin', 'doctor')
 def staff_list(request):
-    users = User.objects.exclude(role='patient').order_by('role','first_name')
-    q = request.GET.get('q','').strip()
-    role = request.GET.get('role','')
-    if q: users=users.filter(Q(username__icontains=q)|Q(email__icontains=q)|Q(phone__icontains=q)|
-                              Q(first_name__icontains=q)|Q(last_name__icontains=q))
-    if role in ('admin','doctor','receptionist'): users=users.filter(role=role)
-    ordering={'name':('first_name','last_name','pk'), 'username':('username','pk'),
-              'role':('role','first_name','pk'), 'recent':('-date_joined','pk')}
-    sort=request.GET.get('sort','name')
-    users=users.order_by(*ordering.get(sort,ordering['name']))
-    page=Paginator(users,30).get_page(request.GET.get('page'))
-    query=request.GET.copy()
-    query.pop('page',None)
-    return render(request,'staff/staff_list.html',{'staff':page,'page_obj':page,
-                  'page_query':query.urlencode(),'query':q,'role_filter':role,'sort':sort})
+    users = User.objects.exclude(role='patient')\
+        .select_related('doctor_profile__department', 'doctor_profile__chamber')\
+        .prefetch_related('doctor_profile__receptionists', 'assigned_doctors__user', 'assigned_doctors__chamber')\
+        .order_by('role', 'first_name')
+    q = request.GET.get('q', '').strip()
+    role = request.GET.get('role', '')
+    if q:
+        users = users.filter(
+            Q(username__icontains=q) |
+            Q(email__icontains=q) |
+            Q(phone__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q) |
+            Q(doctor_profile__department__name__icontains=q) |
+            Q(doctor_profile__chamber__name__icontains=q) |
+            Q(doctor_profile__chamber__building__icontains=q) |
+            Q(doctor_profile__room_number__icontains=q)
+        )
+    if role in ('admin', 'doctor', 'receptionist'):
+        users = users.filter(role=role)
+    ordering = {
+        'name': ('first_name', 'last_name', 'pk'),
+        'username': ('username', 'pk'),
+        'role': ('role', 'first_name', 'pk'),
+        'recent': ('-date_joined', 'pk'),
+    }
+    sort = request.GET.get('sort', 'name')
+    users = users.order_by(*ordering.get(sort, ordering['name']))
+    page = Paginator(users, 30).get_page(request.GET.get('page'))
+    query = request.GET.copy()
+    query.pop('page', None)
+    return render(request, 'staff/staff_list.html', {
+        'staff': page,
+        'page_obj': page,
+        'page_query': query.urlencode(),
+        'query': q,
+        'role_filter': role,
+        'sort': sort,
+    })
 
 
 @role_required('admin')

@@ -426,3 +426,37 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(file_complaint.status, 'resolved')
         self.assertTrue(bool(file_complaint.admin_attachment))
         self.assertIn('resolution_notes', file_complaint.admin_attachment.name)
+
+    def test_doctor_panel_navigation_and_team_directory(self):
+        # 1. Doctor navigates to dashboard: navigation shows 'Dashboard' and 'Staff & Doctors'
+        self.client.force_login(self.doctor)
+        resp_dash = self.client.get(reverse('dashboard'))
+        self.assertEqual(resp_dash.status_code, 200)
+        self.assertContains(resp_dash, 'Staff & Doctors')
+        self.assertContains(resp_dash, 'Dashboard')
+        self.assertNotContains(resp_dash, 'Find Doctors')
+
+        # 2. Doctor accesses /team/ (Staff & Doctor directory)
+        resp_team = self.client.get(reverse('staff_list'))
+        self.assertEqual(resp_team.status_code, 200)
+        self.assertContains(resp_team, 'Staff & Doctor Directory')
+        self.assertContains(resp_team, 'Dr. Karim')
+        self.assertContains(resp_team, 'reception_one')
+        self.assertContains(resp_team, reverse('doctor_detail', args=[self.doc.profile_slug]))
+        # Doctor cannot see admin actions
+        self.assertNotContains(resp_team, reverse('staff_new'))
+        self.assertNotContains(resp_team, reverse('staff_edit', args=[self.doctor.pk]))
+
+        # 3. Admin accesses /team/ and can see management action buttons
+        self.client.force_login(self.admin)
+        resp_admin_team = self.client.get(reverse('staff_list'))
+        self.assertEqual(resp_admin_team.status_code, 200)
+        self.assertContains(resp_admin_team, 'Add Team Member')
+        self.assertContains(resp_admin_team, reverse('staff_new'))
+        self.assertContains(resp_admin_team, reverse('staff_edit', args=[self.doctor.pk]))
+
+        # 4. Patient cannot access /team/ (permission denied / redirected)
+        self.client.force_login(self.patient)
+        resp_patient_team = self.client.get(reverse('staff_list'))
+        self.assertIn(resp_patient_team.status_code, (302, 403))
+
