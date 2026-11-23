@@ -26,6 +26,7 @@ urlpatterns = [
     path('reception/book/', views.staff_book, name='staff_book'),
     path('api/slots/', views.slots_api, name='slots_api'),
     path('api/patients/lookup/', views.patient_lookup, name='patient_lookup'),
+    path('api/check-username/', views.check_username_api, name='check_username_api'),
     path('schedules/', views.schedule, name='schedule'),
     path('schedules/weekly/<int:doctor_pk>/new/', views.weekly_edit, name='weekly_new'),
     path('schedules/weekly/<int:doctor_pk>/<int:pk>/', views.weekly_edit, name='weekly_edit'),

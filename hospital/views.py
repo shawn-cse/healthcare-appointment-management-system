@@ -559,6 +559,35 @@ def patient_lookup(request):
     return JsonResponse({'patient':{'id':account.pk,'name':account.display_name}})
 
 
+def check_username_api(request):
+    username = request.GET.get('username', '').strip()
+    exclude_id = request.GET.get('exclude_id', '').strip()
+    if not username:
+        return JsonResponse({
+            'valid': False,
+            'status': 'empty',
+            'message': 'Username must be unique.'
+        })
+    qs = User.objects.filter(
+        Q(username__iexact=username) |
+        Q(phone=username) |
+        Q(email__iexact=username)
+    )
+    if exclude_id and exclude_id.isdigit():
+        qs = qs.exclude(pk=int(exclude_id))
+    if qs.exists():
+        return JsonResponse({
+            'valid': False,
+            'status': 'conflict',
+            'message': 'This username conflicts with another account identifier.'
+        })
+    return JsonResponse({
+        'valid': True,
+        'status': 'available',
+        'message': 'Username is OK'
+    })
+
+
 @role_required('receptionist','doctor','admin')
 def slots_api(request):
     doctor_id = request.GET.get('doctor','')

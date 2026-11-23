@@ -12111,3 +12111,42 @@ body.is-page-loading .main-content {
   background: #fef3c7;
   color: #b45309;
 }
+
+/* --- Live Username Feedback Styles --- */
+.username-live-feedback {
+  display: block;
+  font-size: 12px;
+  margin-top: 5px;
+  font-weight: 500;
+  line-height: 1.35;
+  transition: all 0.18s ease;
+}
+
+.username-live-feedback.feedback-default-neutral {
+  color: #64748b !important;
+  font-weight: 500 !important;
+}
+
+.username-live-feedback.feedback-conflict-red {
+  color: #dc2626 !important;
+  font-weight: 700 !important;
+}
+
+.username-live-feedback.feedback-ok-green {
+  color: #16a34a !important;
+  font-weight: 700 !important;
+}
+
+.field-control.input-conflict-red,
+input.input-conflict-red {
+  border-color: #ef4444 !important;
+  background-color: #fffafb !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14) !important;
+}
+
+.field-control.input-valid-green,
+input.input-valid-green {
+  border-color: #10b981 !important;
+  background-color: #f7fdf9 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14) !important;
+}

@@ -84,6 +84,12 @@ class RegisterForm(forms.ModelForm, FormStyleMixin):
         self.fields['phone'].required = True
         self.fields['dob'].required = True
         self.fields['username'].required = False
+        self.fields['username'].help_text = 'Username must be unique.'
+        self.fields['username'].widget.attrs.update({
+            'data-live-username': 'true',
+            'placeholder': 'Choose unique username',
+            'autocomplete': 'off'
+        })
         self.style_fields()
 
     def clean_username(self):
@@ -136,6 +142,12 @@ class ProfileForm(forms.ModelForm, FormStyleMixin):
         self.fields['phone'].required = True
         self.fields['first_name'].required = True
         self.fields['username'].required = True
+        self.fields['username'].help_text = 'Username must be unique.'
+        self.fields['username'].widget.attrs.update({
+            'data-live-username': 'true',
+            'data-exclude-id': str(self.instance.pk or ''),
+            'autocomplete': 'off'
+        })
         if self.instance and self.instance.role == 'doctor' and hasattr(self.instance, 'doctor_profile'):
             doc = self.instance.doctor_profile
             self.fields['designation'] = forms.CharField(
@@ -230,6 +242,13 @@ class StaffForm(forms.ModelForm, FormStyleMixin):
         self.fields['role'].choices = [('doctor','Doctor'),('receptionist','Receptionist'),('admin','Administrator')]
         for key in ('role','first_name','last_name','username','email','phone'):
             self.fields[key].required = True
+        self.fields['username'].help_text = 'Username must be unique.'
+        self.fields['username'].widget.attrs.update({
+            'data-live-username': 'true',
+            'data-exclude-id': str(self.instance.pk or '') if self.instance else '',
+            'placeholder': 'Enter unique staff username',
+            'autocomplete': 'off'
+        })
         chambers_qs = Chamber.objects.filter(is_active=True).prefetch_related('doctors__user')
         self.fields['chamber'].queryset = chambers_qs
         self.fields['chamber'].label_from_instance = lambda c: f"{c.building} · {c.room_number} ({c.floor}) - {c.description} [{'Occupied: ' + ', '.join([d.user.display_name for d in c.doctors.all()]) if c.doctors.exists() else 'Empty / Available'}]"

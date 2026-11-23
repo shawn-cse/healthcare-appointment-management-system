@@ -592,5 +592,36 @@ class AppointmentSystemTests(TestCase):
         form_weekly = WeeklyForm(data=weekly_data)
         self.assertTrue(form_weekly.is_valid(), f"WeeklyForm 12h errors: {form_weekly.errors}")
 
+    def test_live_username_conflict_api_and_help_text(self):
+        # 1. Verify StaffForm help text and attributes
+        form = StaffForm()
+        self.assertEqual(form.fields['username'].help_text, 'Username must be unique.')
+        self.assertEqual(form.fields['username'].widget.attrs.get('data-live-username'), 'true')
+
+        # 2. Test check_username_api with empty username
+        url = reverse('check_username_api')
+        res_empty = self.client.get(url + '?username=')
+        self.assertEqual(res_empty.status_code, 200)
+        self.assertEqual(res_empty.json()['status'], 'empty')
+        self.assertEqual(res_empty.json()['message'], 'Username must be unique.')
+
+        # 3. Test check_username_api with existing username (conflict)
+        res_conflict = self.client.get(url + f'?username={self.doctor.username}')
+        self.assertEqual(res_conflict.status_code, 200)
+        self.assertEqual(res_conflict.json()['status'], 'conflict')
+        self.assertEqual(res_conflict.json()['message'], 'This username conflicts with another account identifier.')
+
+        # 4. Test check_username_api with exclude_id (e.g. editing own profile)
+        res_exclude = self.client.get(url + f'?username={self.doctor.username}&exclude_id={self.doctor.pk}')
+        self.assertEqual(res_exclude.status_code, 200)
+        self.assertEqual(res_exclude.json()['status'], 'available')
+        self.assertEqual(res_exclude.json()['message'], 'Username is OK')
+
+        # 5. Test check_username_api with brand new username (available)
+        res_ok = self.client.get(url + '?username=dr_unique_999')
+        self.assertEqual(res_ok.status_code, 200)
+        self.assertEqual(res_ok.json()['status'], 'available')
+        self.assertEqual(res_ok.json()['message'], 'Username is OK')
+
 
 

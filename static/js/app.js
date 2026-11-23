@@ -524,4 +524,108 @@
       }
     });
   })();
+
+  // --- Live Username Conflict & Availability Checker ---
+  function initLiveUsernameValidation() {
+    const inputs = doc.querySelectorAll('input[data-live-username="true"], #id_username, input[name="username"]');
+    inputs.forEach(input => {
+      if (input.dataset.liveUsernameAttached) return;
+      input.dataset.liveUsernameAttached = 'true';
+
+      const group = input.closest('.form-group') || input.parentElement;
+      if (!group) return;
+
+      // Find or attach live feedback element
+      let feedback = group.querySelector('.username-live-feedback');
+      if (!feedback) {
+        const existingHelp = group.querySelector('.help-text');
+        feedback = doc.createElement('small');
+        feedback.className = 'username-live-feedback feedback-default-neutral';
+        feedback.textContent = 'Username must be unique.';
+        if (existingHelp) {
+          existingHelp.replaceWith(feedback);
+        } else {
+          input.insertAdjacentElement('afterend', feedback);
+        }
+      }
+
+      const serverError = group.querySelector('.error-text');
+      const defaultText = 'Username must be unique.';
+      let debounceTimer = null;
+      let abortController = null;
+
+      function updateFeedback(state, message) {
+        feedback.textContent = message;
+        feedback.className = 'username-live-feedback';
+        input.classList.remove('input-valid-green', 'input-conflict-red');
+
+        if (serverError && state !== 'default') {
+          serverError.style.display = 'none';
+        }
+
+        if (state === 'conflict') {
+          feedback.classList.add('feedback-conflict-red');
+          input.classList.add('input-conflict-red');
+        } else if (state === 'ok') {
+          feedback.classList.add('feedback-ok-green');
+          input.classList.add('input-valid-green');
+        } else {
+          feedback.classList.add('feedback-default-neutral');
+        }
+      }
+
+      input.addEventListener('input', () => {
+        const val = input.value.trim();
+        const excludeId = input.dataset.excludeId || '';
+
+        if (debounceTimer) clearTimeout(debounceTimer);
+        if (abortController) abortController.abort();
+
+        if (!val) {
+          updateFeedback('default', defaultText);
+          return;
+        }
+
+        debounceTimer = setTimeout(() => {
+          abortController = new AbortController();
+          const targetUrl = '/api/check-username/?' + new URLSearchParams({
+            username: val,
+            exclude_id: excludeId
+          });
+
+          fetch(targetUrl, {
+            signal: abortController.signal,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.status === 'conflict') {
+                updateFeedback('conflict', 'This username conflicts with another account identifier.');
+              } else if (data.status === 'available') {
+                updateFeedback('ok', 'Username is OK');
+              } else {
+                updateFeedback('default', data.message || defaultText);
+              }
+            })
+            .catch(err => {
+              if (err && err.name !== 'AbortError') {
+                // Ignore fetch abort
+              }
+            });
+        }, 220);
+      });
+
+      input.addEventListener('blur', () => {
+        if (!input.value.trim()) {
+          updateFeedback('default', defaultText);
+        }
+      });
+    });
+  }
+
+  if (doc.readyState === 'loading') {
+    doc.addEventListener('DOMContentLoaded', initLiveUsernameValidation);
+  } else {
+    initLiveUsernameValidation();
+  }
 })();
