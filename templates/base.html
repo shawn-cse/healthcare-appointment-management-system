@@ -133,12 +133,8 @@
         <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> My Appointments</a>
         <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Complaints & Support</a>
       {% else %}
-        <a href="{% url 'dashboard' %}" data-nav="dashboard"><svg class="icon"><use href="#ic-grid"/></svg> {% if user.role == 'doctor' %}Dashboard{% else %}Overview{% endif %}</a>
-        {% if user.role == 'doctor' %}
-          <a href="{% url 'staff_list' %}" data-nav="staff_list"><svg class="icon"><use href="#ic-users"/></svg> Staff & Doctors</a>
-        {% else %}
-          <a href="{% url 'doctor_directory' %}" data-nav="doctor_directory"><svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors</a>
-        {% endif %}
+        <a href="{% url 'dashboard' %}" data-nav="dashboard"><svg class="icon"><use href="#ic-grid"/></svg> Dashboard</a>
+        <a href="{% url 'staff_list' %}" data-nav="staff_list"><svg class="icon"><use href="#ic-users"/></svg> Staff & Doctors</a>
         <a href="{% url 'public_departments' %}" data-nav="public_departments"><svg class="icon"><use href="#ic-building"/></svg> Departments</a>
         <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> Appointments</a>
         {% if user.role != 'doctor' %}
@@ -157,7 +153,6 @@
         {% endif %}
         {% if user.role == 'admin' %}
           <div class="nav-eyebrow nav-section">ADMINISTRATION</div>
-          <a href="{% url 'staff_list' %}" data-nav="staff_list"><svg class="icon"><use href="#ic-users"/></svg> Staff & Doctors</a>
           <a href="{% url 'chamber_list' %}" data-nav="chamber_list"><svg class="icon"><use href="#ic-building"/></svg> Chambers & Rooms</a>
           <a href="{% url 'departments' %}" data-nav="departments"><svg class="icon"><use href="#ic-building"/></svg> Manage Departments</a>
           <a href="{% url 'policy' %}" data-nav="policy"><svg class="icon"><use href="#ic-settings"/></svg> Hospital Policies</a>

@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
-{% block title %}Staff & Doctor Directory · Green Hospital{% endblock %}
+{% block title %}Staff & Doctors · Green Hospital{% endblock %}
 
 {% block content %}
 <div class="staff-directory-page">
-  <!-- Page Heading -->
+  <!-- Clean Page Heading -->
   <div class="page-heading">
     <div>
       <p class="eyebrow">HOSPITAL PERSONNEL & CHAMBERS</p>
-      <h1>Staff & Doctor Directory</h1>
-      <p>Consultant profiles, chamber allocations, assigned receptionists, and internal contact information.</p>
+      <h1>Staff &amp; Doctors</h1>
+      <p>Excel-style hospital personnel directory. Live search and filter doctors, front desk receptionists, and hospital administration.</p>
     </div>
     {% if user.role == 'admin' %}
     <div class="heading-actions">
@@ -19,89 +19,180 @@
     {% endif %}
   </div>
 
-  <!-- Filter & Search Bar -->
-  <form method="get" class="panel filter-bar staff-filter-bar">
-    <div class="search-input">
-      <svg class="icon"><use href="#ic-search"/></svg>
-      <input type="text" name="q" value="{{ query }}"
-             placeholder="Search by name, role, department, chamber, room, phone..."
-             autocomplete="off">
-      {% if query %}
-        <a href="?{% if role_filter %}role={{ role_filter }}&amp;{% endif %}{% if sort %}sort={{ sort }}{% endif %}" class="clear-search-btn" title="Clear search">✕</a>
-      {% endif %}
+  <!-- Metric Summary Cards -->
+  <div class="metric-grid four-metrics" style="margin-bottom: 20px;">
+    <div class="metric-card">
+      <div class="metric-top">
+        <span>Total Personnel</span>
+        <span class="metric-icon"><svg class="icon"><use href="#ic-users"/></svg></span>
+      </div>
+      <strong>{{ counts.all }}</strong>
+      <small>All registered members</small>
     </div>
+    <div class="metric-card">
+      <div class="metric-top">
+        <span>Doctors (Dr)</span>
+        <span class="metric-icon blue"><svg class="icon"><use href="#ic-stethoscope"/></svg></span>
+      </div>
+      <strong>{{ counts.doctor }}</strong>
+      <small>Consultants &amp; Specialists</small>
+    </div>
+    <div class="metric-card">
+      <div class="metric-top">
+        <span>Staff (Reception)</span>
+        <span class="metric-icon purple"><svg class="icon"><use href="#ic-user"/></svg></span>
+      </div>
+      <strong>{{ counts.receptionist }}</strong>
+      <small>Chamber &amp; Front Desk</small>
+    </div>
+    <div class="metric-card">
+      <div class="metric-top">
+        <span>Administration</span>
+        <span class="metric-icon amber"><svg class="icon"><use href="#ic-settings"/></svg></span>
+      </div>
+      <strong>{{ counts.admin }}</strong>
+      <small>Management &amp; IT Ops</small>
+    </div>
+  </div>
 
-    <select class="field-control" name="role" aria-label="Filter by role" onchange="this.form.submit()">
-      <option value="">All Roles (Doctors & Staff)</option>
-      <option value="doctor" {% if role_filter == 'doctor' %}selected{% endif %}>Doctors & Specialists</option>
-      <option value="receptionist" {% if role_filter == 'receptionist' %}selected{% endif %}>Chamber Receptionists</option>
-      <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Hospital Administrators</option>
-    </select>
+  <!-- Excel Filter & Live Search Toolbar -->
+  <div class="panel excel-toolbar-panel">
+    <form method="get" class="excel-filter-form" id="staff-filter-form">
+      <div class="filter-controls-row">
+        <!-- Live Search Field -->
+        <div class="filter-field-group search-field-group" style="flex: 2;">
+          <label for="staff-search-input">Search Keywords (Live Search)</label>
+          <div class="search-wrap">
+            <svg class="icon search-icon"><use href="#ic-search"/></svg>
+            <input type="text" name="q" id="staff-search-input" value="{{ query }}"
+                   class="field-control search-input-field"
+                   placeholder="Live search by name, phone no, room no, chamber, or department..."
+                   autocomplete="off">
+            <button type="button" class="clear-search-btn" id="clear-search-btn" title="Clear search" style="{% if not query %}display: none;{% endif %}">✕</button>
+          </div>
+        </div>
 
-    <select name="sort" class="field-control" aria-label="Sort staff" onchange="this.form.submit()">
-      <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A–Z</option>
-      <option value="role" {% if sort == 'role' %}selected{% endif %}>Role</option>
-      <option value="username" {% if sort == 'username' %}selected{% endif %}>Username</option>
-      <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Recently Added</option>
-    </select>
+        <!-- Inline Role Filter Select: All is default, Dr, Staff, Administration -->
+        <div class="filter-field-group">
+          <label for="filter-role-select">Role Filter</label>
+          <select name="role" id="filter-role-select" class="field-control">
+            <option value="" {% if not role_filter %}selected{% endif %}>All (Default)</option>
+            <option value="doctor" {% if role_filter == 'doctor' %}selected{% endif %}>Dr (Doctors)</option>
+            <option value="receptionist" {% if role_filter == 'receptionist' %}selected{% endif %}>Staff (Reception)</option>
+            <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Administration</option>
+          </select>
+        </div>
 
-    <button type="submit" class="button button-primary">Apply</button>
-    {% if query or role_filter or sort != 'name' %}
-      <a href="{% url 'staff_list' %}" class="button button-outline" title="Reset all filters">Reset</a>
-    {% endif %}
-  </form>
+        <!-- Sort Filter -->
+        <div class="filter-field-group">
+          <label for="filter-sort">Sort Order</label>
+          <select name="sort" id="filter-sort" class="field-control" onchange="this.form.submit()">
+            <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A–Z</option>
+            <option value="role" {% if sort == 'role' %}selected{% endif %}>Role</option>
+            <option value="username" {% if sort == 'username' %}selected{% endif %}>Username</option>
+            <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Recently Added</option>
+          </select>
+        </div>
 
-  <!-- Staff & Doctor Table Panel -->
-  <div class="panel">
-    <div class="panel-header">
-      <div>
-        <h2>Hospital Team Directory</h2>
-        <p>Complete directory of physicians, front desk receptionists, and clinical operations staff.</p>
+        <!-- Search & Reset Buttons -->
+        <div class="filter-button-group">
+          <label>&nbsp;</label>
+          <button type="submit" class="button button-primary" id="btn-staff-search">
+            <svg class="icon"><use href="#ic-search"/></svg> Search
+          </button>
+          {% if query or role_filter or sort != 'name' %}
+            <a href="{% url 'staff_list' %}" class="button button-outline" title="Reset all filters">Reset</a>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Excel Sheet Panel Container -->
+  <div class="panel excel-sheet-panel">
+    <!-- Excel Sheet Header -->
+    <div class="excel-sheet-header-bar">
+      <div class="excel-header-left">
+        <div class="sheet-indicator">
+          <span class="live-dot-pulse"></span>
+          <strong>Live Personnel Registry</strong> · Showing <span id="staff-live-count">{{ staff|length }}</span> of {{ counts.all }} recorded team members
+        </div>
+      </div>
+      <div class="excel-header-right">
+        {% if user.role == 'admin' %}
+          <a class="button button-primary button-sm" href="{% url 'staff_new' %}">
+            <svg class="icon"><use href="#ic-plus"/></svg> Add Team Member
+          </a>
+        {% endif %}
       </div>
     </div>
 
-    <div class="table-responsive">
-      <table class="data-table staff-directory-table">
+    <!-- Excel Table -->
+    <div class="table-responsive excel-table-wrap">
+      <table class="data-table excel-grid-table" id="staff-excel-table">
         <thead>
           <tr>
-            <th style="min-width: 220px;">Member & Role</th>
-            <th style="min-width: 170px;">Chamber / Room</th>
+            <th style="width: 45px; text-align: center;">#</th>
+            <th style="min-width: 200px;">Member &amp; Role</th>
+            <th style="min-width: 150px;">Department</th>
+            <th style="min-width: 160px;">Chamber &amp; Room</th>
             <th style="min-width: 190px;">Assigned Personnel</th>
-            <th style="min-width: 160px;">Contact Phone</th>
-            <th style="min-width: 160px;">Email / Login</th>
-            <th style="min-width: 90px;">Account</th>
-            <th style="min-width: 130px; text-align: right;">Action</th>
+            <th style="min-width: 140px;">Contact Phone</th>
+            <th style="min-width: 170px;">Email / Username</th>
+            <th style="min-width: 90px; text-align: center;">Status</th>
+            <th style="min-width: 110px; text-align: right;">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for person in staff %}
-          <tr>
+          <tr class="excel-row staff-data-row" id="row-user-{{ person.pk }}"
+              data-role="{{ person.role }}"
+              data-name="{{ person.display_name|lower }}"
+              data-username="{{ person.username|lower }}"
+              data-phone="{{ person.phone|default:''|lower }}"
+              data-email="{{ person.email|default:''|lower }}"
+              data-room="{% if person.role == 'doctor' and person.doctor_profile %}{{ person.doctor_profile.room_number|default:''|lower }}{% endif %}"
+              data-chamber="{% if person.role == 'doctor' and person.doctor_profile and person.doctor_profile.chamber %}{{ person.doctor_profile.chamber.name|lower }} {{ person.doctor_profile.chamber.building|lower }}{% endif %}"
+              data-department="{% if person.role == 'doctor' and person.doctor_profile and person.doctor_profile.department %}{{ person.doctor_profile.department.name|lower }}{% endif %}"
+              data-search="{{ person.display_name|lower }} {{ person.username|lower }} {{ person.phone|default:''|lower }} {{ person.email|default:''|lower }} {% if person.role == 'doctor' and person.doctor_profile %}{{ person.doctor_profile.room_number|default:''|lower }} {{ person.doctor_profile.chamber.name|default:''|lower }} {{ person.doctor_profile.chamber.building|default:''|lower }} {{ person.doctor_profile.department.name|default:''|lower }}{% elif person.role == 'receptionist' %}reception front desk opd counter{% else %}admin administration office{% endif %} {{ person.get_role_display|lower }}">
+            
+            <!-- Index -->
+            <td style="text-align: center; color: #64748b; font-weight: 600;">
+              {{ forloop.counter }}
+            </td>
+
             <!-- Member & Role -->
             <td>
-              <div class="person-cell">
-                <span class="avatar avatar-small">
-                  {% if person.avatar %}
-                    <img src="{{ person.avatar.url }}" alt="{{ person.display_name }}">
-                  {% else %}
-                    {{ person.first_name|first|upper }}{{ person.last_name|first|upper }}
-                  {% endif %}
-                </span>
-                <div class="person-meta-wrap">
-                  <b class="person-name">{{ person.display_name }}</b>
-                  <div class="person-role-tags">
+              <div class="user-identity-cell">
+                <div class="cell-avatar role-{{ person.role }}-avatar">
+                  {{ person.first_name|first|upper }}{{ person.last_name|first|upper }}
+                </div>
+                <div class="identity-text-box">
+                  <span class="person-name">
+                    {% if person.role == 'doctor' %}Dr. {% endif %}{{ person.display_name }}
+                  </span>
+                  <div>
                     {% if person.role == 'doctor' %}
-                      <span class="badge-cat-support"><svg class="icon"><use href="#ic-stethoscope"/></svg> Doctor</span>
-                      {% if person.doctor_profile and person.doctor_profile.department %}
-                        <span class="dept-sub-tag">{{ person.doctor_profile.department.name }}</span>
-                      {% endif %}
+                      <span class="badge-role role-doctor"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-stethoscope"/></svg> Doctor</span>
                     {% elif person.role == 'receptionist' %}
-                      <span class="role-pill-badge"><svg class="icon"><use href="#ic-user"/></svg> Receptionist</span>
+                      <span class="badge-role role-receptionist"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-user"/></svg> Staff (Reception)</span>
                     {% elif person.role == 'admin' %}
-                      <span class="status-badge status-solved"><svg class="icon"><use href="#ic-settings"/></svg> Administrator</span>
+                      <span class="badge-role role-admin"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-settings"/></svg> Administration</span>
                     {% endif %}
                   </div>
                 </div>
               </div>
+            </td>
+
+            <!-- Department -->
+            <td>
+              {% if person.role == 'doctor' and person.doctor_profile and person.doctor_profile.department %}
+                <span class="dept-subtitle"><b>{{ person.doctor_profile.department.name }}</b></span>
+              {% elif person.role == 'receptionist' %}
+                <span class="muted-text">Front Desk Operations</span>
+              {% else %}
+                <span class="muted-text">Hospital Management</span>
+              {% endif %}
             </td>
 
             <!-- Chamber / Room -->
@@ -109,11 +200,11 @@
               {% if person.role == 'doctor' and person.doctor_profile %}
                 <div class="cell-chamber-box">
                   <span class="room-chip">
-                    <svg class="icon"><use href="#ic-building"/></svg>
-                    <b>{{ person.doctor_profile.room_number|default:'Chamber 101' }}</b>
+                    <svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-building"/></svg>
+                    Room {{ person.doctor_profile.room_number|default:'101' }}
                   </span>
                   {% if person.doctor_profile.chamber %}
-                    <small class="muted-text">{{ person.doctor_profile.chamber.building|default:person.doctor_profile.chamber.name }}</small>
+                    <small class="muted-text">{{ person.doctor_profile.chamber.name }}{% if person.doctor_profile.chamber.building %}, {{ person.doctor_profile.chamber.building }}{% endif %}</small>
                   {% else %}
                     <small class="muted-text">Green Hospital Mirpur</small>
                   {% endif %}
@@ -121,16 +212,16 @@
               {% elif person.role == 'receptionist' %}
                 <div class="cell-chamber-box">
                   <span class="room-chip">
-                    <svg class="icon"><use href="#ic-building"/></svg> Front Desk / OPD
+                    <svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-building"/></svg> Front Desk / OPD
                   </span>
-                  <small class="muted-text">Building 1 &amp; 2 Chambers</small>
+                  <small class="muted-text">Building 1 &amp; 2 Reception Counters</small>
                 </div>
               {% else %}
-                <span class="muted-text">Hospital Operations Office</span>
+                <span class="muted-text">Administrative Office</span>
               {% endif %}
             </td>
 
-            <!-- Assigned Receptionist / Assigned Doctor(s) -->
+            <!-- Assigned Personnel -->
             <td>
               {% if person.role == 'doctor' and person.doctor_profile %}
                 <div class="person-assoc-box">
@@ -138,7 +229,7 @@
                   <b>{{ person.doctor_profile.assigned_receptionist_name|default:'Front Desk Reception' }}</b>
                   {% with rec=person.doctor_profile.receptionists.first %}
                     {% if rec and rec.phone %}
-                      <small class="muted-text">Tel: <a href="tel:{{ rec.phone }}">{{ rec.phone }}</a></small>
+                      <small class="muted-text">Tel: <a href="tel:{{ rec.phone }}" class="phone-link">{{ rec.phone }}</a></small>
                     {% endif %}
                   {% endwith %}
                 </div>
@@ -146,24 +237,24 @@
                 <div class="person-assoc-box">
                   <span class="assoc-lbl">Assigned Doctors:</span>
                   {% for doc in person.assigned_doctors.all|slice:':2' %}
-                    <span class="doc-tag-pill">Dr. {{ doc.user.display_name }} ({{ doc.room_number|default:'Chamber' }})</span>
+                    <span class="doc-tag-pill">Dr. {{ doc.user.display_name }} (Room {{ doc.room_number|default:'101' }})</span>
                   {% empty %}
-                    <span class="muted-text">OPD Reception Counter</span>
+                    <span class="muted-text">General OPD Counter</span>
                   {% endfor %}
                   {% if person.assigned_doctors.count > 2 %}
                     <small class="muted-text">+{{ person.assigned_doctors.count|add:'-2' }} more</small>
                   {% endif %}
                 </div>
               {% else %}
-                <span class="muted-text">Hospital Administration</span>
+                <span class="muted-text">Hospital Operations Team</span>
               {% endif %}
             </td>
 
-            <!-- Phone Number -->
+            <!-- Contact Phone -->
             <td>
               {% if person.phone %}
                 <a href="tel:{{ person.phone }}" class="phone-link">
-                  <svg class="icon"><use href="#ic-phone"/></svg>
+                  <svg class="icon" style="width: 13px; height: 13px;"><use href="#ic-phone"/></svg>
                   <b>{{ person.phone }}</b>
                 </a>
               {% else %}
@@ -182,7 +273,7 @@
             </td>
 
             <!-- Account Status -->
-            <td>
+            <td style="text-align: center;">
               <span class="status status-{% if person.is_active %}confirmed{% else %}cancelled{% endif %}">
                 {% if person.is_active %}Active{% else %}Inactive{% endif %}
               </span>
@@ -194,7 +285,7 @@
                 <!-- For Doctors: Link to view public profile as patient sees it -->
                 {% if person.role == 'doctor' and person.doctor_profile %}
                   <a class="button button-outline button-xs" href="{% url 'doctor_detail' person.doctor_profile.profile_slug %}" title="View doctor public profile as patient sees it">
-                    <svg class="icon"><use href="#ic-stethoscope"/></svg> Profile
+                    <svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-stethoscope"/></svg> Profile
                   </a>
                 {% endif %}
 
@@ -209,8 +300,8 @@
             </td>
           </tr>
           {% empty %}
-          <tr>
-            <td colspan="7" class="table-empty">
+          <tr id="staff-initial-empty-row">
+            <td colspan="9" class="empty-state-cell">
               <div class="empty-state">
                 <span class="empty-icon"><svg class="icon"><use href="#ic-users"/></svg></span>
                 <h3>No staff or doctors found</h3>
@@ -220,6 +311,18 @@
             </td>
           </tr>
           {% endfor %}
+
+          <!-- Dynamic Live Search Empty State (Hidden by default) -->
+          <tr id="staff-empty-live-row" style="display: none;">
+            <td colspan="9" class="empty-state-cell">
+              <div class="empty-state">
+                <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
+                <h3>No matching personnel found</h3>
+                <p>No doctor or staff member matches your search or filter keywords.</p>
+                <button type="button" class="button button-outline button-sm" onclick="resetLiveFilters()">Clear Search</button>
+              </div>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -240,4 +343,70 @@
     {% endif %}
   </div>
 </div>
+
+<!-- Live Search & Interactive Filter Script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('staff-search-input');
+  const clearBtn = document.getElementById('clear-search-btn');
+  const roleSelect = document.getElementById('filter-role-select');
+  const rows = document.querySelectorAll('#staff-excel-table tbody tr.staff-data-row');
+  const emptyRow = document.getElementById('staff-empty-live-row');
+  const liveCount = document.getElementById('staff-live-count');
+
+  function filterStaffRows() {
+    const query = (searchInput.value || '').trim().toLowerCase();
+    const selectedRole = (roleSelect.value || '').trim().toLowerCase();
+    let visibleCount = 0;
+
+    // Show/hide clear search button
+    if (clearBtn) {
+      clearBtn.style.display = query ? 'inline-block' : 'none';
+    }
+
+    rows.forEach(function(row) {
+      const searchData = row.getAttribute('data-search') || '';
+      const rowRole = row.getAttribute('data-role') || '';
+      const matchesQuery = !query || searchData.includes(query);
+      const matchesRole = !selectedRole || rowRole === selectedRole;
+
+      if (matchesQuery && matchesRole) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (liveCount) {
+      liveCount.textContent = visibleCount;
+    }
+    if (emptyRow) {
+      emptyRow.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', filterStaffRows);
+  }
+
+  if (roleSelect) {
+    roleSelect.addEventListener('change', filterStaffRows);
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function() {
+      searchInput.value = '';
+      filterStaffRows();
+      searchInput.focus();
+    });
+  }
+
+  window.resetLiveFilters = function() {
+    if (searchInput) searchInput.value = '';
+    if (roleSelect) roleSelect.value = '';
+    filterStaffRows();
+  };
+});
+</script>
 {% endblock %}

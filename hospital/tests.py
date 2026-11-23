@@ -434,28 +434,46 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(resp_dash.status_code, 200)
         self.assertContains(resp_dash, 'Staff & Doctors')
         self.assertContains(resp_dash, 'Dashboard')
-        self.assertNotContains(resp_dash, 'Find Doctors')
+        self.assertNotContains(resp_dash, 'Overview')
 
-        # 2. Doctor accesses /team/ (Staff & Doctor directory)
+        # 2. Receptionist navigates to dashboard and team directory
+        self.client.force_login(self.reception)
+        resp_rec_dash = self.client.get(reverse('dashboard'))
+        self.assertEqual(resp_rec_dash.status_code, 200)
+        self.assertContains(resp_rec_dash, 'Staff & Doctors')
+        self.assertContains(resp_rec_dash, 'Dashboard')
+        self.assertNotContains(resp_rec_dash, 'Overview')
+        resp_rec_team = self.client.get(reverse('staff_list'))
+        self.assertEqual(resp_rec_team.status_code, 200)
+
+        # 3. Doctor accesses /team/ (Staff & Doctor directory)
+        self.client.force_login(self.doctor)
         resp_team = self.client.get(reverse('staff_list'))
         self.assertEqual(resp_team.status_code, 200)
-        self.assertContains(resp_team, 'Staff & Doctor Directory')
+        self.assertContains(resp_team, 'Staff &amp; Doctors')
         self.assertContains(resp_team, 'Dr. Karim')
         self.assertContains(resp_team, 'reception_one')
         self.assertContains(resp_team, reverse('doctor_detail', args=[self.doc.profile_slug]))
+        # Excel sheet live search and filter controls
+        self.assertContains(resp_team, 'staff-search-input')
+        self.assertContains(resp_team, 'btn-staff-search')
+        self.assertContains(resp_team, 'filter-role-select')
         # Doctor cannot see admin actions
         self.assertNotContains(resp_team, reverse('staff_new'))
         self.assertNotContains(resp_team, reverse('staff_edit', args=[self.doctor.pk]))
 
-        # 3. Admin accesses /team/ and can see management action buttons
+        # 4. Admin accesses /team/ and can see management action buttons and Dashboard in nav
         self.client.force_login(self.admin)
+        resp_admin_dash = self.client.get(reverse('dashboard'))
+        self.assertContains(resp_admin_dash, 'Dashboard')
+        self.assertNotContains(resp_admin_dash, 'Overview')
         resp_admin_team = self.client.get(reverse('staff_list'))
         self.assertEqual(resp_admin_team.status_code, 200)
         self.assertContains(resp_admin_team, 'Add Team Member')
         self.assertContains(resp_admin_team, reverse('staff_new'))
         self.assertContains(resp_admin_team, reverse('staff_edit', args=[self.doctor.pk]))
 
-        # 4. Patient cannot access /team/ (permission denied / redirected)
+        # 5. Patient cannot access /team/ (permission denied / redirected)
         self.client.force_login(self.patient)
         resp_patient_team = self.client.get(reverse('staff_list'))
         self.assertIn(resp_patient_team.status_code, (302, 403))

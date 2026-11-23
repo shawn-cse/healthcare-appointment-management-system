@@ -739,9 +739,17 @@ def policy(request):
         'submit_label':'Save policy'})
 
 
-@role_required('admin', 'doctor')
+@role_required('admin', 'doctor', 'receptionist')
 def staff_list(request):
-    users = User.objects.exclude(role='patient')\
+    base_users = User.objects.exclude(role='patient')
+    counts = {
+        'all': base_users.count(),
+        'doctor': base_users.filter(role='doctor').count(),
+        'receptionist': base_users.filter(role='receptionist').count(),
+        'admin': base_users.filter(role='admin').count(),
+    }
+
+    users = base_users\
         .select_related('doctor_profile__department', 'doctor_profile__chamber')\
         .prefetch_related('doctor_profile__receptionists', 'assigned_doctors__user', 'assigned_doctors__chamber')\
         .order_by('role', 'first_name')
@@ -769,12 +777,13 @@ def staff_list(request):
     }
     sort = request.GET.get('sort', 'name')
     users = users.order_by(*ordering.get(sort, ordering['name']))
-    page = Paginator(users, 30).get_page(request.GET.get('page'))
+    page = Paginator(users, 50).get_page(request.GET.get('page'))
     query = request.GET.copy()
     query.pop('page', None)
     return render(request, 'staff/staff_list.html', {
         'staff': page,
         'page_obj': page,
+        'counts': counts,
         'page_query': query.urlencode(),
         'query': q,
         'role_filter': role,
