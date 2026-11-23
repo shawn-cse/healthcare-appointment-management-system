@@ -75,15 +75,14 @@
       <table class="data-table excel-grid-table" id="staff-excel-table">
         <thead>
           <tr>
-            <th style="width: 45px; text-align: center;">#</th>
-            <th style="min-width: 200px;">Member &amp; Role</th>
-            <th style="min-width: 150px;">Department</th>
-            <th style="min-width: 160px;">Chamber &amp; Room</th>
-            <th style="min-width: 190px;">Assigned Personnel</th>
-            <th style="min-width: 140px;">Contact Phone</th>
-            <th style="min-width: 170px;">Email / Username</th>
-            <th style="min-width: 90px; text-align: center;">Status</th>
-            <th style="min-width: 110px; text-align: right;">Action</th>
+            <th>Member &amp; Role</th>
+            <th>Department</th>
+            <th>Chamber &amp; Room</th>
+            <th>Assigned Personnel</th>
+            <th>Contact Phone</th>
+            <th>Email / Username</th>
+            <th style="text-align: center;">Status</th>
+            <th style="text-align: right;">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -99,30 +98,20 @@
               data-department="{% if person.role == 'doctor' and person.doctor_profile and person.doctor_profile.department %}{{ person.doctor_profile.department.name|lower }}{% endif %}"
               data-search="{{ person.display_name|lower }} {{ person.username|lower }} {{ person.phone|default:''|lower }} {{ person.email|default:''|lower }} {% if person.role == 'doctor' and person.doctor_profile %}{{ person.doctor_profile.room_number|default:''|lower }} {{ person.doctor_profile.chamber.name|default:''|lower }} {{ person.doctor_profile.chamber.building|default:''|lower }} {{ person.doctor_profile.department.name|default:''|lower }}{% elif person.role == 'receptionist' %}reception front desk opd counter{% else %}admin administration office{% endif %} {{ person.get_role_display|lower }}">
             
-            <!-- Index -->
-            <td style="text-align: center; color: #64748b; font-weight: 600;">
-              {{ forloop.counter }}
-            </td>
-
             <!-- Member & Role -->
             <td>
-              <div class="user-identity-cell">
-                <div class="cell-avatar role-{{ person.role }}-avatar">
-                  {{ person.first_name|first|upper }}{{ person.last_name|first|upper }}
-                </div>
-                <div class="identity-text-box">
-                  <span class="person-name">
-                    {% if person.role == 'doctor' %}Dr. {% endif %}{{ person.display_name }}
-                  </span>
-                  <div>
-                    {% if person.role == 'doctor' %}
-                      <span class="badge-role role-doctor"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-stethoscope"/></svg> Doctor</span>
-                    {% elif person.role == 'receptionist' %}
-                      <span class="badge-role role-receptionist"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-user"/></svg> Staff (Reception)</span>
-                    {% elif person.role == 'admin' %}
-                      <span class="badge-role role-admin"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-settings"/></svg> Administration</span>
-                    {% endif %}
-                  </div>
+              <div class="identity-text-box">
+                <span class="person-name">
+                  {% if person.role == 'doctor' %}Dr. {% endif %}{{ person.display_name }}
+                </span>
+                <div>
+                  {% if person.role == 'doctor' %}
+                    <span class="badge-role role-doctor"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-stethoscope"/></svg> Doctor</span>
+                  {% elif person.role == 'receptionist' %}
+                    <span class="badge-role role-receptionist"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-user"/></svg> Staff (Reception)</span>
+                  {% elif person.role == 'admin' %}
+                    <span class="badge-role role-admin"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-settings"/></svg> Administration</span>
+                  {% endif %}
                 </div>
               </div>
             </td>
@@ -144,23 +133,21 @@
                 <div class="cell-chamber-box">
                   <span class="room-chip">
                     <svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-building"/></svg>
-                    Room {{ person.doctor_profile.room_number|default:'101' }}
+                    {{ person.doctor_profile.room_number|default:'Chamber 101' }}
                   </span>
                   {% if person.doctor_profile.chamber %}
-                    <small class="muted-text">{{ person.doctor_profile.chamber.name }}{% if person.doctor_profile.chamber.building %}, {{ person.doctor_profile.chamber.building }}{% endif %}</small>
-                  {% else %}
-                    <small class="muted-text">Green Hospital Mirpur</small>
+                    <small class="muted-text">{{ person.doctor_profile.chamber.building|default:person.doctor_profile.chamber.name }}</small>
                   {% endif %}
                 </div>
               {% elif person.role == 'receptionist' %}
                 <div class="cell-chamber-box">
                   <span class="room-chip">
-                    <svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-building"/></svg> Front Desk / OPD
+                    <svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-building"/></svg> Front Desk
                   </span>
-                  <small class="muted-text">Building 1 &amp; 2 Reception Counters</small>
+                  <small class="muted-text">Reception Counters</small>
                 </div>
               {% else %}
-                <span class="muted-text">Administrative Office</span>
+                <span class="muted-text">Admin Office</span>
               {% endif %}
             </td>
 
@@ -170,26 +157,14 @@
                 <div class="person-assoc-box">
                   <span class="assoc-lbl">Receptionist:</span>
                   <b>{{ person.doctor_profile.assigned_receptionist_name|default:'Front Desk Reception' }}</b>
-                  {% with rec=person.doctor_profile.receptionists.first %}
-                    {% if rec and rec.phone %}
-                      <small class="muted-text">Tel: <a href="tel:{{ rec.phone }}" class="phone-link">{{ rec.phone }}</a></small>
-                    {% endif %}
-                  {% endwith %}
                 </div>
               {% elif person.role == 'receptionist' %}
                 <div class="person-assoc-box">
-                  <span class="assoc-lbl">Assigned Doctors:</span>
-                  {% for doc in person.assigned_doctors.all|slice:':2' %}
-                    <span class="doc-tag-pill">Dr. {{ doc.user.display_name }} (Room {{ doc.room_number|default:'101' }})</span>
-                  {% empty %}
-                    <span class="muted-text">General OPD Counter</span>
-                  {% endfor %}
-                  {% if person.assigned_doctors.count > 2 %}
-                    <small class="muted-text">+{{ person.assigned_doctors.count|add:'-2' }} more</small>
-                  {% endif %}
+                  <span class="assoc-lbl">Doctors:</span>
+                  <b>{{ person.assigned_doctors.count }} Doctors Assigned</b>
                 </div>
               {% else %}
-                <span class="muted-text">Hospital Operations Team</span>
+                <span class="muted-text">Hospital Operations</span>
               {% endif %}
             </td>
 
@@ -244,7 +219,7 @@
           </tr>
           {% empty %}
           <tr id="staff-initial-empty-row">
-            <td colspan="9" class="empty-state-cell">
+            <td colspan="8" class="empty-state-cell">
               <div class="empty-state">
                 <span class="empty-icon"><svg class="icon"><use href="#ic-users"/></svg></span>
                 <h3>No staff or doctors found</h3>
@@ -257,7 +232,7 @@
 
           <!-- Dynamic Search Empty State (Hidden by default) -->
           <tr id="staff-empty-live-row" style="display: none;">
-            <td colspan="9" class="empty-state-cell">
+            <td colspan="8" class="empty-state-cell">
               <div class="empty-state">
                 <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
                 <h3>No matching personnel found</h3>

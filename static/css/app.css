@@ -819,6 +819,88 @@ img {
   font-size: 12px;
 }
 
+/* Sidebar Header with Brand & Close Button */
+.sidebar-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-header-row .sidebar-brand {
+  flex: 1;
+}
+
+.sidebar-close-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  color: #4b665d;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  margin-right: 12px;
+  transition: all 0.15s ease;
+}
+
+.sidebar-close-btn:hover {
+  background: #e2f4ea;
+  color: #0d4c3f;
+}
+
+/* Sidebar Toggle Button in Topbar (Visible for all roles on all screen sizes) */
+.sidebar-toggle-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid #d4e7dc;
+  background: #f0f7f3;
+  color: #0d4c3f;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn:hover {
+  background: #e2f4ea;
+  border-color: #10b981;
+  color: #064e3b;
+}
+
+.sidebar-toggle-btn .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Collapsible Desktop / Responsive Sidebar */
+.sidebar {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease !important;
+}
+
+.app-shell {
+  transition: margin-left 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@media (min-width: 901px) {
+  body.sidebar-collapsed {
+    --side: 0px !important;
+  }
+  body.sidebar-collapsed .sidebar {
+    transform: translateX(-100%) !important;
+    box-shadow: none !important;
+    pointer-events: none;
+  }
+  body.sidebar-collapsed .app-shell {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}
+
 .mobile-toggle {
   display: none;
 }

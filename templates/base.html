@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link href="{% static 'css/app.css' %}?v=20261123_11" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}?v=20261123_12" rel="stylesheet">
   <link href="{% static 'css/calendar.css' %}?v=20261123_50" rel="stylesheet">
 </head>
 <body class="{% if user.is_authenticated %}app-layout{% else %}public-layout{% endif %}">
@@ -121,10 +121,15 @@
 <!-- Authenticated Application Layout with Sidebar -->
 <div class="sidebar-scrim" data-close-nav></div>
 <aside class="sidebar" id="sidebar">
-  <a class="brand sidebar-brand" href="{% url 'dashboard' %}">
-    <span class="brand-mark-emblem"><svg class="brand-logo-icon" viewBox="0 0 40 40"><use href="#ic-hospital-logo"/></svg></span>
-    <span><strong>Green Hospital</strong><small>{% if user.role == 'patient' %}Patient Portal{% else %}Clinical Management{% endif %}</small></span>
-  </a>
+  <div class="sidebar-header-row">
+    <a class="brand sidebar-brand" href="{% url 'dashboard' %}">
+      <span class="brand-mark-emblem"><svg class="brand-logo-icon" viewBox="0 0 40 40"><use href="#ic-hospital-logo"/></svg></span>
+      <span><strong>Green Hospital</strong><small>{% if user.role == 'patient' %}Patient Portal{% else %}Clinical Management{% endif %}</small></span>
+    </a>
+    <button type="button" class="icon-button sidebar-close-btn" id="sidebar-close-btn" data-close-nav aria-label="Close navigation" title="Close side menu">
+      <svg class="icon"><use href="#ic-x"/></svg>
+    </button>
+  </div>
   <div class="sidebar-scroll">
     <div class="nav-eyebrow">{% if user.role == 'patient' %}PATIENT SERVICES{% else %}WORKSPACE{% endif %}</div>
     <nav class="nav-list" aria-label="Main navigation">
@@ -167,7 +172,7 @@
 <div class="app-shell">
   <header class="topbar">
     <div class="topbar-left">
-      <button type="button" class="icon-button mobile-toggle" data-toggle-nav aria-label="Open navigation">
+      <button type="button" class="icon-button sidebar-toggle-btn" id="sidebar-toggle-btn" data-toggle-nav aria-label="Toggle navigation menu" title="Toggle side menu">
         <svg class="icon"><use href="#ic-menu"/></svg>
       </button>
       <div class="topbar-breadcrumb">
@@ -366,6 +371,6 @@
 {% endif %}
 
 <script src="{% static 'js/calendar.js' %}?v=20261123_50" defer></script>
-<script src="{% static 'js/app.js' %}?v=20261123_05" defer></script>
+<script src="{% static 'js/app.js' %}?v=20261123_06" defer></script>
 </body>
 </html>

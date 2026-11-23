@@ -2,16 +2,50 @@
 (function(){
   const doc=document;
   const path=window.location.pathname;
-  const navAliases={'/dashboard/':'dashboard','/doctors/':'doctor_directory','/appointments/':'appointments','/reception/book/':'staff_book','/schedules/':'schedule','/finance/refunds/':'refunds','/reports/':'reports','/team/':'staff_list','/departments/':'departments','/policy/':'policy','/audit/':'audit_log','/complaints/':'complaints','/service/complaints/':'complaint_queue','/profile/':'profile','/profile/password/':'password_change'};
+  const navAliases={'/dashboard/':'dashboard','/doctors/':'doctor_directory','/appointments/':'appointments','/reception/book/':'staff_book','/schedules/':'schedule','/finance/refunds/':'refunds','/reports/':'reports','/staff/':'staff_list','/team/':'staff_list','/departments/':'departments','/policy/':'policy','/audit/':'audit_log','/complaints/':'complaints','/service/complaints/':'complaint_queue','/profile/':'profile','/profile/password/':'password_change'};
   for(const [prefix,key] of Object.entries(navAliases)){
-    if(path===prefix || (prefix==='/doctors/' && path.startsWith('/doctors/') && !path.endsWith('/rules/')) || (prefix==='/schedules/' && path.startsWith('/schedules/')) || (prefix==='/team/' && path.startsWith('/team/'))){
+    if(path===prefix || (prefix==='/doctors/' && path.startsWith('/doctors/') && !path.endsWith('/rules/')) || (prefix==='/schedules/' && path.startsWith('/schedules/')) || (prefix==='/staff/' && path.startsWith('/staff/')) || (prefix==='/team/' && path.startsWith('/team/'))){
       const link=doc.querySelector('[data-nav="'+key+'"]');if(link){link.classList.add('active');link.setAttribute('aria-current','page');break;}
     }
   }
-  const openNav=()=>doc.body.classList.add('nav-open');
-  const closeNav=()=>doc.body.classList.remove('nav-open');
-  doc.querySelectorAll('[data-toggle-nav]').forEach(b=>b.addEventListener('click',()=>doc.body.classList.contains('nav-open')?closeNav():openNav()));
-  doc.querySelectorAll('[data-close-nav]').forEach(b=>b.addEventListener('click',closeNav));
+
+  // --- Universal Sidebar Open / Close / Toggle for all screen sizes and roles ---
+  function toggleNav() {
+    if (window.innerWidth <= 900) {
+      doc.body.classList.toggle('nav-open');
+    } else {
+      const isCollapsed = doc.body.classList.toggle('sidebar-collapsed');
+      try { localStorage.setItem('gh_sidebar_collapsed', isCollapsed ? 'true' : 'false'); } catch (e) {}
+    }
+  }
+
+  function closeNav() {
+    if (window.innerWidth <= 900) {
+      doc.body.classList.remove('nav-open');
+    } else {
+      doc.body.classList.add('sidebar-collapsed');
+      try { localStorage.setItem('gh_sidebar_collapsed', 'true'); } catch (e) {}
+    }
+  }
+
+  function openNav() {
+    if (window.innerWidth <= 900) {
+      doc.body.classList.add('nav-open');
+    } else {
+      doc.body.classList.remove('sidebar-collapsed');
+      try { localStorage.setItem('gh_sidebar_collapsed', 'false'); } catch (e) {}
+    }
+  }
+
+  // Restore saved desktop sidebar collapse preference
+  try {
+    if (window.innerWidth > 900 && localStorage.getItem('gh_sidebar_collapsed') === 'true') {
+      doc.body.classList.add('sidebar-collapsed');
+    }
+  } catch (e) {}
+
+  doc.querySelectorAll('[data-toggle-nav]').forEach(b=>b.addEventListener('click',(e)=>{e.preventDefault();toggleNav();}));
+  doc.querySelectorAll('[data-close-nav]').forEach(b=>b.addEventListener('click',(e)=>{e.preventDefault();closeNav();}));
   doc.addEventListener('keydown',e=>{if(e.key==='Escape')closeNav()});
   doc.querySelectorAll('[data-dismiss]').forEach(b=>b.addEventListener('click',()=>b.closest('.flash')?.remove()));
   doc.querySelectorAll('[data-password-toggle]').forEach(b=>b.addEventListener('click',()=>{const input=doc.getElementById(b.dataset.passwordToggle);if(!input)return;const show=input.type==='password';input.type=show?'text':'password';b.textContent=show?'Hide':'Show';b.setAttribute('aria-label',show?'Hide password':'Show password')}));

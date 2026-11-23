@@ -443,10 +443,16 @@ class AppointmentSystemTests(TestCase):
         self.assertContains(resp_rec_dash, 'Staff & Doctors')
         self.assertContains(resp_rec_dash, 'Dashboard')
         self.assertNotContains(resp_rec_dash, 'Overview')
+        self.assertEqual(reverse('staff_list'), '/staff/')
+        self.assertEqual(reverse('staff_new'), '/staff/new/')
         resp_rec_team = self.client.get(reverse('staff_list'))
         self.assertEqual(resp_rec_team.status_code, 200)
 
-        # 3. Doctor accesses /team/ (Staff & Doctor directory)
+        # Legacy /team/ URL redirects to /staff/
+        resp_legacy = self.client.get('/team/')
+        self.assertRedirects(resp_legacy, '/staff/')
+
+        # 3. Doctor accesses /staff/ (Staff & Doctor directory)
         self.client.force_login(self.doctor)
         resp_team = self.client.get(reverse('staff_list'))
         self.assertEqual(resp_team.status_code, 200)
@@ -463,7 +469,7 @@ class AppointmentSystemTests(TestCase):
         self.assertNotContains(resp_team, reverse('staff_new'))
         self.assertNotContains(resp_team, reverse('staff_edit', args=[self.doctor.pk]))
 
-        # 4. Admin accesses /team/ and can see management action buttons and Dashboard in nav
+        # 4. Admin accesses /staff/ and can see management action buttons and Dashboard in nav
         self.client.force_login(self.admin)
         resp_admin_dash = self.client.get(reverse('dashboard'))
         self.assertContains(resp_admin_dash, 'Dashboard')
@@ -474,7 +480,7 @@ class AppointmentSystemTests(TestCase):
         self.assertContains(resp_admin_team, reverse('staff_new'))
         self.assertContains(resp_admin_team, reverse('staff_edit', args=[self.doctor.pk]))
 
-        # 5. Patient cannot access /team/ (permission denied / redirected)
+        # 5. Patient cannot access /staff/ (permission denied / redirected)
         self.client.force_login(self.patient)
         resp_patient_team = self.client.get(reverse('staff_list'))
         self.assertIn(resp_patient_team.status_code, (302, 403))
