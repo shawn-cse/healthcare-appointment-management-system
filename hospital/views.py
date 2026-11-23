@@ -19,7 +19,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from .models import (User, DoctorProfile, Department, Appointment, AppointmentSlot,
-                     WeeklyAvailability, PaymentTransaction, RefundRequest, Complaint, HospitalPolicy, AuditEvent, Chamber)
+                     WeeklyAvailability, PaymentTransaction, RefundRequest, Complaint, ComplaintMessage, HospitalPolicy, AuditEvent, Chamber)
 from .forms import (RegisterForm, ProfileForm, StaffForm, DoctorSettingsForm, WeeklyForm, SlotForm,
                     PatientBookingForm, ReceptionBookingForm, ComplaintForm, PolicyForm,
                     StaffAssistedBookingForm, ChamberForm)
@@ -960,8 +960,13 @@ def departments(request):
 
 @role_required('patient')
 def complaints(request):
+    complaint_list = Complaint.objects.filter(patient=request.user)\
+        .select_related('appointment__slot__doctor__user', 'updated_by')\
+        .prefetch_related('messages__author')\
+        .order_by('-created_at')
     return render(request, 'patient/complaints.html', {
-        'complaints': Complaint.objects.filter(patient=request.user).order_by('-created_at')
+        'complaints': complaint_list,
+        'page_title': 'Complaints & Support',
     })
 
 
@@ -974,7 +979,7 @@ def complaint_new(request):
         obj.status = 'submitted'
         obj.save()
         log(request.user, 'complaint.submitted', obj.pk)
-        messages.success(request, 'Your request/complaint has been logged. Updates will appear in your portal.')
+        messages.success(request, 'Your request/complaint has been generated. Updates will appear in your portal.')
         return redirect('complaints')
     patient_appts = Appointment.objects.filter(patient=request.user).select_related('slot__doctor__user').order_by('-created_at')[:20]
     return render(request, 'patient/complaint_new.html', {
@@ -984,32 +989,121 @@ def complaint_new(request):
     })
 
 
-@role_required('admin','receptionist','doctor')
+@require_POST
+@role_required('patient')
+def complaint_patient_reply(request, pk):
+    complaint = get_object_or_404(Complaint, pk=pk, patient=request.user)
+    reply_text = request.POST.get('message', '').strip()
+    if reply_text:
+        ComplaintMessage.objects.create(
+            complaint=complaint,
+            author=request.user,
+            message=reply_text
+        )
+        complaint.save()
+        log(request.user, 'complaint.patient_reply', complaint.pk, f'Reply on #{complaint.pk}')
+        messages.success(request, 'Your reply has been sent to hospital administration.')
+    else:
+        messages.error(request, 'Please type a message before replying.')
+    return redirect('complaints')
+
+
+@role_required('admin', 'receptionist', 'doctor')
 def complaint_queue(request):
-    qs=Complaint.objects.select_related('patient','appointment__slot__doctor__user')
-    if request.user.role=='doctor':
-        qs=qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
-    elif request.user.role=='receptionist':
-        qs=qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
-    status=request.GET.get('status','')
-    if status in ('submitted','reviewing','in_progress','resolved'): qs=qs.filter(status=status)
-    return render(request,'staff/complaints.html',{'complaints':qs[:250]})
+    qs = Complaint.objects.select_related('patient', 'appointment__slot__doctor__user', 'updated_by')\
+        .prefetch_related('messages__author')
+    if request.user.role == 'doctor':
+        qs = qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
+    elif request.user.role == 'receptionist':
+        qs = qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
+
+    status_filter = request.GET.get('status', '').strip()
+    if status_filter in ('submitted', 'reviewing', 'resolved'):
+        qs = qs.filter(status=status_filter)
+
+    category_filter = request.GET.get('category', '').strip()
+    if category_filter == 'support':
+        qs = qs.filter(category='support')
+    elif category_filter == 'complaint':
+        qs = qs.exclude(category='support')
+
+    keyword = request.GET.get('q', '').strip()
+    if keyword:
+        qs = qs.filter(
+            Q(subject__icontains=keyword) |
+            Q(patient__first_name__icontains=keyword) |
+            Q(patient__last_name__icontains=keyword) |
+            Q(patient__phone__icontains=keyword) |
+            Q(appointment__reference__icontains=keyword) |
+            Q(message__icontains=keyword)
+        )
+
+    base_qs = Complaint.objects.all()
+    if request.user.role in ('doctor', 'receptionist'):
+        base_qs = base_qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
+
+    counts = {
+        'all': base_qs.count(),
+        'submitted': base_qs.filter(status='submitted').count(),
+        'reviewing': base_qs.filter(status='reviewing').count(),
+        'resolved': base_qs.filter(status='resolved').count(),
+        'support': base_qs.filter(category='support').count(),
+        'complaint': base_qs.exclude(category='support').count(),
+    }
+
+    return render(request, 'staff/complaints.html', {
+        'complaints': qs[:250],
+        'counts': counts,
+        'active_status': status_filter,
+        'active_category': category_filter,
+        'query': keyword,
+    })
 
 
 @require_POST
-@role_required('admin','receptionist')
-def complaint_update(request,pk):
-    qs=Complaint.objects.all()
-    if request.user.role=='receptionist':
-        qs=qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
-    obj=get_object_or_404(qs,pk=pk)
-    if request.POST.get('status') not in ('submitted','reviewing','in_progress','resolved'):
-        messages.error(request,'Invalid complaint status.')
-    else:
-        obj.status=request.POST['status'];obj.response=request.POST.get('response','')[:3000]
-        obj.updated_by=request.user;obj.save()
-        log(request.user,'complaint.updated',obj.pk,obj.status)
-        messages.success(request,'Complaint progress updated.')
+@role_required('admin', 'receptionist')
+def complaint_update(request, pk):
+    qs = Complaint.objects.all()
+    if request.user.role == 'receptionist':
+        qs = qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
+    complaint = get_object_or_404(qs, pk=pk)
+
+    new_status = request.POST.get('status', '').strip()
+    message_text = request.POST.get('message', '').strip()
+    response_note = request.POST.get('response', '').strip()
+
+    # 1. Admin asking a question / posting an inquiry message
+    if message_text:
+        ComplaintMessage.objects.create(
+            complaint=complaint,
+            author=request.user,
+            message=message_text
+        )
+        if complaint.status == 'submitted' and not new_status:
+            new_status = 'reviewing'
+            log(request.user, 'complaint.inquired', complaint.pk, f'Inquiry sent on #{complaint.pk}')
+
+    # 2. Status update
+    if new_status in ('submitted', 'reviewing', 'resolved'):
+        complaint.status = new_status
+        if new_status == 'resolved':
+            log(request.user, 'complaint.resolved', complaint.pk, f'Issue solved on #{complaint.pk}')
+        else:
+            log(request.user, 'complaint.updated', complaint.pk, complaint.status)
+
+    # 3. Resolution response note
+    if response_note:
+        complaint.response = response_note
+        if complaint.status == 'resolved' and not message_text:
+            ComplaintMessage.objects.create(
+                complaint=complaint,
+                author=request.user,
+                message=f"Official Resolution: {response_note}"
+            )
+
+    complaint.updated_by = request.user
+    complaint.save()
+    messages.success(request, f'Ticket #{complaint.pk} updated successfully.')
     return redirect('complaint_queue')
 
 

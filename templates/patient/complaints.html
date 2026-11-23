@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
-{% block title %}Complaints & Support | Green Hospital{% endblock %}
+{% block title %}Complaints & Support · Green Hospital{% endblock %}
 
 {% block content %}
 <div class="patient-complaints-page">
+  <!-- Clean Header Bar -->
   <div class="sheet-heading-bar">
     <div>
-      <span class="sheet-eyebrow">PATIENT ASSISTANCE</span>
+      <span class="sheet-eyebrow">PATIENT ASSISTANCE DESK</span>
       <h1 class="sheet-main-title">Complaints & Support</h1>
-      <p class="sheet-subtitle">Track your support requests, inquiries, and grievances with transparent real-time status updates from hospital management.</p>
+      <p class="sheet-subtitle">Transparent three-step support: <b>1. Generated</b> → <b>2. Under Review & Inquiring</b> → <b>3. Issue Solved</b></p>
     </div>
     <div class="sheet-header-actions">
       <a class="button button-primary" href="{% url 'complaint_new' %}">
@@ -19,71 +20,181 @@
   <div class="panel complaints-panel">
     <div class="panel-header">
       <div>
-        <h2>Your Tickets & Support History</h2>
-        <p>Real-time status updates: <b>Complaint Generated</b> → <b>Under Review</b> → <b>Issue Solved</b></p>
+        <h2>Your Active Tickets & History</h2>
+        <p>Communicate directly with hospital administration, answer inquiries, and track resolution.</p>
       </div>
     </div>
 
     <div class="concern-list-wrapper">
       {% for c in complaints %}
-      <article class="ticket-card {% if c.status == 'resolved' %}ticket-resolved{% elif c.status == 'reviewing' %}ticket-reviewing{% else %}ticket-submitted{% endif %}">
+      <article class="ticket-card {% if c.status == 'resolved' %}ticket-resolved{% elif c.status == 'reviewing' %}ticket-reviewing{% else %}ticket-submitted{% endif %}" id="ticket-{{ c.pk }}">
+        <!-- Top Metadata Row -->
         <div class="ticket-top-row">
-          <div class="ticket-type-badge">
-            {% if c.category == 'support' %}
-              <span class="badge-cat-support"><svg class="icon"><use href="#ic-help"/></svg> Support & Help</span>
-            {% else %}
-              <span class="badge-cat-complaint"><svg class="icon"><use href="#ic-alert"/></svg> Grievance: {{ c.get_category_display }}</span>
-            {% endif %}
-          </div>
-
-          <div class="ticket-status-pill">
-            {% if c.status == 'resolved' %}
-              <span class="status-badge status-solved"><svg class="icon"><use href="#ic-check"/></svg> Issue Solved</span>
-            {% elif c.status == 'reviewing' %}
-              <span class="status-badge status-reviewing"><svg class="icon"><use href="#ic-clock"/></svg> Under Review</span>
-            {% else %}
-              <span class="status-badge status-generated"><svg class="icon"><use href="#ic-alert"/></svg> Complaint Generated</span>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="ticket-main-body">
-          <h3 class="ticket-subject">{{ c.subject }}</h3>
-          <p class="ticket-message">{{ c.message|linebreaksbr }}</p>
-
-          <div class="ticket-meta-footer">
-            <span class="ticket-timestamp">Submitted on {{ c.created_at|date:'d M Y, g:i A' }}</span>
+          <div class="ticket-meta-left">
+            <span class="ticket-number-tag">Ticket #{{ c.pk }}</span>
+            <div class="ticket-type-badge">
+              {% if c.is_support %}
+                <span class="badge-cat-support"><svg class="icon"><use href="#ic-help"/></svg> General Support & Help</span>
+              {% else %}
+                <span class="badge-cat-complaint"><svg class="icon"><use href="#ic-alert"/></svg> Grievance: {{ c.get_category_display }}</span>
+              {% endif %}
+            </div>
             {% if c.appointment %}
               <span class="ticket-appt-link">
                 Ref: <a href="{% url 'appointment_detail' c.appointment.pk %}">{{ c.appointment.reference }}</a> (Dr. {{ c.appointment.doctor.user.display_name }})
               </span>
             {% endif %}
           </div>
+
+          <div class="ticket-status-pill">
+            {% if c.status == 'resolved' %}
+              <span class="status-badge status-solved"><svg class="icon"><use href="#ic-check"/></svg> Step 3: Issue Solved</span>
+            {% elif c.status == 'reviewing' %}
+              <span class="status-badge status-reviewing"><svg class="icon"><use href="#ic-clock"/></svg> Step 2: Under Review & Inquiring</span>
+            {% else %}
+              <span class="status-badge status-generated"><svg class="icon"><use href="#ic-alert"/></svg> Step 1: {{ c.step_label }}</span>
+            {% endif %}
+          </div>
         </div>
 
-        {% if c.response %}
-        <div class="ticket-resolution-box">
-          <div class="resolution-header">
-            <svg class="icon"><use href="#ic-check"/></svg>
-            <strong>Official Hospital Resolution Response:</strong>
-            <small class="resolution-date">{{ c.updated_at|date:'d M Y, g:i A' }}</small>
-          </div>
-          <div class="resolution-body">
-            <p>{{ c.response|linebreaksbr }}</p>
+        <!-- 3-Step Visual Progress Stepper -->
+        <div class="ticket-stepper-box">
+          <div class="ticket-stepper-track">
+            <!-- Step 1: Generated -->
+            <div class="stepper-node {% if c.status_step >= 1 %}node-done{% endif %} {% if c.status_step == 1 %}node-active{% endif %}">
+              <span class="node-icon">{% if c.status_step > 1 %}✓{% else %}1{% endif %}</span>
+              <div class="node-text">
+                <span class="node-title">{% if c.is_support %}Support Help Generated{% else %}Complaint Generated{% endif %}</span>
+                <span class="node-sub">{{ c.created_at|date:'d M, g:i A' }}</span>
+              </div>
+            </div>
+
+            <div class="stepper-connector {% if c.status_step >= 2 %}connector-done{% endif %}"></div>
+
+            <!-- Step 2: Under Review & Inquiring -->
+            <div class="stepper-node {% if c.status_step >= 2 %}node-done{% endif %} {% if c.status_step == 2 %}node-active{% endif %}">
+              <span class="node-icon">{% if c.status_step > 2 %}✓{% else %}2{% endif %}</span>
+              <div class="node-text">
+                <span class="node-title">Under Review & Inquiring</span>
+                <span class="node-sub">{% if c.status_step >= 2 %}Hospital Dialogue Active{% else %}Awaiting Admin Check{% endif %}</span>
+              </div>
+            </div>
+
+            <div class="stepper-connector {% if c.status_step >= 3 %}connector-done{% endif %}"></div>
+
+            <!-- Step 3: Issue Solved -->
+            <div class="stepper-node {% if c.status_step == 3 %}node-done node-solved{% endif %}">
+              <span class="node-icon">{% if c.status_step == 3 %}✓{% else %}3{% endif %}</span>
+              <div class="node-text">
+                <span class="node-title">Issue Solved</span>
+                <span class="node-sub">{% if c.status_step == 3 %}Case Resolved{% else %}Final Step{% endif %}</span>
+              </div>
+            </div>
           </div>
         </div>
-        {% elif c.status == 'reviewing' %}
-        <div class="ticket-pending-note">
-          <svg class="icon"><use href="#ic-clock"/></svg>
-          <span>Hospital management is actively investigating this matter. An official resolution will be posted here.</span>
+
+        <!-- Ticket Body & Subject -->
+        <div class="ticket-main-body">
+          <h3 class="ticket-subject">{{ c.subject }}</h3>
+
+          <!-- Conversation Thread: Q&A Dialogue -->
+          <div class="ticket-thread-container">
+            <!-- Original Patient Request -->
+            <div class="thread-bubble bubble-patient">
+              <div class="bubble-meta">
+                <div class="bubble-author-wrap">
+                  <span class="bubble-avatar-patient">{{ c.patient.first_name|first|upper }}</span>
+                  <strong class="author-name">{{ c.patient.display_name }} (You)</strong>
+                  <span class="badge-role role-patient">Original Request</span>
+                </div>
+                <span class="bubble-time">{{ c.created_at|date:'d M Y, g:i A' }}</span>
+              </div>
+              <div class="bubble-body">
+                {{ c.message|linebreaksbr }}
+              </div>
+            </div>
+
+            <!-- Subsequent Dialogue / Q&A Messages -->
+            {% for m in c.messages.all %}
+              <div class="thread-bubble {% if m.author == c.patient %}bubble-patient{% else %}bubble-staff{% endif %}">
+                <div class="bubble-meta">
+                  <div class="bubble-author-wrap">
+                    {% if m.author == c.patient %}
+                      <span class="bubble-avatar-patient">{{ m.author.first_name|first|upper }}</span>
+                      <strong class="author-name">{{ m.author.display_name }} (You)</strong>
+                      <span class="badge-role role-patient">Patient Reply</span>
+                    {% else %}
+                      <span class="bubble-avatar-staff">GH</span>
+                      <strong class="author-name">{{ m.author.display_name }}</strong>
+                      <span class="badge-role role-staff">
+                        {% if m.author.role == 'admin' %}Hospital Administrator{% else %}Front Desk / Support{% endif %}
+                      </span>
+                    {% endif %}
+                  </div>
+                  <span class="bubble-time">{{ m.created_at|date:'d M Y, g:i A' }}</span>
+                </div>
+                <div class="bubble-body">
+                  {{ m.message|linebreaksbr }}
+                </div>
+              </div>
+            {% endfor %}
+
+            <!-- Fallback resolution if response field exists without messages -->
+            {% if c.response and not c.messages.all %}
+              <div class="thread-bubble bubble-staff bubble-resolution">
+                <div class="bubble-meta">
+                  <div class="bubble-author-wrap">
+                    <span class="bubble-avatar-staff">GH</span>
+                    <strong class="author-name">Hospital Administration</strong>
+                    <span class="badge-role role-staff">Official Resolution</span>
+                  </div>
+                  <span class="bubble-time">{{ c.updated_at|date:'d M Y, g:i A' }}</span>
+                </div>
+                <div class="bubble-body">
+                  {{ c.response|linebreaksbr }}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Interactive Reply Box (Active when ticket is in Step 1 or Step 2) -->
+          {% if c.status != 'resolved' %}
+            <div class="patient-reply-section">
+              <div class="reply-header">
+                <svg class="icon"><use href="#ic-chat"/></svg>
+                <span><b>Answer inquiry or provide missing details:</b></span>
+              </div>
+              <form method="post" action="{% url 'complaint_patient_reply' c.pk %}" class="patient-reply-form">
+                {% csrf_token %}
+                <textarea name="message" class="field-control reply-textarea" rows="2"
+                          placeholder="Type your response to hospital administration (e.g. appointment date, slip number, or clarifying details)..." required></textarea>
+                <div class="reply-actions">
+                  <button type="submit" class="button button-primary button-sm">
+                    <svg class="icon"><use href="#ic-arrow"/></svg> Send Reply
+                  </button>
+                </div>
+              </form>
+            </div>
+          {% else %}
+            <!-- Solved Status Banner -->
+            <div class="ticket-solved-banner">
+              <svg class="icon"><use href="#ic-check"/></svg>
+              <div>
+                <strong>✓ Issue Solved & Case Completed</strong>
+                <p>This request has been investigated and resolved by hospital administration. Thank you for your cooperation.</p>
+                {% if c.response %}
+                  <div class="resolution-summary-text"><b>Final Resolution:</b> {{ c.response }}</div>
+                {% endif %}
+              </div>
+            </div>
+          {% endif %}
         </div>
-        {% endif %}
       </article>
       {% empty %}
       <div class="empty-state panel">
         <span class="empty-icon"><svg class="icon"><use href="#ic-help"/></svg></span>
         <h3>No support tickets or complaints yet</h3>
-        <p>If you experience any difficulties or require assistance, our patient relations team is ready to help.</p>
+        <p>If you have any questions, need assistance with your booking, or have service concerns, our patient relations team is here for you.</p>
         <a class="button button-primary button-sm" href="{% url 'complaint_new' %}" style="margin-top:14px;">
           Create Support Request or Complaint
         </a>

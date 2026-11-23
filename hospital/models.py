@@ -421,7 +421,7 @@ class Complaint(models.Model):
         max_length=20,
         choices=[
             ('submitted', 'Complaint Generated'),
-            ('reviewing', 'Under Review'),
+            ('reviewing', 'Under Review & Inquiring'),
             ('resolved', 'Issue Solved'),
         ],
         default='submitted'
@@ -433,6 +433,43 @@ class Complaint(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+    @property
+    def is_support(self):
+        return self.category == 'support'
+
+    @property
+    def status_step(self):
+        if self.status == 'submitted':
+            return 1
+        elif self.status == 'reviewing':
+            return 2
+        elif self.status == 'resolved':
+            return 3
+        return 1
+
+    @property
+    def step_label(self):
+        if self.status == 'submitted':
+            return 'Support Help Generated' if self.is_support else 'Complaint Generated'
+        elif self.status == 'reviewing':
+            return 'Under Review & Inquiring'
+        elif self.status == 'resolved':
+            return 'Issue Solved'
+        return self.get_status_display()
+
+
+class ComplaintMessage(models.Model):
+    complaint = models.ForeignKey(Complaint, on_delete=models.CASCADE, related_name='messages')
+    author = models.ForeignKey(User, on_delete=models.PROTECT, related_name='complaint_messages')
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.author.display_name}: {self.message[:35]}"
 
 
 class AuditEvent(models.Model):
@@ -472,8 +509,11 @@ class AuditEvent(models.Model):
         'department.created': ('Department Created', 'Management', 'status-info', 'ic-building'),
         'doctor.rules_updated': ('Doctor Practice Rules Saved', 'Management', 'status-teal', 'ic-settings'),
         'hospital.policy_defaults': ('Hospital Policy Updated', 'Management', 'status-teal', 'ic-settings'),
-        'complaint.submitted': ('Patient Feedback Logged', 'Feedback', 'status-amber', 'ic-alert'),
-        'complaint.updated': ('Feedback Status Updated', 'Feedback', 'status-teal', 'ic-alert'),
+        'complaint.submitted': ('Ticket / Request Logged', 'Support', 'status-amber', 'ic-alert'),
+        'complaint.updated': ('Ticket Status Updated', 'Support', 'status-teal', 'ic-alert'),
+        'complaint.patient_reply': ('Patient Reply Received', 'Support', 'status-info', 'ic-user'),
+        'complaint.inquired': ('Hospital Inquiry Sent', 'Support', 'status-teal', 'ic-help'),
+        'complaint.resolved': ('Ticket Issue Solved', 'Support', 'status-confirmed', 'ic-check'),
         'report.exported': ('Financial Report Exported', 'Analytics', 'status-slate', 'ic-chart'),
     }
 

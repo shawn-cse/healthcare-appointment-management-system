@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.core.exceptions import ValidationError, PermissionDenied
 from .models import (User,Department,DoctorProfile,AppointmentSlot,Appointment,RefundRequest,
-                     PaymentTransaction, Chamber, WeeklyAvailability)
+                     PaymentTransaction, Chamber, WeeklyAvailability, Complaint, ComplaintMessage)
 from .services import (create_appointment, record_cash_payment, cancel_appointment,
                        fee_for, approve_refund, finalize_cash_refund, collected_revenue_shares)
 from .forms import RegisterForm, StaffForm
@@ -311,3 +311,72 @@ class AppointmentSystemTests(TestCase):
         response = self.client.get(reverse('patient_book', args=[self.slot.pk]))
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login/', response.url)
+
+    def test_complaints_and_support_three_step_lifecycle_and_qa_flow(self):
+        # 1. Step 1: Patient generates a Support / Complaint ticket
+        self.client.force_login(self.patient)
+        resp = self.client.post(reverse('complaint_new'), {
+            'category': 'support',
+            'subject': 'Inquiry about report collection',
+            'message': 'When can I collect my cardiology ECG report from room 201?'
+        })
+        self.assertEqual(resp.status_code, 302)
+        complaint = Complaint.objects.get(patient=self.patient, subject='Inquiry about report collection')
+        self.assertEqual(complaint.status, 'submitted')
+        self.assertEqual(complaint.status_step, 1)
+        self.assertEqual(complaint.step_label, 'Support Help Generated')
+
+        # Patient view shows ticket in Step 1
+        resp_patient = self.client.get(reverse('complaints'))
+        self.assertEqual(resp_patient.status_code, 200)
+        self.assertContains(resp_patient, 'Support Help Generated')
+        self.assertContains(resp_patient, 'When can I collect my cardiology ECG report')
+
+        # 2. Step 2: Admin checks ticket and asks a question / requests details
+        self.client.force_login(self.admin)
+        resp_queue = self.client.get(reverse('complaint_queue'))
+        self.assertEqual(resp_queue.status_code, 200)
+        self.assertContains(resp_queue, 'Inquiry about report collection')
+
+        # Admin posts inquiry message
+        resp_inquire = self.client.post(reverse('complaint_update', args=[complaint.pk]), {
+            'message': 'Dear patient, please provide your invoice slip number so we can check with the diagnostic lab.'
+        })
+        self.assertEqual(resp_inquire.status_code, 302)
+        complaint.refresh_from_db()
+        self.assertEqual(complaint.status, 'reviewing')
+        self.assertEqual(complaint.status_step, 2)
+        self.assertEqual(complaint.messages.count(), 1)
+        self.assertEqual(complaint.messages.first().author, self.admin)
+
+        # 3. Patient views admin question and replies back
+        self.client.force_login(self.patient)
+        resp_patient_view = self.client.get(reverse('complaints'))
+        self.assertContains(resp_patient_view, 'Under Review & Inquiring')
+        self.assertContains(resp_patient_view, 'Dear patient, please provide your invoice slip number')
+
+        resp_reply = self.client.post(reverse('complaint_patient_reply', args=[complaint.pk]), {
+            'message': 'My invoice number is INV-88291, tested yesterday afternoon.'
+        })
+        self.assertEqual(resp_reply.status_code, 302)
+        complaint.refresh_from_db()
+        self.assertEqual(complaint.messages.count(), 2)
+        self.assertEqual(complaint.messages.last().author, self.patient)
+
+        # 4. Step 3: Admin verifies and marks as Issue Solved
+        self.client.force_login(self.admin)
+        resp_solve = self.client.post(reverse('complaint_update', args=[complaint.pk]), {
+            'status': 'resolved',
+            'response': 'Report INV-88291 is ready at Chamber 201 reception desk. Thank you!'
+        })
+        self.assertEqual(resp_solve.status_code, 302)
+        complaint.refresh_from_db()
+        self.assertEqual(complaint.status, 'resolved')
+        self.assertEqual(complaint.status_step, 3)
+        self.assertEqual(complaint.step_label, 'Issue Solved')
+
+        # 5. Patient view shows Issue Solved
+        self.client.force_login(self.patient)
+        resp_final = self.client.get(reverse('complaints'))
+        self.assertContains(resp_final, 'Issue Solved & Case Completed')
+        self.assertContains(resp_final, 'Report INV-88291 is ready at Chamber 201 reception desk')
