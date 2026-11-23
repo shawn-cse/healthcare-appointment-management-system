@@ -1,7 +1,42 @@
 {% extends 'base.html' %}
-{% block title %}Choose your portal{% endblock %}
+{% block title %}Hospital Portal Access · Green Hospital{% endblock %}
+
 {% block public_content %}
-<section class="auth-background"><div class="container"><div class="auth-heading"><p class="eyebrow">WELCOME BACK</p><h1>How would you like to sign in?</h1><p>Choose the space that matches your role at Green Hospital.</p></div>
-<div class="portal-grid"><a class="portal-card" href="{% url 'login_screen' 'patient' %}"><span class="portal-icon"><svg class="icon"><use href="#ic-user"/></svg></span><span class="portal-tag">FOR PATIENTS</span><h2>Patient portal</h2><p>Book appointments, follow your visits, manage payments and track support requests.</p><span class="portal-link">Continue as patient <svg class="icon"><use href="#ic-arrow"/></svg></span></a>
-<a class="portal-card" href="{% url 'login_screen' 'staff' %}"><span class="portal-icon alt"><svg class="icon"><use href="#ic-stethoscope"/></svg></span><span class="portal-tag">FOR HOSPITAL STAFF</span><h2>Staff workspace</h2><p>Secure access for doctors, receptionists and hospital administrators.</p><span class="portal-link">Continue as staff <svg class="icon"><use href="#ic-arrow"/></svg></span></a></div><p class="auth-bottom">New patient? <a href="{% url 'register' %}">Create your account</a></p></div></section>
+<section class="auth-background">
+  <div class="container">
+    <div class="auth-heading">
+      <p class="eyebrow">GREEN HOSPITAL DHAKA</p>
+      <h1>Hospital Portal Access</h1>
+      <p>Please select the appropriate portal to access your healthcare services or clinical workspace.</p>
+    </div>
+
+    <div class="portal-grid">
+      <!-- Patient Portal Option -->
+      <a class="portal-card" href="{% url 'login_screen' 'patient' %}">
+        <span class="portal-icon">
+          <svg class="icon"><use href="#ic-user"/></svg>
+        </span>
+        <span class="portal-tag">PATIENT SERVICES</span>
+        <h2>Patient Portal</h2>
+        <p>Book specialist doctor consultations, manage appointments, download visit slips, and access support.</p>
+        <span class="portal-link">Sign in to Patient Portal <svg class="icon"><use href="#ic-arrow"/></svg></span>
+      </a>
+
+      <!-- Staff & Doctor Portal Option -->
+      <a class="portal-card" href="{% url 'login_screen' 'staff' %}">
+        <span class="portal-icon alt">
+          <svg class="icon"><use href="#ic-stethoscope"/></svg>
+        </span>
+        <span class="portal-tag">CLINICAL & ADMINISTRATIVE</span>
+        <h2>Doctor & Staff Portal</h2>
+        <p>Authorized clinical workspace for medical specialists, chamber receptionists, and hospital administrators.</p>
+        <span class="portal-link">Sign in to Staff Workspace <svg class="icon"><use href="#ic-arrow"/></svg></span>
+      </a>
+    </div>
+
+    <p class="auth-bottom">
+      New patient? <a href="{% url 'register' %}">Register an account for online booking</a>
+    </p>
+  </div>
+</section>
 {% endblock %}

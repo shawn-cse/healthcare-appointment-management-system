@@ -106,6 +106,17 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(response.status_code,200)
         self.assertContains(response,'staff account')
 
+    def test_role_based_logout_redirection(self):
+        # Patient logout redirects to patient login screen
+        self.client.force_login(self.patient)
+        resp_patient = self.client.post(reverse('logout'))
+        self.assertRedirects(resp_patient, reverse('login_screen', args=['patient']))
+
+        # Staff logout redirects to staff login screen
+        self.client.force_login(self.admin)
+        resp_staff = self.client.post(reverse('logout'))
+        self.assertRedirects(resp_staff, reverse('login_screen', args=['staff']))
+
     def test_staff_can_log_in_by_email_or_phone(self):
         self.doctor.email='karim@example.org';self.doctor.save(update_fields=['email'])
         self.assertTrue(self.client.login(username='karim@example.org',password='secureDoctor123!'))

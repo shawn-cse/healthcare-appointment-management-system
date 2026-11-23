@@ -110,9 +110,12 @@ def register(request):
 @require_POST
 @login_required
 def log_out(request):
+    user_role = getattr(request.user, 'role', None)
     logout(request)
-    messages.success(request, 'You have been signed out.')
-    return redirect('home')
+    messages.success(request, 'You have been successfully signed out.')
+    if user_role == 'patient':
+        return redirect('login_screen', kind='patient')
+    return redirect('login_screen', kind='staff')
 
 
 @login_required
