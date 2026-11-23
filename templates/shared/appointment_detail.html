@@ -185,6 +185,11 @@
             </form>
           </div>
         {% endif %}
+        {% if user.role == 'patient' %}
+          <a href="{% url 'complaint_new' %}?appointment={{ appointment.pk }}" class="button button-outline button-xs button-full" style="margin-top: 6px;">
+            <svg class="icon"><use href="#ic-help"/></svg> Ask Question / Report Issue
+          </a>
+        {% endif %}
       </div>
     </div>
   </div>

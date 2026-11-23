@@ -999,18 +999,30 @@ def complaints(request):
 
 @role_required('patient')
 def complaint_new(request):
-    form = ComplaintForm(request.POST or None, request.FILES or None, patient=request.user)
+    initial = {}
+    appt_param = request.GET.get('appointment', '').strip()
+    if appt_param and appt_param.isdigit():
+        initial['appointment'] = int(appt_param)
+        initial['category'] = 'doctor'
+    form = ComplaintForm(request.POST or None, request.FILES or None, patient=request.user, initial=initial)
     if request.method == 'POST' and form.is_valid():
         obj = form.save(commit=False)
         obj.patient = request.user
         obj.status = 'submitted'
+        category = request.POST.get('category', 'support')
+        if category in ('doctor', 'hospital', 'staff', 'billing', 'other'):
+            obj.category = category
+        else:
+            obj.category = 'support'
         if 'attachment' in request.FILES:
             obj.attachment = request.FILES['attachment']
         obj.save()
         log(request.user, 'complaint.submitted', obj.pk)
         messages.success(request, f'Your request/complaint {obj.display_code} has been generated. Updates will appear in your portal.')
         return redirect('complaints')
-    patient_appts = Appointment.objects.filter(patient=request.user).select_related('slot__doctor__user').order_by('-created_at')[:20]
+    patient_appts = Appointment.objects.filter(
+        Q(patient=request.user) | Q(guest_phone=request.user.phone)
+    ).select_related('slot__doctor__user', 'slot__doctor__department').distinct().order_by('-created_at')[:30]
     return render(request, 'patient/complaint_new.html', {
         'form': form,
         'patient_appointments': patient_appts,
@@ -1039,9 +1051,20 @@ def complaint_patient_reply(request, pk):
 
 @role_required('admin', 'receptionist', 'doctor')
 def complaint_queue(request):
-    qs = Complaint.objects.select_related('patient', 'appointment__slot__doctor__user', 'updated_by')
-    if request.user.role in ('doctor', 'receptionist'):
-        qs = qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
+    qs = Complaint.objects.select_related(
+        'patient',
+        'appointment__slot__doctor__user',
+        'appointment__slot__doctor__department',
+        'updated_by'
+    )
+    # Role-based visibility scoping:
+    # 1. Admin: Complete Support Desk — sees all complaints and general support requests
+    # 2. Doctor: Sees ONLY complaints/inquiries submitted for their own related appointments
+    # 3. Receptionist: Sees complaints submitted for their assigned doctors' appointments
+    if request.user.role == 'doctor':
+        qs = qs.filter(appointment__isnull=False, appointment__slot__doctor__user=request.user)
+    elif request.user.role == 'receptionist':
+        qs = qs.filter(appointment__isnull=False, appointment__slot__doctor__in=managed_doctors(request.user))
 
     status_filter = request.GET.get('status', '').strip()
     if status_filter in ('submitted', 'reviewing', 'resolved'):
@@ -1053,6 +1076,13 @@ def complaint_queue(request):
     elif category_filter == 'complaint':
         qs = qs.exclude(category='support')
 
+    doctor_filter = request.GET.get('doctor', '').strip()
+    if request.user.role == 'admin' and doctor_filter:
+        if doctor_filter.isdigit():
+            qs = qs.filter(appointment__slot__doctor__pk=int(doctor_filter))
+        elif doctor_filter == 'none':
+            qs = qs.filter(appointment__isnull=True)
+
     keyword = request.GET.get('q', '').strip()
     if keyword:
         qs = qs.filter(
@@ -1062,6 +1092,8 @@ def complaint_queue(request):
             Q(patient__last_name__icontains=keyword) |
             Q(patient__phone__icontains=keyword) |
             Q(appointment__reference__icontains=keyword) |
+            Q(appointment__slot__doctor__user__first_name__icontains=keyword) |
+            Q(appointment__slot__doctor__user__last_name__icontains=keyword) |
             Q(message__icontains=keyword)
         )
 
@@ -1073,8 +1105,10 @@ def complaint_queue(request):
         qs = qs.order_by('-created_at')
 
     base_qs = Complaint.objects.all()
-    if request.user.role in ('doctor', 'receptionist'):
-        base_qs = base_qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
+    if request.user.role == 'doctor':
+        base_qs = base_qs.filter(appointment__isnull=False, appointment__slot__doctor__user=request.user)
+    elif request.user.role == 'receptionist':
+        base_qs = base_qs.filter(appointment__isnull=False, appointment__slot__doctor__in=managed_doctors(request.user))
 
     counts = {
         'all': base_qs.count(),
@@ -1085,22 +1119,34 @@ def complaint_queue(request):
         'complaint': base_qs.exclude(category='support').count(),
     }
 
+    all_doctors = (
+        DoctorProfile.objects.filter(user__is_active=True)
+        .select_related('user', 'department')
+        .order_by('user__first_name')
+        if request.user.role == 'admin'
+        else None
+    )
+
     return render(request, 'staff/complaints.html', {
         'complaints': qs[:300],
         'counts': counts,
         'active_status': status_filter,
         'active_category': category_filter,
+        'active_doctor': doctor_filter,
+        'all_doctors': all_doctors,
         'query': keyword,
         'sort': sort_param,
     })
 
 
 @require_POST
-@role_required('admin', 'receptionist')
+@role_required('admin', 'receptionist', 'doctor')
 def complaint_update(request, pk):
     qs = Complaint.objects.all()
-    if request.user.role == 'receptionist':
-        qs = qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
+    if request.user.role == 'doctor':
+        qs = qs.filter(appointment__isnull=False, appointment__slot__doctor__user=request.user)
+    elif request.user.role == 'receptionist':
+        qs = qs.filter(appointment__isnull=False, appointment__slot__doctor__in=managed_doctors(request.user))
     complaint = get_object_or_404(qs, pk=pk)
 
     new_status = request.POST.get('status', '').strip()
@@ -1127,7 +1173,7 @@ def complaint_update(request, pk):
 
 
 @require_POST
-@role_required('admin', 'receptionist')
+@role_required('admin', 'receptionist', 'doctor')
 def complaint_bulk(request):
     selected_ids = request.POST.getlist('selected_complaints')
     bulk_status = request.POST.get('bulk_status', '').strip()
@@ -1140,8 +1186,10 @@ def complaint_bulk(request):
         return redirect('complaint_queue')
 
     qs = Complaint.objects.filter(pk__in=selected_ids)
-    if request.user.role == 'receptionist':
-        qs = qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
+    if request.user.role == 'doctor':
+        qs = qs.filter(appointment__isnull=False, appointment__slot__doctor__user=request.user)
+    elif request.user.role == 'receptionist':
+        qs = qs.filter(appointment__isnull=False, appointment__slot__doctor__in=managed_doctors(request.user))
 
     count = 0
     for c in qs:

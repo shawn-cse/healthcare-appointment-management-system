@@ -65,7 +65,7 @@
         <select name="appointment" id="complaint-appt-select" class="field-control">
           <option value="">None / General inquiry not tied to a specific visit</option>
           {% for appt in patient_appointments %}
-          <option value="{{ appt.pk }}">{{ appt.reference }} — Dr. {{ appt.doctor.user.display_name }} ({{ appt.slot.date|date:'d M Y' }})</option>
+          <option value="{{ appt.pk }}" {% if form.initial.appointment == appt.pk or request.GET.appointment == appt.pk|stringformat:'s' %}selected{% endif %}>{{ appt.reference }} — Dr. {{ appt.doctor.user.display_name }} ({{ appt.slot.date|date:'d M Y' }})</option>
           {% endfor %}
         </select>
         <small class="field-hint">Attach a specific consultation if your request is related to a doctor visit.</small>

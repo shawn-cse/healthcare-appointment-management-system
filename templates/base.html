@@ -151,7 +151,7 @@
         {% if user.role == 'admin' or user.role == 'receptionist' %}
           <a href="{% url 'refunds' %}" data-nav="refunds"><svg class="icon"><use href="#ic-wallet"/></svg> Refund Management</a>
         {% endif %}
-        <a href="{% url 'complaint_queue' %}" data-nav="complaint_queue"><svg class="icon"><use href="#ic-help"/></svg> Patient Concerns</a>
+        <a href="{% url 'complaint_queue' %}" data-nav="complaint_queue"><svg class="icon"><use href="#ic-help"/></svg> Complaint & Support Desk</a>
         {% if user.role == 'admin' or user.role == 'doctor' %}
           <a href="{% url 'reports' %}" data-nav="reports"><svg class="icon"><use href="#ic-chart"/></svg> Reports & Analytics</a>
         {% endif %}

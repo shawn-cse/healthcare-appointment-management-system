@@ -460,3 +460,73 @@ class AppointmentSystemTests(TestCase):
         resp_patient_team = self.client.get(reverse('staff_list'))
         self.assertIn(resp_patient_team.status_code, (302, 403))
 
+    def test_complaint_support_desk_scoping_doctor_and_admin(self):
+        # Create appointment for Doctor 1 (self.doctor) with self.patient
+        appt1 = self.book(actor=self.patient, slot=self.slot)
+        # Create appointment for Doctor 2 (self.other_doctor) with self.other_patient
+        appt2 = self.book(actor=self.other_patient, patient=self.other_patient, slot=self.slot_two)
+
+        # 1. Ticket linked to Doctor 1's appointment
+        c_doc1 = Complaint.objects.create(
+            patient=self.patient,
+            appointment=appt1,
+            category='doctor',
+            subject='Consultation inquiry for Dr. Karim',
+            message='Please clarify dosage instructed.'
+        )
+
+        # 2. Ticket linked to Doctor 2's appointment
+        c_doc2 = Complaint.objects.create(
+            patient=self.patient,
+            appointment=appt2,
+            category='doctor',
+            subject='Inquiry for second doctor',
+            message='Waiting time question.'
+        )
+
+        # 3. General support ticket not tied to any appointment
+        c_general = Complaint.objects.create(
+            patient=self.patient,
+            appointment=None,
+            category='support',
+            subject='Parking and lift inquiry',
+            message='Is elevator 2 working?'
+        )
+
+        # Doctor 1 accesses Complaint & Support Desk
+        self.client.force_login(self.doctor)
+        resp_doc = self.client.get(reverse('complaint_queue'))
+        self.assertEqual(resp_doc.status_code, 200)
+        # Verify navigation has Complaint & Support Desk
+        self.assertContains(resp_doc, 'Complaint & Support Desk')
+        self.assertNotContains(resp_doc, 'Patient Concerns')
+        # Doctor 1 sees ONLY ticket linked to their own appointment
+        self.assertContains(resp_doc, c_doc1.display_code)
+        self.assertNotContains(resp_doc, c_doc2.display_code)
+        self.assertNotContains(resp_doc, c_general.display_code)
+
+        # Doctor 1 can update their own ticket
+        resp_up = self.client.post(reverse('complaint_update', args=[c_doc1.pk]), {
+            'status': 'resolved',
+            'response': 'Prescription clarified with patient via telephone.'
+        })
+        self.assertEqual(resp_up.status_code, 302)
+        c_doc1.refresh_from_db()
+        self.assertEqual(c_doc1.status, 'resolved')
+
+        # Admin accesses Complaint & Support Desk
+        self.client.force_login(self.admin)
+        resp_admin = self.client.get(reverse('complaint_queue'))
+        self.assertEqual(resp_admin.status_code, 200)
+        # Admin sees complete support desk (all 3 tickets)
+        self.assertContains(resp_admin, c_doc1.display_code)
+        self.assertContains(resp_admin, c_doc2.display_code)
+        self.assertContains(resp_admin, c_general.display_code)
+
+        # Admin filters by Doctor 1
+        resp_admin_filtered = self.client.get(reverse('complaint_queue') + f'?doctor={self.doc.pk}')
+        self.assertContains(resp_admin_filtered, c_doc1.display_code)
+        self.assertNotContains(resp_admin_filtered, c_doc2.display_code)
+        self.assertNotContains(resp_admin_filtered, c_general.display_code)
+
+
