@@ -25,7 +25,18 @@ DOB_DATE = forms.DateInput(attrs={
     'data-mode': 'dob',
     'data-max': 'today'
 })
-TIME = forms.TimeInput(attrs={'type':'time'}, format='%H:%M')
+# Support 12h AM/PM formats globally across all TimeFields
+forms.TimeField.input_formats = [
+    '%H:%M:%S', '%H:%M:%S.%f', '%H:%M',
+    '%I:%M %p', '%I:%M%p', '%I:%M %P', '%I:%M%P'
+]
+TIME = forms.TimeInput(attrs={
+    'type': 'text',
+    'class': 'field-control green-timepicker',
+    'placeholder': 'HH:MM (e.g. 09:30 AM)',
+    'autocomplete': 'off',
+    'data-timepicker': 'true'
+}, format='%H:%M')
 
 
 def get_next_patient_username():

@@ -85,3 +85,12 @@ PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', 'http://localhost:8000').rst
 SSLCOMMERZ_STORE_ID = os.environ.get('SSLCOMMERZ_STORE_ID', '')
 SSLCOMMERZ_STORE_PASSWORD = os.environ.get('SSLCOMMERZ_STORE_PASSWORD', '')
 SSLCOMMERZ_LIVE = os.environ.get('SSLCOMMERZ_LIVE', '0') == '1'
+
+TIME_INPUT_FORMATS = [
+    '%H:%M',
+    '%H:%M:%S',
+    '%I:%M %p',
+    '%I:%M%p',
+    '%I:%M %P',
+    '%I:%M%P',
+]

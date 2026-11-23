@@ -2,9 +2,12 @@
    Green Hospital - Clinical DatePicker & Calendar UI
    ========================================================================== */
 
-/* Suppress browser native datepicker indicators */
+/* Suppress browser native datepicker & timepicker indicators */
 input[type="date"]::-webkit-inner-spin-button,
-input[type="date"]::-webkit-calendar-picker-indicator {
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-inner-spin-button,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-clear-button {
   display: none !important;
   -webkit-appearance: none !important;
   opacity: 0 !important;
@@ -13,7 +16,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   pointer-events: none !important;
 }
 
-input[type="date"] {
+input[type="date"],
+input[type="time"] {
   -moz-appearance: textfield;
 }
 
@@ -365,4 +369,380 @@ input[type="date"] {
 .date-card-pill.selected .pill-clinic-tag {
   background: #ffffff;
   color: #0e4a3e;
+}
+
+/* ==========================================================================
+   Green Hospital - Clinical Watch & TimePicker UI (Like Calendar)
+   ========================================================================== */
+
+/* Time Input Container */
+.green-time-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+}
+
+.green-time-input {
+  width: 100%;
+  cursor: pointer;
+  padding-right: 74px !important;
+}
+
+/* Watch / Clock Button Icon on the right */
+.time-input-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #edf7f2;
+  color: #166151;
+  border: 1px solid #cce5d6;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.time-input-btn:hover {
+  background: #104b42;
+  color: #ffffff;
+  border-color: #104b42;
+  transform: translateY(-50%) scale(1.05);
+}
+
+.time-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Clear button on the right */
+.time-input-clear {
+  position: absolute;
+  right: 44px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e6ede8;
+  color: #4b6b60;
+  border: 0;
+  display: none;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.time-input-clear:hover {
+  background: #fdf2f2;
+  color: #ad2b2b;
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* ==========================================================================
+   Time Popover Dialog (Calendar & Watch Theme)
+   ========================================================================== */
+
+.green-time-popover {
+  position: absolute;
+  z-index: 1000;
+  width: 330px;
+  background: #ffffff;
+  border: 1.5px solid #cbe4d5;
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(14, 74, 62, 0.18), 0 4px 14px rgba(0, 0, 0, 0.04);
+  padding: 16px;
+  display: none;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.green-time-popover.is-open {
+  display: block;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Digital Header Display */
+.gtime-header {
+  background: linear-gradient(135deg, #0d4c3f 0%, #166151 100%);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #ffffff;
+  margin-bottom: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 3px 8px rgba(13, 76, 63, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.gtime-digital {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gtime-digits {
+  font-family: var(--font-mono, monospace);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.gtime-digit-box {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  padding: 2px 7px;
+  min-width: 38px;
+  text-align: center;
+}
+
+.gtime-period-tag {
+  background: #ffffff;
+  color: #0d4c3f;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 7px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
+}
+
+.gtime-session-lbl {
+  font-size: 11px;
+  color: #d1fae5;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+/* Quick Presets Bar */
+.gtime-presets {
+  margin-bottom: 12px;
+}
+
+.gtime-preset-lbl {
+  display: block;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.gtime-preset-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.gtime-preset-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 5px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.gtime-preset-btn:hover {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+  transform: translateY(-1px);
+}
+
+.gtime-preset-btn.is-selected {
+  background: #0d4c3f;
+  border-color: #0d4c3f;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(13, 76, 63, 0.25);
+}
+
+/* Columns Selector (Hour, Minute, AM/PM) */
+.gtime-columns-wrap {
+  display: grid;
+  grid-template-columns: 1.1fr 1.1fr 0.8fr;
+  gap: 8px;
+  margin-bottom: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.gtime-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.gtime-col-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #475569;
+  text-align: center;
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px dashed #cbd5e1;
+}
+
+.gtime-chips-scroll {
+  max-height: 150px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding-right: 2px;
+}
+
+.gtime-chips-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.gtime-chips-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.gtime-chips-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.gtime-chip {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 5px 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.14s ease;
+}
+
+.gtime-chip:hover {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+  color: #0369a1;
+}
+
+.gtime-chip.is-selected {
+  background: #0d4c3f !important;
+  border-color: #0d4c3f !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: 0 2px 5px rgba(13, 76, 63, 0.28);
+}
+
+/* Period AM/PM Stack */
+.gtime-period-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  height: 100%;
+}
+
+.gtime-period-btn {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.16s ease;
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+
+.gtime-period-btn:hover {
+  background: #e6f4ef;
+  border-color: #0d4c3f;
+  color: #0d4c3f;
+}
+
+.gtime-period-btn.is-selected {
+  background: #0d4c3f !important;
+  border-color: #0d4c3f !important;
+  color: #ffffff !important;
+  box-shadow: 0 3px 8px rgba(13, 76, 63, 0.25);
+}
+
+/* Footer Action Bar */
+.gtime-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #edf4ef;
+  padding-top: 10px;
+}
+
+.gtime-btn-text {
+  background: transparent;
+  border: 0;
+  color: #0d4c3f;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: all 0.16s ease;
+}
+
+.gtime-btn-text:hover {
+  text-decoration: underline;
+  color: #166151;
+}
+
+.gtime-btn-muted {
+  color: #64748b;
+}
+
+.gtime-btn-muted:hover {
+  color: #dc2626;
+}
+
+.gtime-btn-pill {
+  background: #0d4c3f;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 0;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.gtime-btn-pill:hover {
+  background: #166151;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(13, 76, 63, 0.25);
 }

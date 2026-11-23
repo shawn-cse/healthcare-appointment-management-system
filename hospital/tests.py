@@ -547,4 +547,49 @@ class AppointmentSystemTests(TestCase):
         self.assertNotContains(resp_admin_filtered, c_doc2.display_code)
         self.assertNotContains(resp_admin_filtered, c_general.display_code)
 
+    def test_clinical_timepicker_formats_and_widget(self):
+        from hospital.forms import TIME, SlotForm, WeeklyForm
+        # 1. Verify TIME widget configuration
+        self.assertEqual(TIME.attrs.get('data-timepicker'), 'true')
+        self.assertIn('green-timepicker', TIME.attrs.get('class', ''))
+        self.assertEqual(TIME.input_type, 'text')
+
+        # 2. Verify SlotForm accepts both 24h and 12h AM/PM formats
+        tomorrow = timezone.localdate() + timedelta(days=2)
+        slot_data_24h = {
+            'doctor': self.doc.pk,
+            'date': tomorrow.isoformat(),
+            'start_time': '16:00',
+            'end_time': '16:30',
+            'capacity': 10,
+            'is_open': True
+        }
+        doc_qs = DoctorProfile.objects.filter(pk=self.doc.pk)
+        form_24h = SlotForm(data=slot_data_24h, doctors=doc_qs)
+        self.assertTrue(form_24h.is_valid(), f"SlotForm 24h errors: {form_24h.errors}")
+
+        slot_data_12h = {
+            'doctor': self.doc.pk,
+            'date': tomorrow.isoformat(),
+            'start_time': '04:00 PM',
+            'end_time': '04:30 PM',
+            'capacity': 10,
+            'is_open': True
+        }
+        form_12h = SlotForm(data=slot_data_12h, doctors=doc_qs)
+        self.assertTrue(form_12h.is_valid(), f"SlotForm 12h errors: {form_12h.errors}")
+
+        # 3. Verify weekly availability form accepts 12h AM/PM format
+        weekly_data = {
+            'weekday': 0,
+            'start_time': '09:30 AM',
+            'end_time': '01:30 PM',
+            'duration_minutes': 15,
+            'capacity': 20,
+            'active': True
+        }
+        form_weekly = WeeklyForm(data=weekly_data)
+        self.assertTrue(form_weekly.is_valid(), f"WeeklyForm 12h errors: {form_weekly.errors}")
+
+
 

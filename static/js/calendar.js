@@ -652,6 +652,399 @@
     }
   }
 
+  /* ==========================================================================
+     GreenTimePicker - Hospital Clinical Watch & Time Picker UI
+     Replaces native browser time scroll-wheel with an emerald clinical timepicker.
+     ========================================================================== */
+
+  class GreenTimePicker {
+    constructor(input) {
+      if (input._greenTimePicker) return input._greenTimePicker;
+      this.input = input;
+      this.input._greenTimePicker = this;
+
+      // Prevent native browser popup by ensuring text mode
+      if (input.type === 'time') {
+        try { input.type = 'text'; } catch(e) {}
+      }
+      input.setAttribute('autocomplete', 'off');
+      input.classList.add('green-time-input');
+      if (!input.placeholder) {
+        input.placeholder = 'HH:MM (e.g. 09:30 AM)';
+      }
+
+      this.isOpen = false;
+      this.parseValue(input.value);
+      this.buildDOM();
+      this.bindEvents();
+    }
+
+    parseValue(str) {
+      let h = 9, m = 0, p = 'AM';
+      if (str && typeof str === 'string' && str.trim()) {
+        const s = str.trim();
+        const match = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)?$/i);
+        if (match) {
+          let rawH = parseInt(match[1], 10);
+          m = parseInt(match[2], 10);
+          const rawP = match[3] ? match[3].toUpperCase() : null;
+          if (rawP) {
+            p = rawP;
+            h = rawH;
+          } else {
+            // 24-hour e.g. "18:00"
+            if (rawH >= 12) {
+              p = 'PM';
+              h = (rawH === 12) ? 12 : rawH - 12;
+            } else {
+              p = 'AM';
+              h = (rawH === 0) ? 12 : rawH;
+            }
+          }
+        }
+      } else {
+        // Default to a sensible next clinical slot
+        const now = new Date();
+        let curH = now.getHours();
+        let curM = Math.ceil(now.getMinutes() / 5) * 5;
+        if (curM >= 60) { curM = 0; curH += 1; }
+        if (curH >= 12) {
+          p = 'PM';
+          h = (curH === 12) ? 12 : curH - 12;
+        } else {
+          p = 'AM';
+          h = (curH === 0) ? 12 : curH;
+        }
+        m = curM;
+      }
+
+      this.hour12 = Math.min(12, Math.max(1, h || 9));
+      this.minute = Math.min(55, Math.max(0, Math.round(m / 5) * 5));
+      this.period = (p === 'PM') ? 'PM' : 'AM';
+    }
+
+    getFormatted24() {
+      let h24 = this.hour12;
+      if (this.period === 'PM' && h24 < 12) h24 += 12;
+      if (this.period === 'AM' && h24 === 12) h24 = 0;
+      return `${pad(h24)}:${pad(this.minute)}`;
+    }
+
+    getFormatted12() {
+      return `${pad(this.hour12)}:${pad(this.minute)} ${this.period}`;
+    }
+
+    buildDOM() {
+      // Create wrapper
+      const wrapper = document.createElement('div');
+      wrapper.className = 'green-time-wrapper';
+      this.input.parentNode.insertBefore(wrapper, this.input);
+      wrapper.appendChild(this.input);
+      this.wrapper = wrapper;
+
+      // Clear button
+      const clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'time-input-clear';
+      clearBtn.innerHTML = '✕';
+      clearBtn.title = 'Clear time';
+      wrapper.appendChild(clearBtn);
+      this.clearBtn = clearBtn;
+
+      // Clock icon button
+      const clockBtn = document.createElement('button');
+      clockBtn.type = 'button';
+      clockBtn.className = 'time-input-btn';
+      clockBtn.title = 'Select Consultation Time';
+      clockBtn.innerHTML = `<svg class="time-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+      wrapper.appendChild(clockBtn);
+      this.clockBtn = clockBtn;
+
+      // Popover element
+      const popover = document.createElement('div');
+      popover.className = 'green-time-popover';
+      document.body.appendChild(popover);
+      this.popover = popover;
+
+      this.updateClearBtn();
+    }
+
+    updateClearBtn() {
+      if (this.clearBtn) {
+        this.clearBtn.style.display = this.input.value.trim() ? 'grid' : 'none';
+      }
+    }
+
+    renderPopover() {
+      const pad2 = pad;
+      const currentFormatted12 = this.getFormatted12();
+      const currentFormatted24 = this.getFormatted24();
+
+      this.popover.innerHTML = `
+        <div class="gtime-header">
+          <div class="gtime-digital">
+            <span class="gtime-digits">
+              <span class="gtime-digit-box">${pad2(this.hour12)}</span>
+              <span>:</span>
+              <span class="gtime-digit-box">${pad2(this.minute)}</span>
+            </span>
+            <span class="gtime-period-tag">${this.period}</span>
+          </div>
+          <span class="gtime-session-lbl">Consultation &amp; Chamber Session Time</span>
+        </div>
+
+        <div class="gtime-presets">
+          <span class="gtime-preset-lbl">Standard Session Slots:</span>
+          <div class="gtime-preset-chips">
+            <button type="button" class="gtime-preset-btn ${currentFormatted24 === '09:00' ? 'is-selected' : ''}" data-val="09:00">09:00 AM</button>
+            <button type="button" class="gtime-preset-btn ${currentFormatted24 === '10:30' ? 'is-selected' : ''}" data-val="10:30">10:30 AM</button>
+            <button type="button" class="gtime-preset-btn ${currentFormatted24 === '11:00' ? 'is-selected' : ''}" data-val="11:00">11:00 AM</button>
+            <button type="button" class="gtime-preset-btn ${currentFormatted24 === '14:00' ? 'is-selected' : ''}" data-val="14:00">02:00 PM</button>
+            <button type="button" class="gtime-preset-btn ${currentFormatted24 === '16:00' ? 'is-selected' : ''}" data-val="16:00">04:00 PM</button>
+            <button type="button" class="gtime-preset-btn ${currentFormatted24 === '18:00' ? 'is-selected' : ''}" data-val="18:00">06:00 PM</button>
+          </div>
+        </div>
+
+        <div class="gtime-columns-wrap">
+          <!-- Hours Column -->
+          <div class="gtime-col">
+            <div class="gtime-col-lbl">Hour</div>
+            <div class="gtime-chips-scroll" id="gtime-hours-grid">
+              ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(h => `
+                <button type="button" class="gtime-chip ${h === this.hour12 ? 'is-selected' : ''}" data-hour="${h}">
+                  ${pad2(h)}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Minutes Column (5-min intervals) -->
+          <div class="gtime-col">
+            <div class="gtime-col-lbl">Minute</div>
+            <div class="gtime-chips-scroll" id="gtime-minutes-grid">
+              ${[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => `
+                <button type="button" class="gtime-chip ${m === this.minute ? 'is-selected' : ''}" data-minute="${m}">
+                  ${pad2(m)}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Period AM/PM Column -->
+          <div class="gtime-col">
+            <div class="gtime-col-lbl">Period</div>
+            <div class="gtime-period-group">
+              <button type="button" class="gtime-period-btn ${this.period === 'AM' ? 'is-selected' : ''}" data-period="AM">
+                AM
+              </button>
+              <button type="button" class="gtime-period-btn ${this.period === 'PM' ? 'is-selected' : ''}" data-period="PM">
+                PM
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="gtime-footer">
+          <button type="button" class="gtime-btn-text" id="gtime-now-btn">Current Clock</button>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" class="gtime-btn-text gtime-btn-muted" id="gtime-clear-act">Clear</button>
+            <button type="button" class="gtime-btn-pill" id="gtime-apply-btn">Set Time</button>
+          </div>
+        </div>
+      `;
+
+      this.attachPopoverEvents();
+    }
+
+    attachPopoverEvents() {
+      // Presets
+      this.popover.querySelectorAll('.gtime-preset-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          this.parseValue(btn.dataset.val);
+          this.applyValue();
+          this.close();
+        };
+      });
+
+      // Hour chips
+      this.popover.querySelectorAll('[data-hour]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          this.hour12 = parseInt(btn.dataset.hour, 10);
+          this.renderPopover();
+          this.applyValue();
+        };
+      });
+
+      // Minute chips
+      this.popover.querySelectorAll('[data-minute]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          this.minute = parseInt(btn.dataset.minute, 10);
+          this.renderPopover();
+          this.applyValue();
+        };
+      });
+
+      // Period buttons
+      this.popover.querySelectorAll('[data-period]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          this.period = btn.dataset.period;
+          this.renderPopover();
+          this.applyValue();
+        };
+      });
+
+      // Now button
+      const nowBtn = this.popover.querySelector('#gtime-now-btn');
+      if (nowBtn) {
+        nowBtn.onclick = (e) => {
+          e.stopPropagation();
+          const now = new Date();
+          let curH = now.getHours();
+          let curM = Math.round(now.getMinutes() / 5) * 5;
+          if (curM >= 60) { curM = 0; curH += 1; }
+          if (curH >= 12) {
+            this.period = 'PM';
+            this.hour12 = (curH === 12) ? 12 : curH - 12;
+          } else {
+            this.period = 'AM';
+            this.hour12 = (curH === 0) ? 12 : curH;
+          }
+          this.minute = curM;
+          this.renderPopover();
+          this.applyValue();
+        };
+      }
+
+      // Clear button
+      const clearAct = this.popover.querySelector('#gtime-clear-act');
+      if (clearAct) {
+        clearAct.onclick = (e) => {
+          e.stopPropagation();
+          this.input.value = '';
+          this.updateClearBtn();
+          this.dispatchEvents();
+          this.close();
+        };
+      }
+
+      // Apply button
+      const applyBtn = this.popover.querySelector('#gtime-apply-btn');
+      if (applyBtn) {
+        applyBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.applyValue();
+          this.close();
+        };
+      }
+    }
+
+    applyValue() {
+      const val24 = this.getFormatted24();
+      this.input.value = val24;
+      this.updateClearBtn();
+      this.dispatchEvents();
+    }
+
+    dispatchEvents() {
+      this.input.dispatchEvent(new Event('input', { bubbles: true }));
+      this.input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    positionPopover() {
+      const rect = this.wrapper.getBoundingClientRect();
+      const popoverWidth = 330;
+      const popoverHeight = 360;
+
+      let top = rect.bottom + window.scrollY + 6;
+      let left = rect.left + window.scrollX;
+
+      if (rect.bottom + popoverHeight > window.innerHeight && rect.top > popoverHeight) {
+        top = rect.top + window.scrollY - popoverHeight - 6;
+      }
+
+      if (left + popoverWidth > window.innerWidth) {
+        left = window.innerWidth - popoverWidth - 16;
+      }
+      if (left < 10) left = 10;
+
+      this.popover.style.top = `${top}px`;
+      this.popover.style.left = `${left}px`;
+    }
+
+    open() {
+      document.querySelectorAll('.green-cal-popover.is-open, .green-time-popover.is-open').forEach(p => {
+        p.classList.remove('is-open');
+      });
+
+      this.parseValue(this.input.value);
+      this.renderPopover();
+      this.positionPopover();
+      this.popover.classList.add('is-open');
+      this.isOpen = true;
+    }
+
+    close() {
+      this.popover.classList.remove('is-open');
+      this.isOpen = false;
+    }
+
+    toggle() {
+      if (this.isOpen) this.close();
+      else this.open();
+    }
+
+    bindEvents() {
+      this.input.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.open();
+      });
+
+      this.input.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' || e.key === 'Enter') {
+          e.preventDefault();
+          this.open();
+        } else if (e.key === 'Escape') {
+          this.close();
+        }
+      });
+
+      this.clockBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggle();
+      });
+
+      this.clearBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.input.value = '';
+        this.updateClearBtn();
+        this.dispatchEvents();
+      });
+
+      document.addEventListener('click', (e) => {
+        if (this.isOpen && !this.wrapper.contains(e.target) && !this.popover.contains(e.target)) {
+          this.close();
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && this.isOpen) {
+          this.close();
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        if (this.isOpen) this.positionPopover();
+      });
+    }
+  }
+
   // Auto-initialize GreenCalendar across all date inputs
   function initAllCalendars() {
     const selectors = [
@@ -675,13 +1068,42 @@
     });
   }
 
+  // Auto-initialize GreenTimePicker across all time inputs
+  function initAllTimePickers() {
+    const selectors = [
+      'input[type="time"]',
+      'input[data-timepicker]',
+      'input.green-timepicker',
+      'input[name="start_time"]',
+      'input[name="end_time"]',
+      'input[name="consultation_start_time"]',
+      'input[name="consultation_end_time"]',
+      '#id_start_time',
+      '#id_end_time',
+      '#id_consultation_start_time',
+      '#id_consultation_end_time'
+    ];
+
+    document.querySelectorAll(selectors.join(',')).forEach((input) => {
+      new GreenTimePicker(input);
+    });
+  }
+
+  function initAllPickers() {
+    initAllCalendars();
+    initAllTimePickers();
+  }
+
   // Run on DOMContentLoaded and expose globally
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAllCalendars);
+    document.addEventListener('DOMContentLoaded', initAllPickers);
   } else {
-    initAllCalendars();
+    initAllPickers();
   }
 
   window.GreenCalendar = GreenCalendar;
+  window.GreenTimePicker = GreenTimePicker;
   window.initAllCalendars = initAllCalendars;
+  window.initAllTimePickers = initAllTimePickers;
+  window.initAllPickers = initAllPickers;
 })();
