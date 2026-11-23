@@ -186,15 +186,15 @@
 
             <!-- 3 Distinct Consultation Fees (Tk. Format) -->
             <div class="doctor-fees-grid">
-              <div class="fee-tile fee-initial">
+              <div class="fee-tile">
                 <span class="fee-tile-label">1st Visit / New</span>
                 <b class="fee-tile-amount">Tk. {{ d.initial_fee|floatformat:0 }}</b>
               </div>
-              <div class="fee-tile fee-followup">
+              <div class="fee-tile">
                 <span class="fee-tile-label">Follow-up (<small>{{ d.followup_within_days }}d</small>)</span>
                 <b class="fee-tile-amount">Tk. {{ d.followup_fee|floatformat:0 }}</b>
               </div>
-              <div class="fee-tile fee-report">
+              <div class="fee-tile">
                 <span class="fee-tile-label">Report Review</span>
                 <b class="fee-tile-amount">Tk. {{ d.report_fee|floatformat:0 }}</b>
               </div>

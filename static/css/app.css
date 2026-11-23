@@ -6763,14 +6763,14 @@ input[type="checkbox"] {
 .doctor-fees-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  gap: 7px;
 }
 
 .fee-tile {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 7px 4px;
+  border-radius: 9px;
+  padding: 8px 4px;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -6781,16 +6781,7 @@ input[type="checkbox"] {
 .fee-tile:hover {
   background: #ffffff;
   border-color: #cbd5e1;
-}
-
-.fee-tile.fee-initial {
-  background: #f0fdf4;
-  border: 1.5px solid #86efac;
-}
-
-.fee-tile.fee-initial:hover {
-  background: #e7fbf0;
-  border-color: #4ade80;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
 }
 
 .fee-tile-label {
@@ -6798,25 +6789,15 @@ input[type="checkbox"] {
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
   line-height: 1.2;
   letter-spacing: 0.02em;
 }
 
-.fee-tile.fee-initial .fee-tile-label {
-  color: #047857;
-}
-
 .fee-tile-amount {
   font-size: 14px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.fee-tile.fee-initial .fee-tile-amount {
-  font-size: 14.5px;
   font-weight: 800;
-  color: #065f46;
+  color: #0f172a;
 }
 
 /* Schedule preview */
