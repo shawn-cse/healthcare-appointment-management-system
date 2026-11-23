@@ -75,7 +75,6 @@
             <th class="col-fee">Fee & Visit Type</th>
             <th class="col-payment">Payment Status</th>
             <th class="col-status">Appointment Status</th>
-            <th class="col-actions">Manage</th>
           </tr>
         </thead>
         <tbody>
@@ -171,30 +170,10 @@
                 <span class="appt-status-badge status-other">{{ a.get_status_display }}</span>
               {% endif %}
             </td>
-
-            <!-- 9. Manage Actions -->
-            <td class="cell-actions">
-              <div class="sheet-actions-wrap">
-                <a href="{% url 'appointment_detail' a.pk %}" class="button button-light button-xs" title="View details and print slip">
-                  Details / Slip
-                </a>
-                {% if a.status == 'confirmed' or a.status == 'pending' %}
-                  <button type="button"
-                          class="button button-danger-light button-xs btn-open-cancel"
-                          data-appt-ref="{{ a.reference }}"
-                          data-appt-doctor="{{ a.doctor.full_doctor_title }}"
-                          data-appt-fee="{{ a.fee|floatformat:0 }}"
-                          data-appt-paid="{% if a.payment_status == 'paid' %}true{% else %}false{% endif %}"
-                          data-appt-cancel-url="{% url 'appointment_cancel' a.pk %}">
-                    Cancel & Refund
-                  </button>
-                {% endif %}
-              </div>
-            </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="9" class="table-empty sheet-empty">
+            <td colspan="8" class="table-empty sheet-empty">
               <div class="empty-state">
                 <span class="empty-icon"><svg class="icon"><use href="#ic-calendar"/></svg></span>
                 <h3>No appointments found</h3>

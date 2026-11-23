@@ -349,7 +349,7 @@ class Appointment(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.reference:
-            self.reference = 'GH-' + uuid.uuid4().hex[:12].upper()
+            self.reference = 'GH-' + uuid.uuid4().hex[:6].upper()
         super().save(*args, **kwargs)
 
     @property
