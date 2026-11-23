@@ -48,6 +48,7 @@ urlpatterns = [
     path('complaints/new/', views.complaint_new, name='complaint_new'),
     path('complaints/<int:pk>/reply/', views.complaint_patient_reply, name='complaint_patient_reply'),
     path('service/complaints/', views.complaint_queue, name='complaint_queue'),
+    path('service/complaints/bulk/', views.complaint_bulk, name='complaint_bulk'),
     path('service/complaints/<int:pk>/', views.complaint_update, name='complaint_update'),
     path('finance/refunds/', views.refunds, name='refunds'),
     path('finance/refunds/bulk/', views.refund_bulk, name='refund_bulk'),

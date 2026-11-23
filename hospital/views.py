@@ -972,14 +972,16 @@ def complaints(request):
 
 @role_required('patient')
 def complaint_new(request):
-    form = ComplaintForm(request.POST or None, patient=request.user)
+    form = ComplaintForm(request.POST or None, request.FILES or None, patient=request.user)
     if request.method == 'POST' and form.is_valid():
         obj = form.save(commit=False)
         obj.patient = request.user
         obj.status = 'submitted'
+        if 'attachment' in request.FILES:
+            obj.attachment = request.FILES['attachment']
         obj.save()
         log(request.user, 'complaint.submitted', obj.pk)
-        messages.success(request, 'Your request/complaint has been generated. Updates will appear in your portal.')
+        messages.success(request, f'Your request/complaint {obj.display_code} has been generated. Updates will appear in your portal.')
         return redirect('complaints')
     patient_appts = Appointment.objects.filter(patient=request.user).select_related('slot__doctor__user').order_by('-created_at')[:20]
     return render(request, 'patient/complaint_new.html', {
@@ -1002,19 +1004,16 @@ def complaint_patient_reply(request, pk):
         )
         complaint.save()
         log(request.user, 'complaint.patient_reply', complaint.pk, f'Reply on #{complaint.pk}')
-        messages.success(request, 'Your reply has been sent to hospital administration.')
+        messages.success(request, 'Your message has been sent.')
     else:
-        messages.error(request, 'Please type a message before replying.')
+        messages.error(request, 'Please type a message before submitting.')
     return redirect('complaints')
 
 
 @role_required('admin', 'receptionist', 'doctor')
 def complaint_queue(request):
-    qs = Complaint.objects.select_related('patient', 'appointment__slot__doctor__user', 'updated_by')\
-        .prefetch_related('messages__author')
-    if request.user.role == 'doctor':
-        qs = qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
-    elif request.user.role == 'receptionist':
+    qs = Complaint.objects.select_related('patient', 'appointment__slot__doctor__user', 'updated_by')
+    if request.user.role in ('doctor', 'receptionist'):
         qs = qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
 
     status_filter = request.GET.get('status', '').strip()
@@ -1030,6 +1029,7 @@ def complaint_queue(request):
     keyword = request.GET.get('q', '').strip()
     if keyword:
         qs = qs.filter(
+            Q(ticket_code__icontains=keyword) |
             Q(subject__icontains=keyword) |
             Q(patient__first_name__icontains=keyword) |
             Q(patient__last_name__icontains=keyword) |
@@ -1037,6 +1037,13 @@ def complaint_queue(request):
             Q(appointment__reference__icontains=keyword) |
             Q(message__icontains=keyword)
         )
+
+    sort_param = request.GET.get('sort', 'newest').strip()
+    if sort_param == 'oldest':
+        qs = qs.order_by('created_at')
+    else:
+        sort_param = 'newest'
+        qs = qs.order_by('-created_at')
 
     base_qs = Complaint.objects.all()
     if request.user.role in ('doctor', 'receptionist'):
@@ -1052,11 +1059,12 @@ def complaint_queue(request):
     }
 
     return render(request, 'staff/complaints.html', {
-        'complaints': qs[:250],
+        'complaints': qs[:300],
         'counts': counts,
         'active_status': status_filter,
         'active_category': category_filter,
         'query': keyword,
+        'sort': sort_param,
     })
 
 
@@ -1069,41 +1077,55 @@ def complaint_update(request, pk):
     complaint = get_object_or_404(qs, pk=pk)
 
     new_status = request.POST.get('status', '').strip()
-    message_text = request.POST.get('message', '').strip()
     response_note = request.POST.get('response', '').strip()
+    admin_file = request.FILES.get('admin_attachment')
 
-    # 1. Admin asking a question / posting an inquiry message
-    if message_text:
-        ComplaintMessage.objects.create(
-            complaint=complaint,
-            author=request.user,
-            message=message_text
-        )
-        if complaint.status == 'submitted' and not new_status:
-            new_status = 'reviewing'
-            log(request.user, 'complaint.inquired', complaint.pk, f'Inquiry sent on #{complaint.pk}')
+    if admin_file:
+        complaint.admin_attachment = admin_file
 
-    # 2. Status update
+    if response_note:
+        complaint.response = response_note
+
     if new_status in ('submitted', 'reviewing', 'resolved'):
         complaint.status = new_status
         if new_status == 'resolved':
-            log(request.user, 'complaint.resolved', complaint.pk, f'Issue solved on #{complaint.pk}')
+            log(request.user, 'complaint.resolved', complaint.pk, f'Issue solved on {complaint.display_code}')
         else:
             log(request.user, 'complaint.updated', complaint.pk, complaint.status)
 
-    # 3. Resolution response note
-    if response_note:
-        complaint.response = response_note
-        if complaint.status == 'resolved' and not message_text:
-            ComplaintMessage.objects.create(
-                complaint=complaint,
-                author=request.user,
-                message=f"Official Resolution: {response_note}"
-            )
-
     complaint.updated_by = request.user
     complaint.save()
-    messages.success(request, f'Ticket #{complaint.pk} updated successfully.')
+    messages.success(request, f'Ticket {complaint.display_code} updated successfully.')
+    return redirect(request.META.get('HTTP_REFERER') or 'complaint_queue')
+
+
+@require_POST
+@role_required('admin', 'receptionist')
+def complaint_bulk(request):
+    selected_ids = request.POST.getlist('selected_complaints')
+    bulk_status = request.POST.get('bulk_status', '').strip()
+    if not selected_ids:
+        messages.error(request, 'Please select at least one ticket to perform a bulk status update.')
+        return redirect('complaint_queue')
+
+    if bulk_status not in ('submitted', 'reviewing', 'resolved'):
+        messages.error(request, 'Invalid status selected for bulk update.')
+        return redirect('complaint_queue')
+
+    qs = Complaint.objects.filter(pk__in=selected_ids)
+    if request.user.role == 'receptionist':
+        qs = qs.filter(appointment__slot__doctor__in=managed_doctors(request.user))
+
+    count = 0
+    for c in qs:
+        c.status = bulk_status
+        c.updated_by = request.user
+        c.save()
+        count += 1
+        log(request.user, f'complaint.bulk_{bulk_status}', c.pk, f'Bulk status change to {bulk_status}')
+
+    status_labels = {'submitted': 'Generated', 'reviewing': 'Under Review & Inquiring', 'resolved': 'Issue Solved'}
+    messages.success(request, f'Successfully updated {count} ticket(s) to "{status_labels.get(bulk_status, bulk_status)}".')
     return redirect('complaint_queue')
 
 

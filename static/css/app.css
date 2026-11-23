@@ -11367,3 +11367,468 @@ body.is-page-loading .main-content {
 @keyframes navSpinner {
   to { transform: rotate(360deg); }
 }
+
+/* ==========================================================================
+   Simplified Patient Complaints & Admin Excel Sheet Styles
+   ========================================================================== */
+
+/* --- Patient Ticket View --- */
+.ticket-code-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono, monospace);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0c3328;
+  background: #e6f4ef;
+  border: 1px solid #b7dfcf;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+}
+
+.patient-tickets-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 14px;
+}
+
+.patient-ticket-card {
+  padding: 22px 24px;
+  border-radius: 16px;
+  border: 1px solid #e2ece6;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(10, 48, 38, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ticket-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #edf4f0;
+}
+
+.ticket-identity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ticket-time-meta {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* 3-Color Stepper for Complaints (1. Blue, 2. Amber, 3. Green) */
+.node-step1 .node-icon {
+  background: #e0f2fe;
+  color: #0284c7;
+  border: 2px solid #38bdf8;
+}
+.node-step1.node-done .node-icon {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+.node-step2 .node-icon {
+  background: #fef3c7;
+  color: #d97706;
+  border: 2px solid #f59e0b;
+}
+.node-step2.node-done .node-icon {
+  background: #d97706;
+  color: #ffffff;
+  border-color: #d97706;
+}
+
+.node-step3 .node-icon {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 2px solid #22c55e;
+}
+.node-step3.node-done .node-icon {
+  background: #16a34a;
+  color: #ffffff;
+  border-color: #16a34a;
+}
+
+.stepper-connector.connector-step2 {
+  background: #fbbf24;
+}
+.stepper-connector.connector-step3 {
+  background: #22c55e;
+}
+
+.ticket-body-content {
+  padding-top: 14px;
+}
+
+.ticket-subject-heading {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0c3328;
+  margin: 0 0 6px 0;
+}
+
+.ticket-message-paragraph {
+  font-size: 13.5px;
+  color: #334155;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.ticket-attachment-wrap {
+  margin-top: 10px;
+}
+
+.attachment-pill,
+.admin-attachment-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.attachment-pill:hover,
+.admin-attachment-pill:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.admin-attachment-pill {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.admin-attachment-pill:hover {
+  background: #d1fae5;
+  color: #047857;
+}
+
+/* Official Hospital Resolution Banner */
+.ticket-resolution-box {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1.5px solid #bbf7d0;
+  background: #f0fdf4;
+}
+
+.ticket-resolution-box.resolution-in-progress {
+  border-color: #fed7aa;
+  background: #fffbeb;
+}
+
+.resolution-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #14532d;
+  margin-bottom: 6px;
+}
+
+.resolution-in-progress .resolution-header {
+  color: #9a3412;
+}
+
+.resolution-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.resolution-in-progress .resolution-icon {
+  background: #f59e0b;
+}
+
+.resolution-text {
+  font-size: 13px;
+  color: #1e293b;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.admin-attachment-wrap {
+  margin-top: 8px;
+}
+
+/* --- Admin Excel Sheet View --- */
+.excel-toolbar-panel {
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2ece6;
+}
+
+.filter-controls-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-field-group label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.5px;
+}
+
+.search-field-group {
+  flex: 1;
+  min-width: 250px;
+}
+
+.filter-button-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.excel-sheet-panel {
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+.excel-sheet-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sheet-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #334155;
+}
+
+.live-dot-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.bulk-selected-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0c3328;
+  margin-right: 6px;
+}
+
+#bulk-actions-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.excel-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.excel-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.excel-grid-table th {
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 8px 12px;
+  border-bottom: 2px solid #cbd5e1;
+  border-right: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.excel-grid-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f8fafc;
+  vertical-align: middle;
+  color: #1e293b;
+}
+
+.excel-grid-table tr:hover td {
+  background: #f8fafc;
+}
+
+.excel-grid-table tr.row-solved td {
+  background: #ffffff;
+}
+
+.excel-grid-table tr.row-reviewing td {
+  background: #fffdfa;
+}
+
+.excel-grid-table tr.row-generated td {
+  background: #ffffff;
+}
+
+.ticket-cell-code {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  color: #0c3328;
+  background: #e6f4ef;
+  border: 1px solid #b7dfcf;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11.5px;
+  display: inline-block;
+}
+
+.cell-sub-link {
+  font-size: 10.5px;
+  margin-top: 3px;
+}
+
+.cell-sub-link a {
+  color: #1b6b50;
+  text-decoration: none;
+}
+
+.cell-datetime {
+  font-size: 11.5px;
+}
+
+.patient-cell-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cell-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e2ece6;
+  color: #0c3328;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.cell-patient-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.cell-phone {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.cell-subject {
+  font-size: 12.5px;
+  color: #0f172a;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.cell-message-preview {
+  margin: 0;
+  font-size: 11.5px;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.btn-read-more {
+  background: none;
+  border: none;
+  color: #1b6b50;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.table-attachment-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0284c7;
+  text-decoration: none;
+}
+
+.table-attachment-link.admin-link {
+  color: #059669;
+}
+
+.table-attachment-link:hover {
+  text-decoration: underline;
+}
+
+.cell-admin-note {
+  font-size: 11.5px;
+  color: #1e293b;
+  font-style: italic;
+}
+
+.ticket-full-text-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 13.5px;
+  color: #334155;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  max-height: 350px;
+  overflow-y: auto;
+}

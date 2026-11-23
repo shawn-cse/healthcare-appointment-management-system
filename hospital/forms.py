@@ -677,12 +677,13 @@ class ReceptionBookingForm(forms.Form, FormStyleMixin):
 class ComplaintForm(forms.ModelForm, FormStyleMixin):
     class Meta:
         model = Complaint
-        fields = ['appointment','category','subject','message']
+        fields = ['appointment','category','subject','message','attachment']
         widgets = {'message':forms.Textarea(attrs={'rows':5})}
     def __init__(self, *args, patient=None, **kwargs):
         super().__init__(*args, **kwargs)
         if patient: self.fields['appointment'].queryset = Appointment.objects.filter(patient=patient)
         self.fields['appointment'].required = False
+        if 'attachment' in self.fields: self.fields['attachment'].required = False
         self.style_fields()
 
 

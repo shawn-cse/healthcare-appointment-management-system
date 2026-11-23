@@ -401,6 +401,7 @@ class RefundRequest(models.Model):
 
 
 class Complaint(models.Model):
+    ticket_code = models.CharField(max_length=12, blank=True, db_index=True)
     patient = models.ForeignKey(User, on_delete=models.PROTECT, related_name='complaints')
     appointment = models.ForeignKey(Appointment, on_delete=models.SET_NULL, null=True, blank=True)
     subject = models.CharField(max_length=150)
@@ -417,6 +418,7 @@ class Complaint(models.Model):
         default='support'
     )
     message = models.TextField()
+    attachment = models.FileField(upload_to='complaints/patient/', blank=True, null=True)
     status = models.CharField(
         max_length=20,
         choices=[
@@ -427,12 +429,24 @@ class Complaint(models.Model):
         default='submitted'
     )
     response = models.TextField(blank=True)
+    admin_attachment = models.FileField(upload_to='complaints/admin/', blank=True, null=True)
     updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='handled_complaints')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.ticket_code:
+            import random, string
+            chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+            self.ticket_code = f"TK-{chars}"
+        super().save(*args, **kwargs)
+
+    @property
+    def display_code(self):
+        return self.ticket_code if self.ticket_code else f"TK-{self.pk:04d}"
 
     @property
     def is_support(self):

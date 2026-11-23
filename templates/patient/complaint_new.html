@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Create Support Request or Complaint · Green Hospital{% endblock %}
+{% block title %}Create Request or File Complaint · Green Hospital{% endblock %}
 
 {% block content %}
 <div class="patient-complaint-container">
@@ -9,7 +9,7 @@
       <a class="back-link" href="{% url 'complaints' %}">‹ Back to Complaints & Support</a>
       <p class="eyebrow">PATIENT ASSISTANCE</p>
       <h1>Create Request or File Complaint</h1>
-      <p>Select the type of assistance you require. Your ticket will follow our transparent 3-step resolution process.</p>
+      <p>Select the type of assistance you require. Your ticket will follow our 3-step resolution process.</p>
     </div>
   </div>
 
@@ -40,7 +40,7 @@
     </div>
 
     <!-- Form Section -->
-    <form method="post" class="smart-form complaint-submission-form" id="patient-concern-form">
+    <form method="post" enctype="multipart/form-data" class="smart-form complaint-submission-form" id="patient-concern-form">
       {% csrf_token %}
 
       <!-- Complaint Category (Visible only when Complaint mode is selected) -->
@@ -49,9 +49,9 @@
           Complaint Category <span class="required">*</span>
         </label>
         <select name="category" id="complaint-category-select" class="field-control">
-          <option value="doctor">Doctor & Consultation</option>
+          <option value="doctor">Doctor Consultation & Conduct</option>
           <option value="hospital">Hospital Facilities & Cleanliness</option>
-          <option value="staff">Staff & Reception Desk</option>
+          <option value="staff">Staff & Front Desk Reception</option>
           <option value="billing">Billing & Payment</option>
           <option value="other">Other Grievance</option>
         </select>
@@ -68,59 +68,72 @@
           <option value="{{ appt.pk }}">{{ appt.reference }} — Dr. {{ appt.doctor.user.display_name }} ({{ appt.slot.date|date:'d M Y' }})</option>
           {% endfor %}
         </select>
+        <small class="field-hint">Attach a specific consultation if your request is related to a doctor visit.</small>
       </div>
       {% endif %}
 
       <!-- Subject Input -->
       <div class="form-group">
-        <label for="concern-subject-input">
-          <span id="subject-label-text">Subject / Question</span> <span class="required">*</span>
+        <label for="id_subject" id="dynamic-subject-label">
+          Support Subject / Question <span class="required">*</span>
         </label>
-        <input type="text" name="subject" id="concern-subject-input" class="field-control"
-               placeholder="e.g. Inquiring about test report delivery or doctor consultation timing..." maxlength="150" required>
+        <input type="text" name="subject" id="id_subject" class="field-control"
+               required maxlength="150"
+               placeholder="e.g. Inquiring about diagnostic report availability...">
       </div>
 
-      <!-- Details / Message Input -->
+      <!-- Details Description -->
       <div class="form-group">
-        <label for="concern-message-input">
-          <span id="details-label-text">Description & Information</span> <span class="required">*</span>
+        <label for="id_message" id="dynamic-details-label">
+          Inquiry Details <span class="required">*</span>
         </label>
-        <textarea name="message" id="concern-message-input" rows="4" class="field-control"
-                  placeholder="Please describe the assistance you need or what occurred..." required></textarea>
+        <textarea name="message" id="id_message" class="field-control" rows="4"
+                  required placeholder="Please describe the question or assistance you need..."></textarea>
       </div>
 
-      <!-- 3-Step Process Explanation Card -->
-      <div class="process-guarantee-card">
-        <div class="guarantee-header">
-          <svg class="icon"><use href="#ic-check"/></svg>
-          <strong>Hospital Assistance Guarantee</strong>
-        </div>
-        <div class="guarantee-steps-row">
-          <div class="g-step">
-            <span class="g-num">1</span>
-            <div><b>Generated</b><small>Instant ticket creation</small></div>
-          </div>
-          <span class="g-arrow">→</span>
-          <div class="g-step">
-            <span class="g-num">2</span>
-            <div><b>Under Review</b><small>Admin inquires & dialogue</small></div>
-          </div>
-          <span class="g-arrow">→</span>
-          <div class="g-step">
-            <span class="g-num">3</span>
-            <div><b>Issue Solved</b><small>Official resolution</small></div>
-          </div>
-        </div>
+      <!-- File Attachment Upload -->
+      <div class="form-group">
+        <label for="id_attachment">
+          Attach Supporting File (Optional)
+        </label>
+        <input type="file" name="attachment" id="id_attachment" class="field-control file-input-control"
+               accept="image/*,.pdf,.doc,.docx,.txt">
+        <small class="field-hint">Upload photos, prescription slips, bills, or medical documents (JPG, PNG, PDF, DOCX up to 5MB).</small>
       </div>
 
       <!-- Form Actions -->
-      <div class="form-actions-row">
-        <button type="submit" class="button button-primary button-lg" id="concern-submit-btn">
+      <div class="form-actions-bar">
+        <a href="{% url 'complaints' %}" class="button button-outline">Cancel</a>
+        <button type="submit" class="button button-primary" id="submit-concern-btn">
           Submit Support Request <svg class="icon"><use href="#ic-arrow"/></svg>
         </button>
-        <a href="{% url 'complaints' %}" class="button button-light">Cancel</a>
       </div>
     </form>
+  </div>
+
+  <!-- 3-Step Guarantee Summary Card -->
+  <div class="panel ticket-guarantee-card">
+    <div class="guarantee-header">
+      <span class="shield-icon">🛡️</span>
+      <div>
+        <strong>Transparent 3-Step Assistance</strong>
+        <p>Green Hospital Patient Support & Grievance Standards</p>
+      </div>
+    </div>
+    <div class="guarantee-steps">
+      <div class="g-step">
+        <span class="g-num">1</span>
+        <div><b>Generated:</b> Instant 4-digit ticket code generated in your patient portal.</div>
+      </div>
+      <div class="g-step">
+        <span class="g-num">2</span>
+        <div><b>Under Review:</b> Hospital administration reviews details and checks records.</div>
+      </div>
+      <div class="g-step">
+        <span class="g-num">3</span>
+        <div><b>Issue Solved:</b> Action taken, official resolution and reports shared.</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -130,17 +143,14 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnComplaint = document.getElementById('pill-complaint');
   const catGroup = document.getElementById('complaint-category-group');
   const catSelect = document.getElementById('complaint-category-select');
-  const subjectLabel = document.getElementById('subject-label-text');
-  const subjectInput = document.getElementById('concern-subject-input');
-  const detailsLabel = document.getElementById('details-label-text');
-  const detailsInput = document.getElementById('concern-message-input');
-  const submitBtn = document.getElementById('concern-submit-btn');
+  const subjectLabel = document.getElementById('dynamic-subject-label');
+  const subjectInput = document.getElementById('id_subject');
+  const detailsLabel = document.getElementById('dynamic-details-label');
+  const detailsInput = document.getElementById('id_message');
+  const submitBtn = document.getElementById('submit-concern-btn');
   const form = document.getElementById('patient-concern-form');
 
-  let activeMode = 'support';
-
   function setMode(mode) {
-    activeMode = mode;
     if (mode === 'support') {
       btnSupport.classList.add('active');
       btnComplaint.classList.remove('active');
@@ -154,11 +164,11 @@ document.addEventListener('DOMContentLoaded', function() {
         form.appendChild(hiddenCat);
       }
       hiddenCat.value = 'support';
-      catSelect.disabled = true;
+      catSelect.removeAttribute('name');
 
-      subjectLabel.textContent = 'Support Question / Subject';
+      subjectLabel.innerHTML = 'Support Question / Subject <span class="required">*</span>';
       subjectInput.placeholder = 'e.g. Inquiring about test report delivery or doctor consultation timing...';
-      detailsLabel.textContent = 'Inquiry Details';
+      detailsLabel.innerHTML = 'Inquiry Details <span class="required">*</span>';
       detailsInput.placeholder = 'Please describe the question or assistance you need...';
       submitBtn.innerHTML = 'Submit Support Request <svg class="icon"><use href="#ic-arrow"/></svg>';
     } else {
@@ -168,13 +178,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
       const hiddenCat = form.querySelector('input[name="category"][type="hidden"]');
       if (hiddenCat) hiddenCat.remove();
-      catSelect.disabled = false;
+      catSelect.setAttribute('name', 'category');
 
-      subjectLabel.textContent = 'Complaint Subject';
-      subjectInput.placeholder = 'e.g. Significant consultation delay at chamber, staff behaviour, billing discrepancy...';
-      detailsLabel.textContent = 'Grievance / Incident Details';
-      detailsInput.placeholder = 'Please provide full details of what occurred so hospital administration can investigate...';
-      submitBtn.innerHTML = 'File Official Complaint <svg class="icon"><use href="#ic-arrow"/></svg>';
+      subjectLabel.innerHTML = 'Complaint Subject <span class="required">*</span>';
+      subjectInput.placeholder = 'e.g. Long delay at doctor chamber, billing discrepancy...';
+      detailsLabel.innerHTML = 'Detailed Complaint / Incident <span class="required">*</span>';
+      detailsInput.placeholder = 'Please provide clear facts and details regarding what occurred...';
+      submitBtn.innerHTML = 'Lodge Formal Complaint <svg class="icon"><use href="#ic-arrow"/></svg>';
     }
   }
 

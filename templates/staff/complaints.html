@@ -8,272 +8,422 @@
     <div>
       <p class="eyebrow">SERVICE QUALITY & PATIENT ASSISTANCE</p>
       <h1>Complaints & Support Desk</h1>
-      <p>Three-step resolution pipeline: <b>1. Generated</b> → <b>2. Under Review & Inquiring</b> → <b>3. Issue Solved</b></p>
+      <p>Excel-style hospital complaint registry. 3-Step Lifecycle: <b>1. Generated</b> → <b>2. Under Review & Inquiring</b> → <b>3. Issue Solved</b></p>
     </div>
   </div>
 
-  <!-- Filter & Search Toolbar -->
-  <div class="panel filter-panel complaints-filter-panel">
-    <!-- Status Pipeline Pills -->
-    <div class="pipeline-filter-bar">
-      <div class="pipeline-steps-group">
-        <a href="?{% if active_category %}category={{ active_category }}&amp;{% endif %}{% if query %}q={{ query }}{% endif %}"
-           class="pipeline-pill {% if not active_status %}active{% endif %}">
-          All Requests <span class="pill-count">{{ counts.all }}</span>
-        </a>
-        <a href="?status=submitted{% if active_category %}&amp;category={{ active_category }}{% endif %}{% if query %}&amp;q={{ query }}{% endif %}"
-           class="pipeline-pill pill-step1 {% if active_status == 'submitted' %}active{% endif %}">
-          <span class="pill-num">1</span> Generated <span class="pill-count">{{ counts.submitted }}</span>
-        </a>
-        <a href="?status=reviewing{% if active_category %}&amp;category={{ active_category }}{% endif %}{% if query %}&amp;q={{ query }}{% endif %}"
-           class="pipeline-pill pill-step2 {% if active_status == 'reviewing' %}active{% endif %}">
-          <span class="pill-num">2</span> Under Review & Inquiring <span class="pill-count">{{ counts.reviewing }}</span>
-        </a>
-        <a href="?status=resolved{% if active_category %}&amp;category={{ active_category }}{% endif %}{% if query %}&amp;q={{ query }}{% endif %}"
-           class="pipeline-pill pill-step3 {% if active_status == 'resolved' %}active{% endif %}">
-          <span class="pill-num">3</span> Issue Solved <span class="pill-count">{{ counts.resolved }}</span>
-        </a>
+  <!-- Metric Summary Cards -->
+  <div class="metric-grid four-metrics" style="margin-bottom: 20px;">
+    <div class="metric-card">
+      <div class="metric-top">
+        <span>Total Registered</span>
+        <span class="metric-icon"><svg class="icon"><use href="#ic-clipboard"/></svg></span>
       </div>
-
-      <!-- Category Filter Pills -->
-      <div class="category-toggle-group">
-        <a href="?{% if active_status %}status={{ active_status }}&amp;{% endif %}{% if query %}q={{ query }}{% endif %}"
-           class="cat-pill {% if not active_category %}active{% endif %}">All Streams</a>
-        <a href="?category=support{% if active_status %}&amp;status={{ active_status }}{% endif %}{% if query %}&amp;q={{ query }}{% endif %}"
-           class="cat-pill {% if active_category == 'support' %}active{% endif %}">
-          <svg class="icon"><use href="#ic-help"/></svg> Support ({{ counts.support }})
-        </a>
-        <a href="?category=complaint{% if active_status %}&amp;status={{ active_status }}{% endif %}{% if query %}&amp;q={{ query }}{% endif %}"
-           class="cat-pill {% if active_category == 'complaint' %}active{% endif %}">
-          <svg class="icon"><use href="#ic-alert"/></svg> Complaints ({{ counts.complaint }})
-        </a>
-      </div>
+      <strong>{{ counts.all }}</strong>
+      <small>All patient tickets</small>
     </div>
-
-    <!-- Search Form -->
-    <form method="get" class="complaints-search-form">
-      {% if active_status %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
-      {% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
-      <div class="search-wrap">
-        <svg class="icon search-icon"><use href="#ic-search"/></svg>
-        <input type="text" name="q" value="{{ query }}" class="field-control search-input-field"
-               placeholder="Instant search by patient name, phone, ticket #, subject or appointment reference..."
-               autocomplete="off">
-        {% if query %}
-          <a href="?{% if active_status %}status={{ active_status }}{% endif %}{% if active_category %}&amp;category={{ active_category }}{% endif %}" class="clear-search-btn">✕</a>
-        {% endif %}
+    <div class="metric-card">
+      <div class="metric-top">
+        <span>1. Generated</span>
+        <span class="metric-icon blue"><svg class="icon"><use href="#ic-alert"/></svg></span>
       </div>
-      <button type="submit" class="button button-primary button-sm">Search</button>
+      <strong>{{ counts.submitted }}</strong>
+      <small>New patient requests</small>
+    </div>
+    <div class="metric-card">
+      <div class="metric-top">
+        <span>2. Under Review</span>
+        <span class="metric-icon amber"><svg class="icon"><use href="#ic-clock"/></svg></span>
+      </div>
+      <strong>{{ counts.reviewing }}</strong>
+      <small>Inquiring / investigating</small>
+    </div>
+    <div class="metric-card">
+      <div class="metric-top">
+        <span>3. Issue Solved</span>
+        <span class="metric-icon green"><svg class="icon"><use href="#ic-check"/></svg></span>
+      </div>
+      <strong>{{ counts.resolved }}</strong>
+      <small>Completed resolutions</small>
+    </div>
+  </div>
+
+  <!-- Excel Filter & Search Toolbar -->
+  <div class="panel excel-toolbar-panel">
+    <form method="get" class="excel-filter-form" id="complaints-filter-form">
+      <div class="filter-controls-row">
+        <!-- Search Keyword -->
+        <div class="filter-field-group search-field-group">
+          <label for="search-input">Search Keywords</label>
+          <div class="search-wrap">
+            <svg class="icon search-icon"><use href="#ic-search"/></svg>
+            <input type="text" name="q" id="search-input" value="{{ query }}"
+                   class="field-control search-input-field"
+                   placeholder="Search by patient name, phone, ticket code, subject, or appointment ref..."
+                   autocomplete="off">
+            {% if query %}
+              <a href="?{% if active_status %}status={{ active_status }}&amp;{% endif %}{% if active_category %}category={{ active_category }}&amp;{% endif %}{% if sort %}sort={{ sort }}{% endif %}" class="clear-search-btn" title="Clear search">✕</a>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Status Filter -->
+        <div class="filter-field-group">
+          <label for="filter-status">Status Lifecycle</label>
+          <select name="status" id="filter-status" class="field-control" onchange="this.form.submit()">
+            <option value="" {% if not active_status %}selected{% endif %}>All Statuses ({{ counts.all }})</option>
+            <option value="submitted" {% if active_status == 'submitted' %}selected{% endif %}>1. Generated ({{ counts.submitted }})</option>
+            <option value="reviewing" {% if active_status == 'reviewing' %}selected{% endif %}>2. Under Review & Inquiring ({{ counts.reviewing }})</option>
+            <option value="resolved" {% if active_status == 'resolved' %}selected{% endif %}>3. Issue Solved ({{ counts.resolved }})</option>
+          </select>
+        </div>
+
+        <!-- Stream Filter -->
+        <div class="filter-field-group">
+          <label for="filter-category">Type Stream</label>
+          <select name="category" id="filter-category" class="field-control" onchange="this.form.submit()">
+            <option value="" {% if not active_category %}selected{% endif %}>All Streams ({{ counts.all }})</option>
+            <option value="support" {% if active_category == 'support' %}selected{% endif %}>General Support & Help ({{ counts.support }})</option>
+            <option value="complaint" {% if active_category == 'complaint' %}selected{% endif %}>Formal Complaints ({{ counts.complaint }})</option>
+          </select>
+        </div>
+
+        <!-- Sort Filter: Oldest to Newest, Newest to Oldest -->
+        <div class="filter-field-group">
+          <label for="filter-sort">Sort Order</label>
+          <select name="sort" id="filter-sort" class="field-control" onchange="this.form.submit()">
+            <option value="newest" {% if sort != 'oldest' %}selected{% endif %}>Newest to Oldest (Latest First)</option>
+            <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest to Newest</option>
+          </select>
+        </div>
+
+        <!-- Filter Submit Button -->
+        <div class="filter-button-group">
+          <label>&nbsp;</label>
+          <button type="submit" class="button button-primary">Apply Filters</button>
+          {% if query or active_status or active_category or sort == 'oldest' %}
+            <a href="{% url 'complaint_queue' %}" class="button button-outline" title="Reset all filters">Reset</a>
+          {% endif %}
+        </div>
+      </div>
     </form>
   </div>
 
-  <!-- Ticket Grid / List -->
-  <div class="staff-tickets-list">
-    {% for c in complaints %}
-    <article class="panel staff-ticket-card {% if c.status == 'resolved' %}ticket-card-resolved{% elif c.status == 'reviewing' %}ticket-card-reviewing{% else %}ticket-card-submitted{% endif %}" id="ticket-{{ c.pk }}">
-      <!-- Ticket Header Row -->
-      <div class="ticket-header-bar">
-        <div class="ticket-identity">
-          <span class="ticket-id-tag">#{{ c.pk }}</span>
-          <div class="patient-profile-snippet">
-            <span class="patient-avatar-circle">{{ c.patient.first_name|first|upper }}</span>
-            <div class="patient-text">
-              <strong>{{ c.patient.display_name }}</strong>
-              <small>{{ c.patient.phone|default:'No Phone' }}</small>
-            </div>
+  <!-- Excel Sheet Container with Bulk Action Bar -->
+  <form method="post" action="{% url 'complaint_bulk' %}" id="bulk-complaint-form">
+    {% csrf_token %}
+    <div class="panel excel-sheet-panel">
+      <!-- Excel Sheet Header with Bulk Status Controls -->
+      <div class="excel-sheet-header-bar">
+        <div class="excel-header-left">
+          <div class="sheet-indicator">
+            <span class="live-dot-pulse"></span>
+            <strong>Live Complaint Registry</strong> · Showing {{ complaints|length }} of {{ counts.all }} recorded tickets
           </div>
-          {% if c.is_support %}
-            <span class="badge-cat-support"><svg class="icon"><use href="#ic-help"/></svg> Support & Help</span>
-          {% else %}
-            <span class="badge-cat-complaint"><svg class="icon"><use href="#ic-alert"/></svg> Grievance: {{ c.get_category_display }}</span>
-          {% endif %}
         </div>
 
-        <div class="ticket-header-status">
-          {% if c.status == 'resolved' %}
-            <span class="status-badge status-solved"><svg class="icon"><use href="#ic-check"/></svg> Step 3: Issue Solved</span>
-          {% elif c.status == 'reviewing' %}
-            <span class="status-badge status-reviewing"><svg class="icon"><use href="#ic-clock"/></svg> Step 2: Under Review & Inquiring</span>
-          {% else %}
-            <span class="status-badge status-generated"><svg class="icon"><use href="#ic-alert"/></svg> Step 1: {{ c.step_label }}</span>
-          {% endif %}
+        <!-- Bulk Action Controls -->
+        <div class="excel-header-right" id="bulk-actions-toolbar" style="display: none;">
+          <span class="bulk-selected-label"><b id="bulk-count-num">0</b> ticket(s) selected:</span>
+          <button type="submit" name="bulk_status" value="reviewing" class="button button-warning button-sm" onclick="return confirm('Change status of selected tickets to Under Review & Inquiring?')">
+            <svg class="icon"><use href="#ic-clock"/></svg> Mark: Under Review
+          </button>
+          <button type="submit" name="bulk_status" value="resolved" class="button button-primary button-sm" onclick="return confirm('Change status of selected tickets to Issue Solved?')">
+            <svg class="icon"><use href="#ic-check"/></svg> Mark: Issue Solved
+          </button>
         </div>
       </div>
 
-      <!-- 3-Step Visual Progress Stepper -->
-      <div class="ticket-stepper-box">
-        <div class="ticket-stepper-track">
-          <!-- Step 1: Generated -->
-          <div class="stepper-node {% if c.status_step >= 1 %}node-done{% endif %} {% if c.status_step == 1 %}node-active{% endif %}">
-            <span class="node-icon">{% if c.status_step > 1 %}✓{% else %}1{% endif %}</span>
-            <div class="node-text">
-              <span class="node-title">{% if c.is_support %}Support Help Generated{% else %}Complaint Generated{% endif %}</span>
-              <span class="node-sub">{{ c.created_at|date:'d M Y, g:i A' }}</span>
-            </div>
-          </div>
+      <!-- Excel Table -->
+      <div class="table-responsive excel-table-wrap">
+        <table class="data-table excel-grid-table" id="complaints-excel-table">
+          <thead>
+            <tr>
+              <th style="width: 36px; text-align: center;">
+                <input type="checkbox" id="select-all-complaints" title="Select all tickets on this page">
+              </th>
+              <th style="width: 105px;">Ticket #</th>
+              <th style="width: 130px;">Date & Time</th>
+              <th style="width: 170px;">Patient & Phone</th>
+              <th style="width: 135px;">Stream & Area</th>
+              <th>Subject & Inquiry Details</th>
+              <th style="width: 110px;">Patient File</th>
+              <th style="width: 155px;">Status</th>
+              <th style="width: 175px;">Hospital Resolution</th>
+              <th style="width: 120px; text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in complaints %}
+            <tr class="excel-row {% if c.status == 'resolved' %}row-solved{% elif c.status == 'reviewing' %}row-reviewing{% else %}row-generated{% endif %}" id="row-{{ c.pk }}">
+              <!-- Checkbox -->
+              <td style="text-align: center;">
+                <input type="checkbox" name="selected_complaints" value="{{ c.pk }}" class="complaint-row-checkbox">
+              </td>
 
-          <div class="stepper-connector {% if c.status_step >= 2 %}connector-done{% endif %}"></div>
+              <!-- Ticket Code -->
+              <td>
+                <span class="ticket-cell-code">{{ c.display_code }}</span>
+                {% if c.appointment %}
+                  <div class="cell-sub-link">
+                    <a href="{% url 'appointment_detail' c.appointment.pk %}" title="View linked appointment">Ref: {{ c.appointment.reference }}</a>
+                  </div>
+                {% endif %}
+              </td>
 
-          <!-- Step 2: Under Review & Inquiring -->
-          <div class="stepper-node {% if c.status_step >= 2 %}node-done{% endif %} {% if c.status_step == 2 %}node-active{% endif %}">
-            <span class="node-icon">{% if c.status_step > 2 %}✓{% else %}2{% endif %}</span>
-            <div class="node-text">
-              <span class="node-title">Under Review & Inquiring</span>
-              <span class="node-sub">{% if c.messages.count %}{{ c.messages.count }} message(s) exchanged{% else %}Inquiry / Review{% endif %}</span>
-            </div>
-          </div>
+              <!-- Date Created -->
+              <td class="nowrap cell-datetime">
+                <div>{{ c.created_at|date:'d M Y' }}</div>
+                <small class="muted-text">{{ c.created_at|date:'g:i A' }}</small>
+              </td>
 
-          <div class="stepper-connector {% if c.status_step >= 3 %}connector-done{% endif %}"></div>
+              <!-- Patient & Phone -->
+              <td>
+                <div class="patient-cell-profile">
+                  <span class="cell-avatar">{{ c.patient.first_name|first|upper }}</span>
+                  <div class="cell-patient-meta">
+                    <strong>{{ c.patient.display_name }}</strong>
+                    <small class="cell-phone">{{ c.patient.phone|default:'No Phone' }}</small>
+                  </div>
+                </div>
+              </td>
 
-          <!-- Step 3: Issue Solved -->
-          <div class="stepper-node {% if c.status_step == 3 %}node-done node-solved{% endif %}">
-            <span class="node-icon">{% if c.status_step == 3 %}✓{% else %}3{% endif %}</span>
-            <div class="node-text">
-              <span class="node-title">Issue Solved</span>
-              <span class="node-sub">{% if c.status_step == 3 %}Resolved{% else %}Pending resolution{% endif %}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Ticket Subject & Meta Details -->
-      <div class="ticket-subject-row">
-        <h3 class="ticket-title">{{ c.subject }}</h3>
-        {% if c.appointment %}
-          <div class="ticket-appt-chip">
-            <svg class="icon"><use href="#ic-calendar"/></svg>
-            <span>Linked Booking: <a href="{% url 'appointment_detail' c.appointment.pk %}"><b>{{ c.appointment.reference }}</b></a> · Dr. {{ c.appointment.doctor.user.display_name }} ({{ c.appointment.slot.date|date:'d M Y' }})</span>
-          </div>
-        {% endif %}
-      </div>
-
-      <!-- Conversation Thread (Q&A Dialogue) -->
-      <div class="ticket-thread-container">
-        <!-- 1. Patient Original Request -->
-        <div class="thread-bubble bubble-patient">
-          <div class="bubble-meta">
-            <div class="bubble-author-wrap">
-              <span class="bubble-avatar-patient">{{ c.patient.first_name|first|upper }}</span>
-              <strong class="author-name">{{ c.patient.display_name }}</strong>
-              <span class="badge-role role-patient">Patient (Original Request)</span>
-            </div>
-            <span class="bubble-time">{{ c.created_at|date:'d M Y, g:i A' }}</span>
-          </div>
-          <div class="bubble-body">
-            {{ c.message|linebreaksbr }}
-          </div>
-        </div>
-
-        <!-- 2. Subsequent Inquiries & Patient Answers -->
-        {% for m in c.messages.all %}
-          <div class="thread-bubble {% if m.author == c.patient %}bubble-patient{% else %}bubble-staff{% endif %}">
-            <div class="bubble-meta">
-              <div class="bubble-author-wrap">
-                {% if m.author == c.patient %}
-                  <span class="bubble-avatar-patient">{{ m.author.first_name|first|upper }}</span>
-                  <strong class="author-name">{{ m.author.display_name }}</strong>
-                  <span class="badge-role role-patient">Patient Reply</span>
+              <!-- Stream & Category -->
+              <td>
+                {% if c.is_support %}
+                  <span class="badge-cat-support"><svg class="icon"><use href="#ic-help"/></svg> Support</span>
                 {% else %}
-                  <span class="bubble-avatar-staff">GH</span>
-                  <strong class="author-name">{{ m.author.display_name }}</strong>
-                  <span class="badge-role role-staff">
-                    {% if m.author.role == 'admin' %}Hospital Administrator{% else %}Front Desk / Support{% endif %}
+                  <span class="badge-cat-complaint"><svg class="icon"><use href="#ic-alert"/></svg> {{ c.get_category_display }}</span>
+                {% endif %}
+              </td>
+
+              <!-- Subject & Details -->
+              <td>
+                <strong class="cell-subject">{{ c.subject }}</strong>
+                <p class="cell-message-preview">{{ c.message|truncatewords:20 }}</p>
+                {% if c.message|length > 120 %}
+                  <button type="button" class="btn-read-more" onclick="showTicketDetail('{{ c.display_code }}', '{{ c.subject|escapejs }}', '{{ c.message|escapejs }}', '{{ c.patient.display_name|escapejs }}', '{{ c.created_at|date:'d M Y, g:i A' }}', '{{ c.get_status_display }}')">Read full text ▾</button>
+                {% endif %}
+              </td>
+
+              <!-- Patient Attachment -->
+              <td>
+                {% if c.attachment %}
+                  <a href="{{ c.attachment.url }}" target="_blank" class="table-attachment-link" download title="Download patient file">
+                    <svg class="icon"><use href="#ic-download"/></svg> Attachment
+                  </a>
+                {% else %}
+                  <span class="muted-text">—</span>
+                {% endif %}
+              </td>
+
+              <!-- Status Badge (3 colors: Blue, Amber, Green) -->
+              <td>
+                {% if c.status == 'resolved' %}
+                  <span class="status-badge status-solved">
+                    <svg class="icon"><use href="#ic-check"/></svg> 3. Solved
+                  </span>
+                {% elif c.status == 'reviewing' %}
+                  <span class="status-badge status-reviewing">
+                    <svg class="icon"><use href="#ic-clock"/></svg> 2. Reviewing
+                  </span>
+                {% else %}
+                  <span class="status-badge status-generated">
+                    <svg class="icon"><use href="#ic-alert"/></svg> 1. Generated
                   </span>
                 {% endif %}
-              </div>
-              <span class="bubble-time">{{ m.created_at|date:'d M Y, g:i A' }}</span>
-            </div>
-            <div class="bubble-body">
-              {{ m.message|linebreaksbr }}
-            </div>
-          </div>
-        {% endfor %}
+              </td>
 
-        <!-- Fallback if resolution response exists without messages -->
-        {% if c.response and not c.messages.all %}
-          <div class="thread-bubble bubble-staff bubble-resolution">
-            <div class="bubble-meta">
-              <div class="bubble-author-wrap">
-                <span class="bubble-avatar-staff">GH</span>
-                <strong class="author-name">{{ c.updated_by.display_name|default:'Hospital Administration' }}</strong>
-                <span class="badge-role role-staff">Resolution Recorded</span>
-              </div>
-              <span class="bubble-time">{{ c.updated_at|date:'d M Y, g:i A' }}</span>
-            </div>
-            <div class="bubble-body">
-              {{ c.response|linebreaksbr }}
-            </div>
-          </div>
-        {% endif %}
-      </div>
-
-      <!-- Staff / Admin Action Area -->
-      {% if user.role != 'doctor' %}
-      <div class="staff-action-box">
-        <form method="post" action="{% url 'complaint_update' c.pk %}" class="staff-complaint-form">
-          {% csrf_token %}
-
-          <div class="action-grid-columns">
-            <!-- Left: Ask Question / Inquire to Patient -->
-            <div class="action-inquiry-col">
-              <label for="inquiry-msg-{{ c.pk }}">
-                <svg class="icon"><use href="#ic-chat"/></svg>
-                <b>Ask Question / Request Details from Patient:</b>
-              </label>
-              <textarea name="message" id="inquiry-msg-{{ c.pk }}" class="field-control" rows="2"
-                        placeholder="e.g. Please provide your test prescription date, chamber room number, or payment transaction ID..."></textarea>
-              <div class="inquiry-action-row">
-                <button type="submit" name="status" value="reviewing" class="button button-outline button-sm">
-                  <svg class="icon"><use href="#ic-chat"/></svg> Send Question & Mark Under Review
-                </button>
-              </div>
-            </div>
-
-            <!-- Right: Status & Resolution Controls -->
-            <div class="action-status-col">
-              <label><b>Quick Status & Resolution:</b></label>
-
-              <!-- If not resolved, give option to solve -->
-              {% if c.status != 'resolved' %}
-                <div class="resolve-box">
-                  <textarea name="response" class="field-control" rows="2"
-                            placeholder="Official resolution summary for the patient (e.g. Consultation rescheduled / Refund verified)..."></textarea>
-                  <button type="submit" name="status" value="resolved" class="button button-primary button-sm button-full">
-                    <svg class="icon"><use href="#ic-check"/></svg> Mark Issue Solved
-                  </button>
-                </div>
-              {% else %}
-                <div class="already-solved-meta">
-                  <div class="solved-indicator">
-                    <svg class="icon"><use href="#ic-check"/></svg>
-                    <span>✓ Marked as Issue Solved</span>
+              <!-- Admin Resolution Note & File -->
+              <td>
+                {% if c.response %}
+                  <div class="cell-admin-note" title="{{ c.response }}">{{ c.response|truncatechars:45 }}</div>
+                {% elif c.status == 'resolved' %}
+                  <small class="muted-text">Marked solved</small>
+                {% else %}
+                  <small class="muted-text">Pending</small>
+                {% endif %}
+                {% if c.admin_attachment %}
+                  <div>
+                    <a href="{{ c.admin_attachment.url }}" target="_blank" class="table-attachment-link admin-link" download title="Download hospital document">
+                      <svg class="icon"><use href="#ic-download"/></svg> Report File
+                    </a>
                   </div>
-                  {% if c.response %}
-                    <p class="resolved-note-text"><b>Summary:</b> {{ c.response }}</p>
-                  {% endif %}
-                  <button type="submit" name="status" value="reviewing" class="button button-light button-xs" style="margin-top: 8px;">
-                    Re-open for Review / Inquiry
-                  </button>
+                {% endif %}
+              </td>
+
+              <!-- Action Controls -->
+              <td style="text-align: right;">
+                <button type="button" class="button button-outline button-xs"
+                        onclick="openUpdateModal('{{ c.pk }}', '{{ c.display_code }}', '{{ c.status }}', '{{ c.response|escapejs }}')">
+                  Update ▾
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="10" class="empty-state-cell">
+                <div class="empty-state">
+                  <span class="empty-icon"><svg class="icon"><use href="#ic-clipboard"/></svg></span>
+                  <h3>No complaints or support tickets match criteria</h3>
+                  <p>Try clearing search keywords or switching filters to view other records.</p>
+                  <a href="{% url 'complaint_queue' %}" class="button button-outline button-sm">Clear Filters</a>
                 </div>
-              {% endif %}
-            </div>
-          </div>
-        </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-      {% elif c.response %}
-      <div class="doctor-view-resolution">
-        <b>Hospital Resolution:</b>
-        <p>{{ c.response }}</p>
-      </div>
-      {% endif %}
-    </article>
-    {% empty %}
-    <div class="panel empty-state">
-      <span class="empty-icon"><svg class="icon"><use href="#ic-help"/></svg></span>
-      <h3>No tickets match your filter criteria</h3>
-      <p>There are no active support inquiries or complaints in this category.</p>
     </div>
-    {% endfor %}
+  </form>
+</div>
+
+<!-- Modal 1: Update Single Complaint (Status, Comment, File) -->
+<div class="modal-backdrop" id="complaint-update-modal" style="display: none;">
+  <div class="modal-dialog modal-md">
+    <div class="modal-header">
+      <div>
+        <h3 id="modal-ticket-title">Update Ticket Status</h3>
+        <p class="modal-sub" id="modal-ticket-sub">Hospital Administration Actions</p>
+      </div>
+      <button type="button" class="modal-close-btn" onclick="closeUpdateModal()">✕</button>
+    </div>
+    <form method="post" enctype="multipart/form-data" id="complaint-update-form" class="smart-form">
+      {% csrf_token %}
+      <div class="modal-body">
+        <!-- Status Picker (3 Steps) -->
+        <div class="form-group">
+          <label for="modal-status-select">Status Lifecycle <span class="required">*</span></label>
+          <select name="status" id="modal-status-select" class="field-control" required>
+            <option value="submitted">1. Complaint Generated</option>
+            <option value="reviewing">2. Under Review & Inquiring</option>
+            <option value="resolved">3. Issue Solved</option>
+          </select>
+        </div>
+
+        <!-- Optional Admin Comment / Resolution Note -->
+        <div class="form-group">
+          <label for="modal-response-textarea">
+            Resolution Comment / Admin Note (Optional)
+          </label>
+          <textarea name="response" id="modal-response-textarea" class="field-control" rows="3"
+                    placeholder="Optional: write an explanation or resolution summary for the patient (leave blank if not needed)..."></textarea>
+          <small class="field-hint">You can leave this blank if you only want to change the status.</small>
+        </div>
+
+        <!-- Optional Hospital File Attachment -->
+        <div class="form-group">
+          <label for="modal-admin-attachment">
+            Attach Document / Report (Optional)
+          </label>
+          <input type="file" name="admin_attachment" id="modal-admin-attachment" class="field-control file-input-control"
+                 accept="image/*,.pdf,.doc,.docx,.txt">
+          <small class="field-hint">Upload investigation reports, receipts, or official letters (JPG, PNG, PDF up to 5MB).</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="button button-outline" onclick="closeUpdateModal()">Cancel</button>
+        <button type="submit" class="button button-primary">Save Ticket Changes</button>
+      </div>
+    </form>
   </div>
 </div>
+
+<!-- Modal 2: View Full Ticket Message -->
+<div class="modal-backdrop" id="ticket-detail-modal" style="display: none;">
+  <div class="modal-dialog modal-md">
+    <div class="modal-header">
+      <div>
+        <h3 id="view-detail-title">Ticket Details</h3>
+        <p class="modal-sub" id="view-detail-meta"></p>
+      </div>
+      <button type="button" class="modal-close-btn" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <h4 id="view-detail-subject" style="margin-bottom: 8px; color: #0c3328;"></h4>
+      <div id="view-detail-body" class="ticket-full-text-box"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="button button-primary" onclick="closeDetailModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const selectAll = document.getElementById('select-all-complaints');
+  const rowCheckboxes = document.querySelectorAll('.complaint-row-checkbox');
+  const bulkToolbar = document.getElementById('bulk-actions-toolbar');
+  const bulkCountNum = document.getElementById('bulk-count-num');
+
+  function updateBulkToolbar() {
+    const checked = document.querySelectorAll('.complaint-row-checkbox:checked');
+    const count = checked.length;
+    if (count > 0) {
+      bulkToolbar.style.display = 'inline-flex';
+      bulkCountNum.textContent = count;
+    } else {
+      bulkToolbar.style.display = 'none';
+      bulkCountNum.textContent = '0';
+    }
+  }
+
+  if (selectAll) {
+    selectAll.addEventListener('change', function() {
+      rowCheckboxes.forEach(cb => cb.checked = selectAll.checked);
+      updateBulkToolbar();
+    });
+  }
+
+  rowCheckboxes.forEach(cb => {
+    cb.addEventListener('change', function() {
+      if (!this.checked && selectAll) selectAll.checked = false;
+      updateBulkToolbar();
+    });
+  });
+});
+
+function openUpdateModal(pk, code, status, response) {
+  const modal = document.getElementById('complaint-update-modal');
+  const form = document.getElementById('complaint-update-form');
+  const title = document.getElementById('modal-ticket-title');
+  const sub = document.getElementById('modal-ticket-sub');
+  const statusSelect = document.getElementById('modal-status-select');
+  const responseText = document.getElementById('modal-response-textarea');
+
+  form.action = '/service/complaints/' + pk + '/';
+  title.textContent = 'Update Ticket ' + code;
+  sub.textContent = 'Hospital Administration Quick Status & Resolution';
+  statusSelect.value = status;
+  responseText.value = response || '';
+
+  modal.style.display = 'flex';
+}
+
+function closeUpdateModal() {
+  document.getElementById('complaint-update-modal').style.display = 'none';
+}
+
+function showTicketDetail(code, subject, message, patient, date, status) {
+  const modal = document.getElementById('ticket-detail-modal');
+  document.getElementById('view-detail-title').textContent = 'Ticket ' + code + ' · ' + status;
+  document.getElementById('view-detail-meta').textContent = 'Patient: ' + patient + ' · Logged: ' + date;
+  document.getElementById('view-detail-subject').textContent = subject;
+  document.getElementById('view-detail-body').textContent = message;
+  modal.style.display = 'flex';
+}
+
+function closeDetailModal() {
+  document.getElementById('ticket-detail-modal').style.display = 'none';
+}
+
+// Close modals on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeUpdateModal();
+    closeDetailModal();
+  }
+});
+</script>
 {% endblock %}

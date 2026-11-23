@@ -325,45 +325,41 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(complaint.status, 'submitted')
         self.assertEqual(complaint.status_step, 1)
         self.assertEqual(complaint.step_label, 'Support Help Generated')
+        self.assertTrue(complaint.display_code.startswith('TK-'))
+        self.assertEqual(len(complaint.display_code), 7)  # TK-XXXX (4-digit random combination)
 
         # Patient view shows ticket in Step 1
         resp_patient = self.client.get(reverse('complaints'))
         self.assertEqual(resp_patient.status_code, 200)
-        self.assertContains(resp_patient, 'Support Help Generated')
+        self.assertContains(resp_patient, 'Support Generated')
+        self.assertContains(resp_patient, complaint.display_code)
         self.assertContains(resp_patient, 'When can I collect my cardiology ECG report')
 
-        # 2. Step 2: Admin checks ticket and asks a question / requests details
+        # 2. Step 2: Admin checks ticket in Excel sheet queue and filters/sorts
         self.client.force_login(self.admin)
-        resp_queue = self.client.get(reverse('complaint_queue'))
+        resp_queue = self.client.get(reverse('complaint_queue') + '?sort=oldest')
         self.assertEqual(resp_queue.status_code, 200)
         self.assertContains(resp_queue, 'Inquiry about report collection')
+        self.assertContains(resp_queue, complaint.display_code)
 
-        # Admin posts inquiry message
+        # Admin updates status to Under Review & Inquiring
         resp_inquire = self.client.post(reverse('complaint_update', args=[complaint.pk]), {
-            'message': 'Dear patient, please provide your invoice slip number so we can check with the diagnostic lab.'
+            'status': 'reviewing',
+            'response': 'Inquiry received. Checking records with diagnostic laboratory.'
         })
         self.assertEqual(resp_inquire.status_code, 302)
         complaint.refresh_from_db()
         self.assertEqual(complaint.status, 'reviewing')
         self.assertEqual(complaint.status_step, 2)
-        self.assertEqual(complaint.messages.count(), 1)
-        self.assertEqual(complaint.messages.first().author, self.admin)
+        self.assertEqual(complaint.step_label, 'Under Review & Inquiring')
 
-        # 3. Patient views admin question and replies back
+        # Patient views Under Review status
         self.client.force_login(self.patient)
         resp_patient_view = self.client.get(reverse('complaints'))
         self.assertContains(resp_patient_view, 'Under Review & Inquiring')
-        self.assertContains(resp_patient_view, 'Dear patient, please provide your invoice slip number')
+        self.assertContains(resp_patient_view, 'Checking records with diagnostic laboratory')
 
-        resp_reply = self.client.post(reverse('complaint_patient_reply', args=[complaint.pk]), {
-            'message': 'My invoice number is INV-88291, tested yesterday afternoon.'
-        })
-        self.assertEqual(resp_reply.status_code, 302)
-        complaint.refresh_from_db()
-        self.assertEqual(complaint.messages.count(), 2)
-        self.assertEqual(complaint.messages.last().author, self.patient)
-
-        # 4. Step 3: Admin verifies and marks as Issue Solved
+        # 3. Step 3: Admin verifies and marks as Issue Solved
         self.client.force_login(self.admin)
         resp_solve = self.client.post(reverse('complaint_update', args=[complaint.pk]), {
             'status': 'resolved',
@@ -375,8 +371,18 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(complaint.status_step, 3)
         self.assertEqual(complaint.step_label, 'Issue Solved')
 
-        # 5. Patient view shows Issue Solved
+        # 4. Patient view shows Issue Solved
         self.client.force_login(self.patient)
         resp_final = self.client.get(reverse('complaints'))
-        self.assertContains(resp_final, 'Issue Solved & Case Completed')
+        self.assertContains(resp_final, 'Issue Solved')
         self.assertContains(resp_final, 'Report INV-88291 is ready at Chamber 201 reception desk')
+
+        # 5. Admin bulk status update test
+        self.client.force_login(self.admin)
+        resp_bulk = self.client.post(reverse('complaint_bulk'), {
+            'selected_complaints': [complaint.pk],
+            'bulk_status': 'reviewing'
+        })
+        self.assertEqual(resp_bulk.status_code, 302)
+        complaint.refresh_from_db()
+        self.assertEqual(complaint.status, 'reviewing')
