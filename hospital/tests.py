@@ -336,8 +336,8 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(complaint.status, 'submitted')
         self.assertEqual(complaint.status_step, 1)
         self.assertEqual(complaint.step_label, 'Support Help Generated')
-        self.assertTrue(complaint.display_code.startswith('TK-'))
-        self.assertEqual(len(complaint.display_code), 7)  # TK-XXXX (4-digit random combination)
+        self.assertTrue(complaint.display_code.isalnum())
+        self.assertEqual(len(complaint.display_code), 6)  # 6-character alphanumeric without symbols
 
         # Patient view shows ticket in Step 1
         resp_patient = self.client.get(reverse('complaints'))
@@ -628,6 +628,107 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(res_ok.status_code, 200)
         self.assertEqual(res_ok.json()['status'], 'available')
         self.assertEqual(res_ok.json()['message'], 'Username is OK')
+
+    def test_appointment_and_complaint_codes_are_6_digit_alphanumeric_without_symbols(self):
+        # 1. Appointment code is 6 characters alphanumeric, without symbols
+        app = self.book()
+        self.assertEqual(len(app.reference), 6)
+        self.assertTrue(app.reference.isalnum(), f"Reference '{app.reference}' contains symbols!")
+        self.assertEqual(app.reference, app.reference.upper())
+
+        # 2. Case-insensitive search works
+        app_search = Appointment.objects.filter(reference__iexact=app.reference.lower())
+        self.assertTrue(app_search.exists())
+
+        # 3. Complaint ticket code is 6 characters alphanumeric, without symbols
+        complaint = Complaint.objects.create(patient=self.patient, subject='Test code format', message='Details')
+        self.assertEqual(len(complaint.display_code), 6)
+        self.assertTrue(complaint.display_code.isalnum(), f"Display code '{complaint.display_code}' contains symbols!")
+
+    def test_appointment_management_role_scoping_and_filters(self):
+        # App 1 for doctor_one (reception_one is assigned to doctor_one)
+        app1 = self.book()
+
+        # App 2 for other_doctor (reception_one is NOT assigned to other_doctor)
+        app2 = create_appointment(
+            actor=self.admin, slot_id=self.slot_two.pk, patient=self.other_patient,
+            name='Other Patient', phone=self.other_patient.phone, visit_type='first', source='desk'
+        )
+
+        # 1. Receptionist can only see and manage appointments for assigned doctors
+        self.client.force_login(self.reception)
+        res_rec = self.client.get(reverse('appointments'))
+        self.assertEqual(res_rec.status_code, 200)
+        self.assertContains(res_rec, app1.reference)
+        self.assertNotContains(res_rec, app2.reference)
+        # Verify doctor dropdown includes username
+        self.assertContains(res_rec, f"(@{self.doctor.username})")
+        # Verify no Apply or Search button, but Reset button is present
+        self.assertNotContains(res_rec, 'type="submit">Apply</button>')
+        self.assertContains(res_rec, 'btn-appt-reset')
+
+        # 2. Doctor can only manage their own appointments
+        self.client.force_login(self.doctor)
+        res_doc = self.client.get(reverse('appointments'))
+        self.assertEqual(res_doc.status_code, 200)
+        self.assertContains(res_doc, app1.reference)
+        self.assertNotContains(res_doc, app2.reference)
+
+        # 3. Admin can manage all appointments
+        self.client.force_login(self.admin)
+        res_admin = self.client.get(reverse('appointments'))
+        self.assertEqual(res_admin.status_code, 200)
+        self.assertContains(res_admin, app1.reference)
+        self.assertContains(res_admin, app2.reference)
+
+        # 4. Date preset and custom filter
+        res_today = self.client.get(reverse('appointments') + '?date_preset=today')
+        self.assertEqual(res_today.status_code, 200)
+
+    def test_appointment_quick_update_endpoint_and_permissions(self):
+        app = self.book()
+        self.assertEqual(app.visit_type, 'first')
+        self.assertEqual(app.fee, Decimal('1000'))
+        self.assertEqual(app.status, 'confirmed')
+
+        # 1. Doctor updates visit type to followup (Second) -> fee updates to 800
+        self.client.force_login(self.doctor)
+        res_update = self.client.post(
+            reverse('appointment_quick_update', args=[app.pk]),
+            {'visit_type': 'followup', 'status': 'completed'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(res_update.status_code, 200)
+        self.assertTrue(res_update.json()['success'])
+        app.refresh_from_db()
+        self.assertEqual(app.visit_type, 'followup')
+        self.assertEqual(app.fee, Decimal('800'))
+        self.assertEqual(app.status, 'completed')
+
+        # 2. Receptionist updates visit type to report checking -> fee updates to 500, collects cash
+        self.client.force_login(self.reception)
+        res_update2 = self.client.post(
+            reverse('appointment_quick_update', args=[app.pk]),
+            {'visit_type': 'report', 'collect_cash': '1'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(res_update2.status_code, 200)
+        app.refresh_from_db()
+        self.assertEqual(app.visit_type, 'report')
+        self.assertEqual(app.fee, Decimal('500'))
+        self.assertEqual(app.payment_status, 'paid')
+
+        # 3. Receptionist is rejected for unassigned doctor's appointment
+        app_unassigned = create_appointment(
+            actor=self.admin, slot_id=self.slot_two.pk, patient=self.other_patient,
+            name='Other Patient', phone=self.other_patient.phone, visit_type='first', source='desk'
+        )
+        res_denied = self.client.post(
+            reverse('appointment_quick_update', args=[app_unassigned.pk]),
+            {'visit_type': 'followup'}
+        )
+        self.assertEqual(res_denied.status_code, 404)
+
 
 
 

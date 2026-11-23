@@ -430,41 +430,183 @@ def visible_appointments(user):
     if user.role == 'admin':
         return qs
     if user.role == 'receptionist':
-        return qs.filter(Q(slot__doctor__in=managed_doctors(user)) | Q(created_by=user)).distinct()
+        return qs.filter(slot__doctor__in=managed_doctors(user)).distinct()
     return qs.filter(slot__doctor__in=managed_doctors(user))
 
 
 @login_required
 def appointments(request):
     qs = visible_appointments(request.user)
-    status = request.GET.get('status', '')
-    payment = request.GET.get('payment', '')
+    status = request.GET.get('status', '').strip()
+    payment = request.GET.get('payment', '').strip()
     q = request.GET.get('q','').strip()
-    date_filter = request.GET.get('date','')
-    doc = request.GET.get('doctor','')
-    if status in dict(Appointment.Status.choices): qs = qs.filter(status=status)
-    if payment in ('paid','unpaid','refund_pending','refunded','partially_refunded'): qs = qs.filter(payment_status=payment)
-    if date_filter:
-        try: qs = qs.filter(slot__date=datetime.strptime(date_filter,'%Y-%m-%d').date())
-        except ValueError: pass
-    if doc.isdigit(): qs = qs.filter(slot__doctor_id=int(doc))
+    date_filter = request.GET.get('date','').strip()
+    date_preset = request.GET.get('date_preset', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+    doc = request.GET.get('doctor','').strip()
+
+    if status in dict(Appointment.Status.choices):
+        qs = qs.filter(status=status)
+    if payment in ('paid','unpaid','refund_pending','refunded','partially_refunded'):
+        qs = qs.filter(payment_status=payment)
+
+    today = timezone.localdate()
+    if date_preset == 'today':
+        qs = qs.filter(slot__date=today)
+    elif date_preset == '7d':
+        qs = qs.filter(slot__date__gte=today - timedelta(days=7), slot__date__lte=today)
+    elif date_preset == '30d':
+        qs = qs.filter(slot__date__gte=today - timedelta(days=30), slot__date__lte=today)
+    elif date_preset == 'custom' or date_from or date_to:
+        if date_from:
+            try:
+                df = datetime.strptime(date_from, '%Y-%m-%d').date()
+                qs = qs.filter(slot__date__gte=df)
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                dt = datetime.strptime(date_to, '%Y-%m-%d').date()
+                qs = qs.filter(slot__date__lte=dt)
+            except ValueError:
+                pass
+    elif date_filter:
+        try:
+            qs = qs.filter(slot__date=datetime.strptime(date_filter,'%Y-%m-%d').date())
+        except ValueError:
+            pass
+
+    if doc.isdigit():
+        qs = qs.filter(slot__doctor_id=int(doc))
+
     if q:
-        qs = qs.filter(Q(reference__icontains=q)|Q(guest_name__icontains=q)|Q(guest_phone__icontains=q)|
-                       Q(slot__doctor__user__first_name__icontains=q)|Q(slot__doctor__user__last_name__icontains=q)|
-                       Q(slot__doctor__department__name__icontains=q))
-    sorting = {'newest':'-created_at','oldest':'created_at','date_asc':'slot__date',
-               'date_desc':'-slot__date','patient':'guest_name','fee_asc':'fee',
-               'fee_desc':'-fee','status':'status'}
+        clean_q = q.replace('[', '').replace(']', '').strip()
+        qs = qs.filter(
+            Q(reference__icontains=clean_q) |
+            Q(guest_name__icontains=clean_q) |
+            Q(guest_phone__icontains=clean_q) |
+            Q(patient__first_name__icontains=clean_q) |
+            Q(patient__last_name__icontains=clean_q) |
+            Q(patient__username__icontains=clean_q) |
+            Q(slot__doctor__user__first_name__icontains=clean_q) |
+            Q(slot__doctor__user__last_name__icontains=clean_q) |
+            Q(slot__doctor__user__username__icontains=clean_q) |
+            Q(slot__doctor__department__name__icontains=clean_q)
+        )
+
+    sorting = {
+        'newest': '-created_at',
+        'oldest': 'created_at',
+        'payment': 'payment_status',
+        'date_asc': 'slot__date',
+        'date_desc': '-slot__date',
+        'patient': 'guest_name',
+        'fee_asc': 'fee',
+        'fee_desc': '-fee',
+        'status': 'status',
+    }
     default_sort = 'oldest' if request.user.role == 'patient' else 'newest'
     sort = request.GET.get('sort', default_sort)
-    qs = qs.order_by(sorting.get(sort, '-created_at' if default_sort == 'newest' else 'created_at'), 'pk')
+    order_col = sorting.get(sort, '-created_at' if default_sort == 'newest' else 'created_at')
+    if sort == 'payment':
+        qs = qs.order_by('payment_status', '-created_at', 'pk')
+    elif sort == 'date_asc':
+        qs = qs.order_by('slot__date', 'slot__start_time', 'pk')
+    elif sort == 'date_desc':
+        qs = qs.order_by('-slot__date', '-slot__start_time', 'pk')
+    else:
+        qs = qs.order_by(order_col, 'pk')
+
     page = Paginator(qs, 25).get_page(request.GET.get('page'))
     query = request.GET.copy()
     query.pop('page', None)
-    return render(request, 'shared/appointments.html', {'appointments':page, 'page_obj':page,
-                  'page_query':query.urlencode(),
-                  'doctor_options':managed_doctors(request.user) if request.user.role!='patient' else None,
-                  'filters':request.GET, 'active_sort': sort})
+    return render(request, 'shared/appointments.html', {
+        'appointments': page,
+        'page_obj': page,
+        'page_query': query.urlencode(),
+        'doctor_options': managed_doctors(request.user) if request.user.role != 'patient' else None,
+        'filters': request.GET,
+        'active_sort': sort,
+    })
+
+
+@require_POST
+@role_required('doctor', 'receptionist', 'admin')
+def appointment_quick_update(request, pk):
+    appt = get_object_or_404(visible_appointments(request.user), pk=pk)
+
+    # 1. Update visit type & fee
+    visit_type = request.POST.get('visit_type', '').strip()
+    custom_fee = request.POST.get('fee', '').strip()
+    doctor = appt.slot.doctor
+
+    if visit_type in dict(Appointment.Visit.choices):
+        appt.visit_type = visit_type
+        if custom_fee:
+            try:
+                new_fee = Decimal(custom_fee)
+                if new_fee >= 0:
+                    appt.fee = new_fee
+            except (ValueError, TypeError, ArithmeticError):
+                pass
+        else:
+            if visit_type == 'first':
+                appt.fee = doctor.initial_fee
+            elif visit_type == 'followup':
+                appt.fee = doctor.followup_fee
+            elif visit_type == 'report':
+                appt.fee = doctor.report_fee
+
+        appt.hospital_cut = doctor.hospital_cut(appt.fee)
+        appt.doctor_cut = max(Decimal('0.00'), appt.fee - appt.hospital_cut)
+
+    # 2. Status update (non-cancel first)
+    new_status = request.POST.get('status', '').strip()
+    cancellation_reason = request.POST.get('cancellation_reason', '').strip()
+
+    if new_status in dict(Appointment.Status.choices) and new_status != 'cancelled':
+        appt.status = new_status
+
+    # 3. Notes update
+    if 'notes' in request.POST:
+        appt.notes = request.POST.get('notes', '').strip()
+
+    appt.save()
+
+    # 4. Handle cancellation if selected
+    if new_status == 'cancelled' and appt.status != 'cancelled':
+        cancel_appointment(
+            appt, request.user,
+            by_doctor=(request.user.role in ('doctor', 'admin')),
+            reason=cancellation_reason or 'Cancelled via quick desk'
+        )
+        appt.refresh_from_db()
+
+    # 5. Quick cash payment collection
+    collect_cash = request.POST.get('collect_cash') in ('1', 'true', 'on')
+    if collect_cash and appt.payment_status == 'unpaid' and appt.status != 'cancelled':
+        record_cash_payment(appt, request.user, note='Quick cash collection at desk')
+        appt.refresh_from_db()
+    log(request.user, 'appointment.quick_update', appt.reference,
+        f'visit={appt.visit_type}, fee={appt.fee}, status={appt.status}, payment={appt.payment_status}')
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+        return JsonResponse({
+            'success': True,
+            'message': f'Appointment [{appt.reference}] updated successfully.',
+            'reference': appt.reference,
+            'visit_type': appt.visit_type,
+            'visit_type_display': appt.get_visit_type_display(),
+            'fee': str(appt.fee),
+            'status': appt.status,
+            'status_display': appt.get_status_display(),
+            'payment_status': appt.payment_status,
+            'payment_status_display': appt.get_payment_status_display(),
+        })
+
+    messages.success(request, f'Appointment [{appt.reference}] updated successfully.')
+    return redirect(request.POST.get('next') or reverse('appointments'))
 
 
 @login_required

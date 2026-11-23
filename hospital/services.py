@@ -59,8 +59,7 @@ def managed_doctors(user):
     if user.role == 'doctor':
         return qs.filter(user=user)
     if user.role == 'receptionist':
-        assigned = qs.filter(receptionists=user)
-        return assigned if assigned.exists() else qs.filter(is_available=True, user__is_active=True)
+        return qs.filter(receptionists=user)
     if user.role == 'admin':
         return qs
     return qs.none()
@@ -69,7 +68,7 @@ def managed_doctors(user):
 def appointment_allowed(user, appt):
     if user.role == 'patient':
         return appt.patient_id == user.pk
-    if user.role in ('admin', 'receptionist'):
+    if user.role == 'admin':
         return True
     return doctor_allowed(user, appt.slot.doctor)
 

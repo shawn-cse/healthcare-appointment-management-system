@@ -267,59 +267,76 @@
      ======================================================== -->
 <div class="page-heading">
   <div>
-    <p class="eyebrow">APPOINTMENT MANAGEMENT DESK</p>
+    <p class="eyebrow">APPOINTMENT MANAGEMENT</p>
     <h1>Appointments</h1>
-    <p>Search, filter, record payments, and manage consultation records for all assigned doctors.</p>
+    <p>Live search, filter, and quick update consultation records for assigned hospital doctors.</p>
   </div>
   <a class="button button-primary" href="{% url 'staff_book' %}">
     <svg class="icon"><use href="#ic-plus"/></svg> Register Booking
   </a>
 </div>
 
-<form class="panel filter-bar wrap-filters" method="get">
-  <div class="search-input">
+<!-- Live Filter Bar (No Search button, No Apply button, Reset is OK) -->
+<form class="panel filter-bar appointment-filter-bar wrap-filters" method="get" id="appointment-filter-form">
+  <!-- Live Search Input -->
+  <div class="search-input appointment-live-search">
     <svg class="icon"><use href="#ic-search"/></svg>
-    <input name="q" value="{{ filters.q|default:'' }}" placeholder="Reference, patient, doctor or phone" aria-label="Search appointments">
+    <input type="text" name="q" id="appt-live-search" value="{{ filters.q|default:'' }}"
+           placeholder="Live search by code, patient name, phone, doctor..."
+           aria-label="Search appointments" autocomplete="off">
   </div>
-  <select name="status" class="field-control">
-    <option value="">All statuses</option>
-    <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Awaiting payment</option>
-    <option value="confirmed" {% if filters.status == 'confirmed' %}selected{% endif %}>Confirmed</option>
-    <option value="completed" {% if filters.status == 'completed' %}selected{% endif %}>Completed</option>
-    <option value="cancelled" {% if filters.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
-    <option value="no_show" {% if filters.status == 'no_show' %}selected{% endif %}>No-show</option>
-    <option value="expired" {% if filters.status == 'expired' %}selected{% endif %}>Expired</option>
+
+  <!-- Date Preset Filter -->
+  <select name="date_preset" id="filter-date-preset" class="field-control" aria-label="Filter by date range">
+    <option value="">All Dates</option>
+    <option value="today" {% if filters.date_preset == 'today' %}selected{% endif %}>Today</option>
+    <option value="7d" {% if filters.date_preset == '7d' %}selected{% endif %}>Last 7 Days</option>
+    <option value="30d" {% if filters.date_preset == '30d' %}selected{% endif %}>Last 30 Days</option>
+    <option value="custom" {% if filters.date_preset == 'custom' or filters.date_from or filters.date_to %}selected{% endif %}>Custom Date Range</option>
   </select>
-  <select name="payment" class="field-control">
-    <option value="">All payments</option>
-    <option value="paid" {% if filters.payment == 'paid' %}selected{% endif %}>Paid</option>
-    <option value="unpaid" {% if filters.payment == 'unpaid' %}selected{% endif %}>Unpaid</option>
-    <option value="refund_pending" {% if filters.payment == 'refund_pending' %}selected{% endif %}>Refund pending</option>
-    <option value="refunded" {% if filters.payment == 'refunded' %}selected{% endif %}>Refunded</option>
-  </select>
+
+  <!-- Custom Date Range Picker (shown when custom is selected) -->
+  <div id="custom-date-container" class="custom-date-inline" {% if filters.date_preset != 'custom' and not filters.date_from and not filters.date_to %}style="display: none;"{% endif %}>
+    <input type="date" name="date_from" id="filter-date-from" value="{{ filters.date_from|default:'' }}" class="field-control field-date-sm" placeholder="From date" aria-label="From date">
+    <span class="date-sep">to</span>
+    <input type="date" name="date_to" id="filter-date-to" value="{{ filters.date_to|default:'' }}" class="field-control field-date-sm" placeholder="To date" aria-label="To date">
+  </div>
+
+  <!-- Doctor Filter (shows Dr name with username) -->
   {% if doctor_options %}
-  <select name="doctor" class="field-control">
-    <option value="">All doctors</option>
+  <select name="doctor" id="filter-doctor" class="field-control" aria-label="Filter by doctor">
+    <option value="">All Doctors (Default)</option>
     {% for d in doctor_options %}
-      <option value="{{ d.pk }}" {% if filters.doctor == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.user.display_name }}</option>
+      <option value="{{ d.pk }}" {% if filters.doctor == d.pk|stringformat:'s' %}selected{% endif %}>
+        Dr. {{ d.user.display_name }} (@{{ d.user.username }})
+      </option>
     {% endfor %}
   </select>
   {% endif %}
-  <input class="field-control date-filter green-datepicker" type="text" name="date" aria-label="Filter date" placeholder="Filter date" value="{{ filters.date|default:'' }}" autocomplete="off" data-datepicker="true">
-  <select class="field-control" name="sort" aria-label="Sort appointments">
-    <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Newest booked</option>
-    <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Oldest booked</option>
-    <option value="date_asc" {% if filters.sort == 'date_asc' %}selected{% endif %}>Date: earliest</option>
-    <option value="date_desc" {% if filters.sort == 'date_desc' %}selected{% endif %}>Date: latest</option>
-    <option value="patient" {% if filters.sort == 'patient' %}selected{% endif %}>Patient A–Z</option>
-    <option value="fee_asc" {% if filters.sort == 'fee_asc' %}selected{% endif %}>Fee: low to high</option>
-    <option value="fee_desc" {% if filters.sort == 'fee_desc' %}selected{% endif %}>Fee: high to low</option>
+
+  <!-- Payment Status Filter -->
+  <select name="payment" id="filter-payment" class="field-control" aria-label="Filter by payment status">
+    <option value="">All Payments</option>
+    <option value="paid" {% if filters.payment == 'paid' %}selected{% endif %}>Paid</option>
+    <option value="unpaid" {% if filters.payment == 'unpaid' %}selected{% endif %}>Unpaid</option>
+    <option value="refund_pending" {% if filters.payment == 'refund_pending' %}selected{% endif %}>Refund Pending</option>
+    <option value="refunded" {% if filters.payment == 'refunded' %}selected{% endif %}>Refunded</option>
   </select>
-  <button class="button button-primary" type="submit"><svg class="icon"><use href="#ic-filter"/></svg> Apply</button>
-  <a class="button button-light" href="{% url 'appointments' %}">Reset</a>
+
+  <!-- Sort Order -->
+  <select name="sort" id="filter-sort" class="field-control" aria-label="Sort appointments">
+    <option value="newest" {% if filters.sort == 'newest' or not filters.sort %}selected{% endif %}>Newest to Oldest</option>
+    <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Oldest to Newest</option>
+    <option value="payment" {% if filters.sort == 'payment' %}selected{% endif %}>Sort by Payment Status</option>
+    <option value="date_asc" {% if filters.sort == 'date_asc' %}selected{% endif %}>Appointment Date: Earliest</option>
+    <option value="date_desc" {% if filters.sort == 'date_desc' %}selected{% endif %}>Appointment Date: Latest</option>
+  </select>
+
+  <!-- Reset Button Only (No Apply, No Search Button) -->
+  <a class="button button-light btn-appt-reset" href="{% url 'appointments' %}">Reset</a>
 </form>
 
-<div class="panel">
+<div class="panel appointment-records-panel">
   <!-- Print Only Clean Report Header -->
   <div class="print-only appointment-print-header">
     <div class="print-brand-row">
@@ -328,10 +345,11 @@
     </div>
     <p class="print-meta">Location: Mirpur, Dhaka · Helpline: +88096100016211 · Total Records: {{ page_obj.paginator.count }} · Printed on {% now "d M Y, h:i A" %}</p>
   </div>
-  <div class="panel-header">
+
+  <div class="panel-header appointment-panel-header">
     <div>
       <h2>Appointment records</h2>
-      <p>Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} records</p>
+      <p id="appt-count-text">Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} records</p>
     </div>
     <div class="table-actions">
       <button type="button" class="button button-outline button-sm" onclick="window.print()" title="Print appointment records table">
@@ -339,60 +357,121 @@
       </button>
     </div>
   </div>
-  <form method="post" action="{% url 'appointment_bulk' %}" id="bulk-form">
-    {% csrf_token %}
-    <div class="bulk-toolbar">
-      <span><b id="selected-count">0</b> selected</span>
-      <select name="action" class="field-control" required>
-        <option value="">Select bulk action</option>
-        <option value="cash">Record cash payment</option>
-        <option value="completed">Mark completed</option>
-        <option value="no_show">Mark no-show</option>
-        {% if user.role != 'receptionist' %}
-          <option value="doctor_cancel">Cancel by doctor (full refund)</option>
-        {% endif %}
-      </select>
-      <button class="button button-outline button-sm" type="submit" data-confirm="Apply this change to all selected appointments?">Apply to selected</button>
-    </div>
 
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th class="checkbox-col"><input type="checkbox" data-check-all aria-label="Select all"></th>
-            <th>Reference / patient</th>
-            <th>Doctor</th>
-            <th>Appointment</th>
-            <th>Visit</th>
-            <th>Fee</th>
-            <th>Payment</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for a in appointments %}
-          <tr>
-            <td><input type="checkbox" name="selected" class="bulk-check" value="{{ a.pk }}" aria-label="Select {{ a.reference }}"></td>
-            <td>
-              <a class="table-primary" href="{% url 'appointment_detail' a.pk %}">{{ a.reference }}</a>
-              <small class="table-sub">{{ a.patient_name }} · {{ a.guest_phone }}{% if a.created_by and a.created_by.role != 'patient' %} · <span style="color:#104b42;font-weight:600;">Booked by {{ a.created_by.display_name }} ({{ a.created_by.get_role_display }})</span>{% endif %}</small>
-            </td>
-            <td><span>Dr. {{ a.doctor.user.display_name }}</span><small class="table-sub">{{ a.doctor.department.name }}</small></td>
-            <td><span>{{ a.slot.date|date:'d M Y' }}</span><small class="table-sub">{{ a.slot.start_time|time:'g:i A' }}</small></td>
-            <td>{{ a.get_visit_type_display }}</td>
-            <td><b>Tk. {{ a.fee|floatformat:0 }}</b></td>
-            <td><span class="status status-{{ a.payment_status }}">{{ a.get_payment_status_display }}</span></td>
-            <td><span class="status status-{{ a.status }}">{{ a.get_status_display }}</span></td>
-            <td><a class="table-action" href="{% url 'appointment_detail' a.pk %}">Details</a></td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="9" class="table-empty">No appointments match these filters.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </form>
+  <!-- Excel-Style Scrollable Table Container (fixes vertical scroll stretch) -->
+  <div class="appointment-table-container excel-table-scroll">
+    <table class="data-table excel-table appointment-data-table" id="appointments-data-table">
+      <thead>
+        <tr>
+          <th>Appointment Code</th>
+          <th>Patient / Phone</th>
+          <th>Doctor &amp; Department</th>
+          <th>Consultation Slot</th>
+          <th>Visit Type</th>
+          <th>Fee</th>
+          <th>Payment</th>
+          <th>Status</th>
+          <th style="text-align: right;">Action</th>
+        </tr>
+      </thead>
+      <tbody id="appointments-tbody">
+        {% for a in appointments %}
+        <tr class="appt-row" id="appt-row-{{ a.pk }}"
+            data-search="{{ a.reference }} {{ a.patient_name }} {{ a.guest_phone }} {{ a.doctor.user.display_name }} {{ a.doctor.user.username }} {{ a.doctor.department.name }}">
+          <!-- Code: Clickable Badge for Quick Update -->
+          <td>
+            <button type="button" class="appt-code-badge" data-action="quick-edit"
+                    data-appt-id="{{ a.pk }}"
+                    data-appt-ref="{{ a.reference }}"
+                    data-patient-name="{{ a.patient_name }}"
+                    data-patient-phone="{{ a.guest_phone }}"
+                    data-doc-name="{{ a.doctor.user.display_name }}"
+                    data-doc-username="{{ a.doctor.user.username }}"
+                    data-doc-initial-fee="{{ a.doctor.initial_fee|floatformat:0 }}"
+                    data-doc-followup-fee="{{ a.doctor.followup_fee|floatformat:0 }}"
+                    data-doc-report-fee="{{ a.doctor.report_fee|floatformat:0 }}"
+                    data-date="{{ a.slot.date|date:'d M Y' }}"
+                    data-time="{{ a.slot.start_time|time:'g:i A' }}"
+                    data-visit="{{ a.visit_type }}"
+                    data-fee="{{ a.fee|floatformat:0 }}"
+                    data-payment-status="{{ a.payment_status }}"
+                    data-status="{{ a.status }}"
+                    data-notes="{{ a.notes }}"
+                    data-detail-url="{% url 'appointment_detail' a.pk %}"
+                    title="Click to quick-update visit type, fee, status or payment">
+              [{{ a.reference }}]
+            </button>
+          </td>
+
+          <!-- Patient & Contact -->
+          <td>
+            <strong class="cell-patient-name">{{ a.patient_name }}</strong>
+            <small class="table-sub">{{ a.guest_phone }}</small>
+          </td>
+
+          <!-- Doctor & Username -->
+          <td>
+            <span>Dr. {{ a.doctor.user.display_name }} <span class="muted-username">(@{{ a.doctor.user.username }})</span></span>
+            <small class="table-sub">{{ a.doctor.department.name }} · {{ a.doctor.active_room }}</small>
+          </td>
+
+          <!-- Date & Time Slot -->
+          <td>
+            <span class="cell-slot-date">{{ a.slot.date|date:'d M Y' }}</span>
+            <small class="table-sub">{{ a.slot.start_time|time:'g:i A' }}</small>
+          </td>
+
+          <!-- Visit Type -->
+          <td>
+            <span class="visit-type-pill visit-{{ a.visit_type }}" id="row-visit-{{ a.pk }}">{{ a.get_visit_type_display }}</span>
+          </td>
+
+          <!-- Fee -->
+          <td>
+            <b id="row-fee-{{ a.pk }}">Tk. {{ a.fee|floatformat:0 }}</b>
+          </td>
+
+          <!-- Payment Status -->
+          <td>
+            <span class="status status-{{ a.payment_status }}" id="row-payment-{{ a.pk }}">{{ a.get_payment_status_display }}</span>
+          </td>
+
+          <!-- Appointment Status -->
+          <td>
+            <span class="status status-{{ a.status }}" id="row-status-{{ a.pk }}">{{ a.get_status_display }}</span>
+          </td>
+
+          <!-- Action -->
+          <td style="text-align: right;">
+            <button type="button" class="button button-outline button-xs" data-action="quick-edit"
+                    data-appt-id="{{ a.pk }}"
+                    data-appt-ref="{{ a.reference }}"
+                    data-patient-name="{{ a.patient_name }}"
+                    data-patient-phone="{{ a.guest_phone }}"
+                    data-doc-name="{{ a.doctor.user.display_name }}"
+                    data-doc-username="{{ a.doctor.user.username }}"
+                    data-doc-initial-fee="{{ a.doctor.initial_fee|floatformat:0 }}"
+                    data-doc-followup-fee="{{ a.doctor.followup_fee|floatformat:0 }}"
+                    data-doc-report-fee="{{ a.doctor.report_fee|floatformat:0 }}"
+                    data-date="{{ a.slot.date|date:'d M Y' }}"
+                    data-time="{{ a.slot.start_time|time:'g:i A' }}"
+                    data-visit="{{ a.visit_type }}"
+                    data-fee="{{ a.fee|floatformat:0 }}"
+                    data-payment-status="{{ a.payment_status }}"
+                    data-status="{{ a.status }}"
+                    data-notes="{{ a.notes }}"
+                    data-detail-url="{% url 'appointment_detail' a.pk %}">
+              Edit
+            </button>
+            <a class="table-action" href="{% url 'appointment_detail' a.pk %}" title="View details" style="margin-left: 4px;">Details</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr id="empty-row"><td colspan="9" class="table-empty">No appointments match these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 
   {% if page_obj.has_other_pages %}
   <nav class="pagination" aria-label="Appointment record pages">
@@ -407,6 +486,123 @@
     </div>
   </nav>
   {% endif %}
+</div>
+
+<!-- ========================================================
+     QUICK UPDATE MODAL (Excel-style instant edit)
+     ======================================================== -->
+<div id="quick-edit-modal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-quick-title">
+  <div class="modal-card quick-edit-modal-card">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <svg class="icon modal-title-icon"><use href="#ic-calendar"/></svg>
+        <h3 id="modal-quick-title">Update Appointment <span id="modal-display-code" class="code-pill">[GH-000000]</span></h3>
+      </div>
+      <button type="button" class="modal-close-btn" id="modal-quick-close-btn" aria-label="Close dialog">✕</button>
+    </div>
+
+    <form method="post" id="modal-quick-form" action="">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+      <div class="modal-body">
+        <!-- Patient & Doctor Snapshot Banner -->
+        <div class="quick-meta-banner">
+          <div class="quick-meta-col">
+            <span class="quick-meta-label">Patient</span>
+            <strong id="modal-meta-patient" class="quick-meta-val">-</strong>
+            <small id="modal-meta-phone" class="quick-meta-sub">-</small>
+          </div>
+          <div class="quick-meta-col">
+            <span class="quick-meta-label">Doctor</span>
+            <strong id="modal-meta-doctor" class="quick-meta-val">-</strong>
+            <small id="modal-meta-username" class="quick-meta-sub">-</small>
+          </div>
+          <div class="quick-meta-col">
+            <span class="quick-meta-label">Session / Slot</span>
+            <strong id="modal-meta-slot" class="quick-meta-val">-</strong>
+          </div>
+        </div>
+
+        <div class="modal-grid-2">
+          <!-- Visit Type Selector -->
+          <div class="form-group">
+            <label for="modal-input-visit" class="field-label">
+              Consultation Visit Type <span class="required">*</span>
+            </label>
+            <select name="visit_type" id="modal-input-visit" class="field-control">
+              <option value="first">1st Visit / New Patient</option>
+              <option value="followup">2nd Visit / Follow-up</option>
+              <option value="report">Report Review</option>
+            </select>
+          </div>
+
+          <!-- Consultation Fee -->
+          <div class="form-group">
+            <label for="modal-input-fee" class="field-label">
+              Consultation Fee (Tk.) <span class="required">*</span>
+            </label>
+            <input type="number" name="fee" id="modal-input-fee" min="0" step="10" class="field-control" required>
+          </div>
+        </div>
+
+        <div class="modal-grid-2">
+          <!-- Status Selector -->
+          <div class="form-group">
+            <label for="modal-input-status" class="field-label">
+              Appointment Status <span class="required">*</span>
+            </label>
+            <select name="status" id="modal-input-status" class="field-control">
+              <option value="confirmed">Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="no_show">No-Show</option>
+              <option value="pending">Awaiting Payment</option>
+            </select>
+          </div>
+
+          <!-- Payment Action / Status -->
+          <div class="form-group" style="display: flex; flex-direction: column; justify-content: flex-end;">
+            <div id="modal-payment-unpaid-box" class="quick-payment-toggle" style="display:none;">
+              <label class="toggle-checkbox-label">
+                <input type="checkbox" name="collect_cash" value="1" id="modal-collect-cash-cb">
+                <span class="toggle-cash-btn">
+                  <svg class="icon"><use href="#ic-check"/></svg> Collect Cash &amp; Mark Paid
+                </span>
+              </label>
+            </div>
+            <div id="modal-payment-paid-box" class="quick-payment-paid" style="display:none;">
+              <span class="status status-paid"><svg class="icon"><use href="#ic-check"/></svg> Payment Verified (Paid)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cancellation Reason Box (Shown if Cancelled) -->
+        <div class="form-group" id="modal-cancel-reason-wrap" style="display: none; margin-top: 10px;">
+          <label for="modal-input-cancel-reason" class="field-label" style="color: #b91c1c;">
+            Reason for Cancellation <span class="required">*</span>
+          </label>
+          <input type="text" name="cancellation_reason" id="modal-input-cancel-reason" class="field-control" placeholder="Patient rescheduled / Doctor unavailable...">
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group" style="margin-top: 10px;">
+          <label for="modal-input-notes" class="field-label">Desk / Clinical Notes</label>
+          <input type="text" name="notes" id="modal-input-notes" class="field-control" placeholder="Optional notes...">
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <a id="modal-full-detail-link" href="#" class="button button-light button-sm" target="_blank">
+          View Full Record ↗
+        </a>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="button button-light" id="modal-quick-cancel-btn">Cancel</button>
+          <button type="submit" class="button button-primary" id="modal-quick-save-btn">Save Changes</button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
 {% endif %}
 {% endblock %}

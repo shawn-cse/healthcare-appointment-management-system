@@ -657,9 +657,317 @@
     });
   }
 
+  // --- Appointment Management Desk: Live Search, Filters & Quick Edit Modal ---
+  function initAppointmentManagementDesk() {
+    const filterForm = doc.getElementById('appointment-filter-form');
+    const liveSearchInput = doc.getElementById('appt-live-search');
+    const tableBody = doc.getElementById('appointments-tbody');
+    const countText = doc.getElementById('appt-count-text');
+    const datePreset = doc.getElementById('filter-date-preset');
+    const customDateWrap = doc.getElementById('custom-date-container');
+    const filterDoctor = doc.getElementById('filter-doctor');
+    const filterPayment = doc.getElementById('filter-payment');
+    const filterSort = doc.getElementById('filter-sort');
+    const filterDateFrom = doc.getElementById('filter-date-from');
+    const filterDateTo = doc.getElementById('filter-date-to');
+
+    // Quick Edit Modal elements
+    const quickModal = doc.getElementById('quick-edit-modal');
+    const quickForm = doc.getElementById('modal-quick-form');
+    const quickCloseBtn = doc.getElementById('modal-quick-close-btn');
+    const quickCancelBtn = doc.getElementById('modal-quick-cancel-btn');
+    const displayCode = doc.getElementById('modal-display-code');
+    const metaPatient = doc.getElementById('modal-meta-patient');
+    const metaPhone = doc.getElementById('modal-meta-phone');
+    const metaDoctor = doc.getElementById('modal-meta-doctor');
+    const metaUsername = doc.getElementById('modal-meta-username');
+    const metaSlot = doc.getElementById('modal-meta-slot');
+    const inputVisit = doc.getElementById('modal-input-visit');
+    const inputFee = doc.getElementById('modal-input-fee');
+    const inputStatus = doc.getElementById('modal-input-status');
+    const cancelReasonWrap = doc.getElementById('modal-cancel-reason-wrap');
+    const inputCancelReason = doc.getElementById('modal-input-cancel-reason');
+    const unpaidBox = doc.getElementById('modal-payment-unpaid-box');
+    const paidBox = doc.getElementById('modal-payment-paid-box');
+    const collectCashCb = doc.getElementById('modal-collect-cash-cb');
+    const inputNotes = doc.getElementById('modal-input-notes');
+    const fullDetailLink = doc.getElementById('modal-full-detail-link');
+
+    let currentDoctorFees = { first: 1000, followup: 800, report: 500 };
+    let currentTargetRow = null;
+
+    // 1. Live Client-side search + Debounced server query
+    if (liveSearchInput && tableBody) {
+      let debounceSubmit = null;
+
+      liveSearchInput.addEventListener('input', () => {
+        const query = liveSearchInput.value.toLowerCase().replace(/[\[\]]/g, '').trim();
+        const rows = tableBody.querySelectorAll('tr.appt-row');
+        let matchedCount = 0;
+
+        rows.forEach(row => {
+          const searchData = (row.dataset.search || row.textContent).toLowerCase();
+          if (!query || searchData.includes(query)) {
+            row.style.display = '';
+            matchedCount++;
+          } else {
+            row.style.display = 'none';
+          }
+        });
+
+        if (countText) {
+          if (query) {
+            countText.textContent = `Showing ${matchedCount} matching appointments (filtered)`;
+          } else {
+            countText.textContent = `Showing ${rows.length} records`;
+          }
+        }
+
+        // Debounced submission if query extends beyond visible page
+        if (debounceSubmit) clearTimeout(debounceSubmit);
+        debounceSubmit = setTimeout(() => {
+          if (filterForm && query.length >= 3) {
+            filterForm.submit();
+          }
+        }, 600);
+      });
+
+      // Submit on Enter
+      liveSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (filterForm) filterForm.submit();
+        }
+      });
+    }
+
+    // 2. Date Preset Dropdown handling
+    if (datePreset) {
+      datePreset.addEventListener('change', () => {
+        if (datePreset.value === 'custom') {
+          if (customDateWrap) customDateWrap.style.display = 'inline-flex';
+        } else {
+          if (customDateWrap) {
+            customDateWrap.style.display = 'none';
+            if (filterDateFrom) filterDateFrom.value = '';
+            if (filterDateTo) filterDateTo.value = '';
+          }
+          if (filterForm) filterForm.submit();
+        }
+      });
+    }
+
+    // Custom date changes auto-submit when both or either is filled
+    [filterDateFrom, filterDateTo].forEach(input => {
+      if (input) {
+        input.addEventListener('change', () => {
+          if (filterForm && (filterDateFrom.value || filterDateTo.value)) {
+            filterForm.submit();
+          }
+        });
+      }
+    });
+
+    // 3. Dropdowns auto-submit on change
+    [filterDoctor, filterPayment, filterSort].forEach(select => {
+      if (select) {
+        select.addEventListener('change', () => {
+          if (filterForm) filterForm.submit();
+        });
+      }
+    });
+
+    // 4. Quick Edit Modal Interactions
+    if (quickModal && quickForm) {
+      function closeQuickModal() {
+        quickModal.style.display = 'none';
+        currentTargetRow = null;
+      }
+
+      if (quickCloseBtn) quickCloseBtn.addEventListener('click', closeQuickModal);
+      if (quickCancelBtn) quickCancelBtn.addEventListener('click', closeQuickModal);
+
+      // Close on backdrop click or ESC
+      quickModal.addEventListener('click', (e) => {
+        if (e.target === quickModal) closeQuickModal();
+      });
+      doc.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && quickModal.style.display !== 'none') {
+          closeQuickModal();
+        }
+      });
+
+      // Open Modal on [GH-E7928B] or Edit click
+      doc.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action="quick-edit"]');
+        if (!btn) return;
+        e.preventDefault();
+
+        const row = btn.closest('tr');
+        currentTargetRow = row;
+
+        const apptId = btn.dataset.apptId;
+        const apptRef = btn.dataset.apptRef;
+        const patientName = btn.dataset.patientName || '-';
+        const patientPhone = btn.dataset.patientPhone || '-';
+        const docName = btn.dataset.docName || '-';
+        const docUsername = btn.dataset.docUsername || '-';
+        const slotDate = btn.dataset.date || '-';
+        const slotTime = btn.dataset.time || '-';
+        const visitType = btn.dataset.visit || 'first';
+        const fee = btn.dataset.fee || '1000';
+        const status = btn.dataset.status || 'confirmed';
+        const paymentStatus = btn.dataset.paymentStatus || 'unpaid';
+        const notes = btn.dataset.notes || '';
+        const detailUrl = btn.dataset.detailUrl || '#';
+
+        // Cache doctor tiered fees
+        currentDoctorFees = {
+          first: parseFloat(btn.dataset.docInitialFee) || 1000,
+          followup: parseFloat(btn.dataset.docFollowupFee) || 800,
+          report: parseFloat(btn.dataset.docReportFee) || 500
+        };
+
+        // Populate modal
+        quickForm.action = `/appointments/${apptId}/quick-update/`;
+        if (displayCode) displayCode.textContent = `[${apptRef}]`;
+        if (metaPatient) metaPatient.textContent = patientName;
+        if (metaPhone) metaPhone.textContent = patientPhone;
+        if (metaDoctor) metaDoctor.textContent = `Dr. ${docName}`;
+        if (metaUsername) metaUsername.textContent = `(@${docUsername})`;
+        if (metaSlot) metaSlot.textContent = `${slotDate} · ${slotTime}`;
+        if (inputVisit) inputVisit.value = visitType;
+        if (inputFee) inputFee.value = fee;
+        if (inputStatus) inputStatus.value = status;
+        if (inputNotes) inputNotes.value = notes;
+        if (fullDetailLink) fullDetailLink.href = detailUrl;
+
+        // Payment status indicator / cash collection toggle
+        if (paymentStatus === 'unpaid') {
+          if (unpaidBox) unpaidBox.style.display = 'block';
+          if (paidBox) paidBox.style.display = 'none';
+          if (collectCashCb) collectCashCb.checked = false;
+        } else {
+          if (unpaidBox) unpaidBox.style.display = 'none';
+          if (paidBox) paidBox.style.display = 'block';
+        }
+
+        // Cancellation reason wrap
+        if (cancelReasonWrap) {
+          cancelReasonWrap.style.display = (status === 'cancelled') ? 'block' : 'none';
+          if (inputCancelReason) inputCancelReason.value = '';
+        }
+
+        quickModal.style.display = 'flex';
+      });
+
+      // Change visit type dynamically updates fee field
+      if (inputVisit) {
+        inputVisit.addEventListener('change', () => {
+          const selected = inputVisit.value;
+          if (currentDoctorFees[selected] !== undefined && inputFee) {
+            inputFee.value = currentDoctorFees[selected];
+          }
+        });
+      }
+
+      // Change status shows/hides cancel reason
+      if (inputStatus) {
+        inputStatus.addEventListener('change', () => {
+          if (cancelReasonWrap) {
+            cancelReasonWrap.style.display = (inputStatus.value === 'cancelled') ? 'block' : 'none';
+          }
+        });
+      }
+
+      // Submit via AJAX for instant update without vertical jump
+      quickForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const submitBtn = doc.getElementById('modal-quick-save-btn');
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Saving...';
+        }
+
+        const formData = new FormData(quickForm);
+
+        fetch(quickForm.action, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          }
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Save Changes';
+            }
+
+            if (data && data.success) {
+              // Update target row dynamically
+              if (currentTargetRow) {
+                const rowPk = quickForm.action.match(/\/appointments\/(\d+)\/quick-update/)?.[1];
+                if (rowPk) {
+                  const visitEl = doc.getElementById(`row-visit-${rowPk}`);
+                  const feeEl = doc.getElementById(`row-fee-${rowPk}`);
+                  const statusEl = doc.getElementById(`row-status-${rowPk}`);
+                  const paymentEl = doc.getElementById(`row-payment-${rowPk}`);
+
+                  if (visitEl && data.visit_type_display) {
+                    visitEl.textContent = data.visit_type_display;
+                    visitEl.className = `visit-type-pill visit-${data.visit_type}`;
+                  }
+                  if (feeEl && data.fee) {
+                    feeEl.textContent = `Tk. ${Math.round(parseFloat(data.fee))}`;
+                  }
+                  if (statusEl && data.status_display) {
+                    statusEl.textContent = data.status_display;
+                    statusEl.className = `status status-${data.status}`;
+                  }
+                  if (paymentEl && data.payment_status_display) {
+                    paymentEl.textContent = data.payment_status_display;
+                    paymentEl.className = `status status-${data.payment_status}`;
+                  }
+
+                  // Update button datasets
+                  currentTargetRow.querySelectorAll('[data-action="quick-edit"]').forEach(b => {
+                    b.dataset.visit = data.visit_type;
+                    b.dataset.fee = Math.round(parseFloat(data.fee));
+                    b.dataset.status = data.status;
+                    b.dataset.paymentStatus = data.payment_status;
+                  });
+
+                  // Add highlight flash animation to row
+                  currentTargetRow.classList.remove('row-highlight-flash');
+                  void currentTargetRow.offsetWidth; // trigger reflow
+                  currentTargetRow.classList.add('row-highlight-flash');
+                }
+              }
+
+              closeQuickModal();
+            } else {
+              // If not JSON success, fall back to standard submit
+              quickForm.submit();
+            }
+          })
+          .catch(() => {
+            // Fallback to normal form POST
+            quickForm.submit();
+          });
+      });
+    }
+  }
+
   if (doc.readyState === 'loading') {
-    doc.addEventListener('DOMContentLoaded', initLiveUsernameValidation);
+    doc.addEventListener('DOMContentLoaded', () => {
+      initLiveUsernameValidation();
+      initAppointmentManagementDesk();
+    });
   } else {
     initLiveUsernameValidation();
+    initAppointmentManagementDesk();
   }
 })();

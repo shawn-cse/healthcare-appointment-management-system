@@ -12232,3 +12232,233 @@ input.input-valid-green {
   background-color: #f7fdf9 !important;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14) !important;
 }
+
+/* --- Appointment Management Desk & Excel-Style Container --- */
+.appointment-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.appointment-live-search {
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+.custom-date-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-date-sm {
+  width: 135px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+
+.date-sep {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.appointment-table-container.excel-table-scroll {
+  max-height: calc(100vh - 280px);
+  min-height: 380px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #dce8e1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+  position: relative;
+}
+
+.appointment-table-container.excel-table-scroll table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #f4f8f6;
+  border-bottom: 2px solid #c2e2d0;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #104b42;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.appointment-table-container.excel-table-scroll table tbody td {
+  padding: 9px 14px;
+  font-size: 12.5px;
+  border-bottom: 1px solid #edf4f0;
+  vertical-align: middle;
+}
+
+.appointment-table-container.excel-table-scroll table tbody tr:hover {
+  background-color: #f7faf8;
+}
+
+.appt-code-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: #eef7f2;
+  color: #0d4c3f;
+  border: 1px solid #bce1cd;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease-in-out;
+}
+
+.appt-code-badge:hover {
+  background: #0d4c3f;
+  color: #ffffff;
+  border-color: #0d4c3f;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(13, 76, 63, 0.25);
+}
+
+.muted-username {
+  color: #0284c7;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.cell-patient-name {
+  color: #12332a;
+  font-weight: 700;
+  display: block;
+}
+
+.visit-type-pill {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+.visit-type-pill.visit-first {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+.visit-type-pill.visit-followup {
+  background: #eff6ff;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+
+.visit-type-pill.visit-report {
+  background: #faf5ff;
+  color: #6b21a8;
+  border-color: #e9d5ff;
+}
+
+/* Quick Edit Modal Specific Styles */
+.quick-edit-modal-card {
+  max-width: 580px;
+  width: 95%;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.quick-meta-banner {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  padding: 12px 14px;
+  background: #f8faf9;
+  border: 1px solid #e2ebe6;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+
+.quick-meta-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.quick-meta-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.04em;
+}
+
+.quick-meta-val {
+  font-size: 13px;
+  color: #12332a;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.quick-meta-sub {
+  font-size: 11px;
+  color: #0284c7;
+  font-weight: 500;
+}
+
+.modal-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.quick-payment-toggle {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.toggle-cash-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #15803d;
+  cursor: pointer;
+}
+
+.code-pill {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  background: #eef7f2;
+  color: #0d4c3f;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid #c2e2d0;
+  margin-left: 6px;
+}
+
+.row-highlight-flash {
+  animation: rowFlash 1.6s ease;
+}
+
+@keyframes rowFlash {
+  0% { background-color: #bbf7d0; }
+  100% { background-color: transparent; }
+}

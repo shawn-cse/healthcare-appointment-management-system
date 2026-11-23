@@ -349,7 +349,12 @@ class Appointment(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.reference:
-            self.reference = 'GH-' + uuid.uuid4().hex[:6].upper()
+            import random, string
+            while True:
+                code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                if not Appointment.objects.filter(reference__iexact=code).exists():
+                    self.reference = code
+                    break
         super().save(*args, **kwargs)
 
     @property
@@ -440,13 +445,18 @@ class Complaint(models.Model):
     def save(self, *args, **kwargs):
         if not self.ticket_code:
             import random, string
-            chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-            self.ticket_code = f"TK-{chars}"
+            while True:
+                chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                if not Complaint.objects.filter(ticket_code__iexact=chars).exists():
+                    self.ticket_code = chars
+                    break
         super().save(*args, **kwargs)
 
     @property
     def display_code(self):
-        return self.ticket_code if self.ticket_code else f"TK-{self.pk:04d}"
+        if self.ticket_code:
+            return self.ticket_code.replace('TK-', '').replace('-', '').upper()
+        return f"{self.pk:06d}"
 
     @property
     def is_support(self):
