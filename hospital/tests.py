@@ -397,3 +397,32 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(resp_bulk.status_code, 302)
         complaint.refresh_from_db()
         self.assertEqual(complaint.status, 'reviewing')
+
+        # 6. Test file uploads (PDF, DOCX, Image) without InvalidStorageError
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_login(self.patient)
+        pdf_file = SimpleUploadedFile("test_report.pdf", b"%PDF-1.4 test document", content_type="application/pdf")
+        resp_upload = self.client.post(reverse('complaint_new'), {
+            'category': 'support',
+            'subject': 'ECG file upload test',
+            'message': 'Please review my attached ECG report.',
+            'attachment': pdf_file
+        })
+        self.assertEqual(resp_upload.status_code, 302)
+        file_complaint = Complaint.objects.get(patient=self.patient, subject='ECG file upload test')
+        self.assertTrue(bool(file_complaint.attachment))
+        self.assertIn('test_report', file_complaint.attachment.name)
+
+        # Admin attached resolution document
+        self.client.force_login(self.admin)
+        docx_file = SimpleUploadedFile("resolution_notes.docx", b"PK docx binary content", content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        resp_admin_file = self.client.post(reverse('complaint_update', args=[file_complaint.pk]), {
+            'status': 'resolved',
+            'response': 'Case solved and stamped.',
+            'admin_attachment': docx_file
+        })
+        self.assertEqual(resp_admin_file.status_code, 302)
+        file_complaint.refresh_from_db()
+        self.assertEqual(file_complaint.status, 'resolved')
+        self.assertTrue(bool(file_complaint.admin_attachment))
+        self.assertIn('resolution_notes', file_complaint.admin_attachment.name)
