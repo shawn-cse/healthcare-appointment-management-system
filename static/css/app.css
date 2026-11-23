@@ -11561,43 +11561,165 @@ body.is-page-loading .main-content {
 
 /* --- Admin Excel Sheet View --- */
 .excel-toolbar-panel {
-  padding: 14px 18px;
-  margin-bottom: 16px;
+  padding: 16px 20px;
+  margin-bottom: 18px;
   background: #ffffff;
   border-radius: 12px;
-  border: 1px solid #e2ece6;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 .filter-controls-row {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
 .filter-field-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .filter-field-group label {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
   text-transform: uppercase;
-  color: #64748b;
-  letter-spacing: 0.5px;
+  color: #475569;
+  letter-spacing: 0.4px;
 }
 
 .search-field-group {
-  flex: 1;
-  min-width: 250px;
+  flex: 2;
+  min-width: 260px;
+}
+
+.excel-toolbar-panel .search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.excel-toolbar-panel .search-wrap .search-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #0d5c46;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.excel-toolbar-panel .search-input-field {
+  padding-left: 38px !important;
+  padding-right: 36px !important;
+  height: 42px !important;
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  background: #f8fafc !important;
+  font-size: 13.5px !important;
+  color: #0f172a !important;
+  transition: all 0.2s ease !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.excel-toolbar-panel .search-input-field:focus {
+  background: #ffffff !important;
+  border-color: #0d5c46 !important;
+  box-shadow: 0 0 0 3px rgba(13, 92, 70, 0.12) !important;
+  outline: none !important;
+}
+
+.excel-toolbar-panel .clear-search-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #e2e8f0;
+  border: none;
+  color: #475569;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+  z-index: 3;
+}
+
+.excel-toolbar-panel .clear-search-btn:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
+.excel-toolbar-panel select.field-control {
+  height: 42px !important;
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  background: #f8fafc !important;
+  font-size: 13.5px !important;
+  padding: 0 32px 0 12px !important;
+  min-width: 170px;
+  color: #0f172a !important;
+  font-weight: 500 !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s ease !important;
+}
+
+.excel-toolbar-panel select.field-control:focus {
+  background: #ffffff !important;
+  border-color: #0d5c46 !important;
+  box-shadow: 0 0 0 3px rgba(13, 92, 70, 0.12) !important;
+  outline: none !important;
 }
 
 .filter-button-group {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-button-group label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: transparent;
+  user-select: none;
+}
+
+.excel-toolbar-panel .btn-reset-filters {
+  height: 42px !important;
+  padding: 0 18px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  border: 1.5px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #475569 !important;
+  text-decoration: none !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+}
+
+.excel-toolbar-panel .btn-reset-filters:hover {
+  background: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
 }
 
 .excel-sheet-panel {

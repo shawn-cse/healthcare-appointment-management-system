@@ -456,7 +456,8 @@ class AppointmentSystemTests(TestCase):
         self.assertContains(resp_team, reverse('doctor_detail', args=[self.doc.profile_slug]))
         # Excel sheet live search and filter controls
         self.assertContains(resp_team, 'staff-search-input')
-        self.assertContains(resp_team, 'btn-staff-search')
+        self.assertContains(resp_team, 'btn-staff-reset')
+        self.assertNotContains(resp_team, 'btn-staff-search')
         self.assertContains(resp_team, 'filter-role-select')
         # Doctor cannot see admin actions
         self.assertNotContains(resp_team, reverse('staff_new'))
@@ -469,7 +470,7 @@ class AppointmentSystemTests(TestCase):
         self.assertNotContains(resp_admin_dash, 'Overview')
         resp_admin_team = self.client.get(reverse('staff_list'))
         self.assertEqual(resp_admin_team.status_code, 200)
-        self.assertContains(resp_admin_team, 'Add Team Member')
+        self.assertContains(resp_admin_team, 'Add Doctor or Staff')
         self.assertContains(resp_admin_team, reverse('staff_new'))
         self.assertContains(resp_admin_team, reverse('staff_edit', args=[self.doctor.pk]))
 

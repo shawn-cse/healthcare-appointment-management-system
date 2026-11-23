@@ -8,65 +8,28 @@
     <div>
       <p class="eyebrow">HOSPITAL PERSONNEL & CHAMBERS</p>
       <h1>Staff &amp; Doctors</h1>
-      <p>Excel-style hospital personnel directory. Live search and filter doctors, front desk receptionists, and hospital administration.</p>
     </div>
     {% if user.role == 'admin' %}
     <div class="heading-actions">
       <a class="button button-primary" href="{% url 'staff_new' %}">
-        <svg class="icon"><use href="#ic-plus"/></svg> Add Team Member
+        <svg class="icon"><use href="#ic-plus"/></svg> Add Doctor or Staff
       </a>
     </div>
     {% endif %}
   </div>
 
-  <!-- Metric Summary Cards -->
-  <div class="metric-grid four-metrics" style="margin-bottom: 20px;">
-    <div class="metric-card">
-      <div class="metric-top">
-        <span>Total Personnel</span>
-        <span class="metric-icon"><svg class="icon"><use href="#ic-users"/></svg></span>
-      </div>
-      <strong>{{ counts.all }}</strong>
-      <small>All registered members</small>
-    </div>
-    <div class="metric-card">
-      <div class="metric-top">
-        <span>Doctors (Dr)</span>
-        <span class="metric-icon blue"><svg class="icon"><use href="#ic-stethoscope"/></svg></span>
-      </div>
-      <strong>{{ counts.doctor }}</strong>
-      <small>Consultants &amp; Specialists</small>
-    </div>
-    <div class="metric-card">
-      <div class="metric-top">
-        <span>Staff (Reception)</span>
-        <span class="metric-icon purple"><svg class="icon"><use href="#ic-user"/></svg></span>
-      </div>
-      <strong>{{ counts.receptionist }}</strong>
-      <small>Chamber &amp; Front Desk</small>
-    </div>
-    <div class="metric-card">
-      <div class="metric-top">
-        <span>Administration</span>
-        <span class="metric-icon amber"><svg class="icon"><use href="#ic-settings"/></svg></span>
-      </div>
-      <strong>{{ counts.admin }}</strong>
-      <small>Management &amp; IT Ops</small>
-    </div>
-  </div>
-
-  <!-- Excel Filter & Live Search Toolbar -->
+  <!-- Excel Filter & Search Toolbar -->
   <div class="panel excel-toolbar-panel">
-    <form method="get" class="excel-filter-form" id="staff-filter-form">
+    <form method="get" class="excel-filter-form" id="staff-filter-form" onsubmit="return false;">
       <div class="filter-controls-row">
-        <!-- Live Search Field -->
-        <div class="filter-field-group search-field-group" style="flex: 2;">
-          <label for="staff-search-input">Search Keywords (Live Search)</label>
+        <!-- Search Field -->
+        <div class="filter-field-group search-field-group">
+          <label for="staff-search-input">Search Keywords</label>
           <div class="search-wrap">
             <svg class="icon search-icon"><use href="#ic-search"/></svg>
             <input type="text" name="q" id="staff-search-input" value="{{ query }}"
                    class="field-control search-input-field"
-                   placeholder="Live search by name, phone no, room no, chamber, or department..."
+                   placeholder="Search by name, phone no, room no, chamber, or department..."
                    autocomplete="off">
             <button type="button" class="clear-search-btn" id="clear-search-btn" title="Clear search" style="{% if not query %}display: none;{% endif %}">✕</button>
           </div>
@@ -86,7 +49,7 @@
         <!-- Sort Filter -->
         <div class="filter-field-group">
           <label for="filter-sort">Sort Order</label>
-          <select name="sort" id="filter-sort" class="field-control" onchange="this.form.submit()">
+          <select name="sort" id="filter-sort" class="field-control">
             <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A–Z</option>
             <option value="role" {% if sort == 'role' %}selected{% endif %}>Role</option>
             <option value="username" {% if sort == 'username' %}selected{% endif %}>Username</option>
@@ -94,15 +57,12 @@
           </select>
         </div>
 
-        <!-- Search & Reset Buttons -->
+        <!-- Reset Button Only -->
         <div class="filter-button-group">
-          <label>&nbsp;</label>
-          <button type="submit" class="button button-primary" id="btn-staff-search">
-            <svg class="icon"><use href="#ic-search"/></svg> Search
-          </button>
-          {% if query or role_filter or sort != 'name' %}
-            <a href="{% url 'staff_list' %}" class="button button-outline" title="Reset all filters">Reset</a>
-          {% endif %}
+          <label aria-hidden="true">&nbsp;</label>
+          <a href="{% url 'staff_list' %}" class="btn-reset-filters" id="btn-staff-reset" onclick="resetFilters(event)" title="Reset all filters">
+            <svg class="icon" style="width: 14px; height: 14px;"><use href="#ic-refresh"/></svg> Reset
+          </a>
         </div>
       </div>
     </form>
@@ -115,13 +75,13 @@
       <div class="excel-header-left">
         <div class="sheet-indicator">
           <span class="live-dot-pulse"></span>
-          <strong>Live Personnel Registry</strong> · Showing <span id="staff-live-count">{{ staff|length }}</span> of {{ counts.all }} recorded team members
+          <strong>Hospital Personnel Registry</strong> · Showing <span id="staff-live-count">{{ staff|length }}</span> of {{ counts.all }} recorded staff &amp; doctors
         </div>
       </div>
       <div class="excel-header-right">
         {% if user.role == 'admin' %}
           <a class="button button-primary button-sm" href="{% url 'staff_new' %}">
-            <svg class="icon"><use href="#ic-plus"/></svg> Add Team Member
+            <svg class="icon"><use href="#ic-plus"/></svg> Add Doctor or Staff
           </a>
         {% endif %}
       </div>
@@ -305,21 +265,21 @@
               <div class="empty-state">
                 <span class="empty-icon"><svg class="icon"><use href="#ic-users"/></svg></span>
                 <h3>No staff or doctors found</h3>
-                <p>No team members match your selected search or role criteria.</p>
+                <p>No personnel match your selected search or role criteria.</p>
                 <a href="{% url 'staff_list' %}" class="button button-outline button-sm">Clear Filters</a>
               </div>
             </td>
           </tr>
           {% endfor %}
 
-          <!-- Dynamic Live Search Empty State (Hidden by default) -->
+          <!-- Dynamic Search Empty State (Hidden by default) -->
           <tr id="staff-empty-live-row" style="display: none;">
             <td colspan="9" class="empty-state-cell">
               <div class="empty-state">
                 <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
                 <h3>No matching personnel found</h3>
-                <p>No doctor or staff member matches your search or filter keywords.</p>
-                <button type="button" class="button button-outline button-sm" onclick="resetLiveFilters()">Clear Search</button>
+                <p>No doctor or staff member matches your search keywords or role filter.</p>
+                <button type="button" class="button button-outline button-sm" onclick="resetFilters(event)">Clear Search</button>
               </div>
             </td>
           </tr>
@@ -344,24 +304,25 @@
   </div>
 </div>
 
-<!-- Live Search & Interactive Filter Script -->
+<!-- Interactive Search & Filter Script -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const searchInput = document.getElementById('staff-search-input');
   const clearBtn = document.getElementById('clear-search-btn');
   const roleSelect = document.getElementById('filter-role-select');
+  const sortSelect = document.getElementById('filter-sort');
   const rows = document.querySelectorAll('#staff-excel-table tbody tr.staff-data-row');
   const emptyRow = document.getElementById('staff-empty-live-row');
   const liveCount = document.getElementById('staff-live-count');
 
   function filterStaffRows() {
-    const query = (searchInput.value || '').trim().toLowerCase();
-    const selectedRole = (roleSelect.value || '').trim().toLowerCase();
+    const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const selectedRole = (roleSelect ? roleSelect.value : '').trim().toLowerCase();
     let visibleCount = 0;
 
     // Show/hide clear search button
     if (clearBtn) {
-      clearBtn.style.display = query ? 'inline-block' : 'none';
+      clearBtn.style.display = query ? 'flex' : 'none';
     }
 
     rows.forEach(function(row) {
@@ -388,24 +349,59 @@ document.addEventListener('DOMContentLoaded', function() {
 
   if (searchInput) {
     searchInput.addEventListener('input', filterStaffRows);
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        filterStaffRows();
+      }
+    });
   }
 
   if (roleSelect) {
     roleSelect.addEventListener('change', filterStaffRows);
   }
 
-  if (clearBtn) {
-    clearBtn.addEventListener('click', function() {
-      searchInput.value = '';
-      filterStaffRows();
-      searchInput.focus();
+  if (sortSelect) {
+    sortSelect.addEventListener('change', function() {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('sort', this.value);
+      if (searchInput && searchInput.value) {
+        currentUrl.searchParams.set('q', searchInput.value);
+      } else {
+        currentUrl.searchParams.delete('q');
+      }
+      if (roleSelect && roleSelect.value) {
+        currentUrl.searchParams.set('role', roleSelect.value);
+      } else {
+        currentUrl.searchParams.delete('role');
+      }
+      currentUrl.searchParams.delete('page');
+      window.location.href = currentUrl.toString();
     });
   }
 
-  window.resetLiveFilters = function() {
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function() {
+      if (searchInput) {
+        searchInput.value = '';
+        filterStaffRows();
+        searchInput.focus();
+      }
+    });
+  }
+
+  window.resetFilters = function(e) {
+    const hasUrlParams = window.location.search && window.location.search.length > 1;
+    if (hasUrlParams) {
+      // Let link navigate to clean /staff/ to reset server query params
+      return;
+    }
+    if (e) e.preventDefault();
     if (searchInput) searchInput.value = '';
     if (roleSelect) roleSelect.value = '';
+    if (sortSelect) sortSelect.value = 'name';
     filterStaffRows();
+    if (searchInput) searchInput.focus();
   };
 });
 </script>

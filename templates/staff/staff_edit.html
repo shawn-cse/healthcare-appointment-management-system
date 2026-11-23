@@ -5,8 +5,8 @@
 <div class="page-heading">
   <div>
     <a class="back-link" href="{% url 'staff_list' %}">‹ Staff directory</a>
-    <p class="eyebrow">TEAM ACCESS</p>
-    <h1>{% if member %}Edit staff account{% else %}Create staff account{% endif %}</h1>
+    <p class="eyebrow">HOSPITAL PERSONNEL</p>
+    <h1>{% if member %}Edit staff account{% else %}Add Doctor or Staff{% endif %}</h1>
     <p>{% if member %}Update member details, account status or initial password.{% else %}Create doctor, receptionist or administrator accounts for Green Hospital.{% endif %}</p>
   </div>
 </div>
