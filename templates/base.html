@@ -120,7 +120,7 @@
 <!-- Authenticated Application Layout with Sidebar -->
 <div class="sidebar-scrim" data-close-nav></div>
 <aside class="sidebar" id="sidebar">
-  <a class="brand sidebar-brand" href="{% if user.role == 'patient' %}{% url 'doctor_directory' %}{% else %}{% url 'dashboard' %}{% endif %}">
+  <a class="brand sidebar-brand" href="{% url 'dashboard' %}">
     <span class="brand-mark-emblem"><svg class="brand-logo-icon" viewBox="0 0 40 40"><use href="#ic-hospital-logo"/></svg></span>
     <span><strong>Green Hospital</strong><small>{% if user.role == 'patient' %}Patient Portal{% else %}Clinical Management{% endif %}</small></span>
   </a>
@@ -128,6 +128,7 @@
     <div class="nav-eyebrow">{% if user.role == 'patient' %}PATIENT SERVICES{% else %}WORKSPACE{% endif %}</div>
     <nav class="nav-list" aria-label="Main navigation">
       {% if user.role == 'patient' %}
+        <a href="{% url 'dashboard' %}" data-nav="dashboard"><svg class="icon"><use href="#ic-grid"/></svg> Dashboard</a>
         <a href="{% url 'doctor_directory' %}" data-nav="doctor_directory"><svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors</a>
         <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> My Appointments</a>
         <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Complaints & Support</a>
