@@ -11236,3 +11236,134 @@ b, strong {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   Smooth Page Transitions & Navigation Progress Bar
+   ========================================================================== */
+
+/* Modern Cross-Document View Transitions (Chrome 126+, Edge, modern browsers) */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root) {
+  animation: 160ms cubic-bezier(0.4, 0, 1, 1) both ghPageFadeOut;
+}
+
+::view-transition-new(root) {
+  animation: 200ms cubic-bezier(0, 0, 0.2, 1) both ghPageFadeIn;
+}
+
+@keyframes ghPageFadeOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.996);
+  }
+}
+
+@keyframes ghPageFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(1.004);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Fallback & Enhanced Smooth Page Entrance for all browsers */
+@keyframes pageSmoothEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.main-content,
+.public-content,
+.departments-page,
+.doctor-directory-page,
+.appointments-page,
+.patient-complaint-container,
+.patient-complaints-page,
+.auth-page,
+.dashboard-page,
+.reports-page {
+  animation: pageSmoothEntrance 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Top Progress Bar (Brand Emerald Gradient with Glow) */
+.page-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 9999999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.page-progress-bar.is-active {
+  opacity: 1;
+}
+
+.page-progress-inner {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #0d5c46 0%, #10b981 60%, #34d399 100%);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.8), 0 0 4px rgba(52, 211, 153, 0.9);
+  border-radius: 0 2px 2px 0;
+  transition: width 0.22s cubic-bezier(0.1, 0.8, 0.2, 1);
+}
+
+/* Subtle Page Softening During Transition */
+body.is-page-loading .main-content {
+  opacity: 0.76;
+  filter: blur(0.4px);
+  transition: opacity 0.16s ease-out, filter 0.16s ease-out;
+  pointer-events: none;
+}
+
+/* Sidebar & Navigation Link Instant Feedback */
+.nav-list a {
+  transition: background 0.18s ease, color 0.18s ease, transform 0.1s ease;
+}
+
+.nav-list a:active {
+  transform: scale(0.985);
+}
+
+.nav-list a.is-navigating {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #0c3328 !important;
+  font-weight: 600;
+  position: relative;
+}
+
+.nav-list a.is-navigating::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  top: calc(50% - 6px);
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(13, 92, 70, 0.2);
+  border-top-color: #0d5c46;
+  border-radius: 50%;
+  animation: navSpinner 0.6s linear infinite;
+}
+
+@keyframes navSpinner {
+  to { transform: rotate(360deg); }
+}

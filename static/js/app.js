@@ -426,4 +426,102 @@
       });
     });
   }
+
+  // --- Global Smooth Page Transitions & Progress Indicator ---
+  (function initPageTransitions() {
+    const progressBar = doc.getElementById('page-progress-bar');
+    const progressInner = progressBar ? progressBar.querySelector('.page-progress-inner') : null;
+    let progressTimer = null;
+    let currentProgress = 0;
+
+    function setProgress(percent) {
+      if (!progressInner) return;
+      currentProgress = percent;
+      progressInner.style.width = percent + '%';
+    }
+
+    function startLoading() {
+      if (!progressBar || !progressInner) return;
+      if (progressTimer) clearInterval(progressTimer);
+      progressBar.classList.add('is-active');
+      doc.body.classList.add('is-page-loading');
+      setProgress(25);
+
+      progressTimer = setInterval(() => {
+        if (currentProgress < 82) {
+          setProgress(currentProgress + (85 - currentProgress) * 0.18);
+        }
+      }, 100);
+    }
+
+    function finishLoading() {
+      if (!progressBar || !progressInner) return;
+      if (progressTimer) {
+        clearInterval(progressTimer);
+        progressTimer = null;
+      }
+      setProgress(100);
+      setTimeout(() => {
+        progressBar.classList.remove('is-active');
+        doc.body.classList.remove('is-page-loading');
+        doc.querySelectorAll('.nav-list a.is-navigating').forEach(el => el.classList.remove('is-navigating'));
+        setTimeout(() => {
+          setProgress(0);
+        }, 220);
+      }, 180);
+    }
+
+    // Finish progress on initial page ready
+    if (doc.readyState === 'complete') {
+      finishLoading();
+    } else {
+      window.addEventListener('load', finishLoading);
+    }
+
+    // Handle browser back/forward cache restoration
+    window.addEventListener('pageshow', () => {
+      finishLoading();
+    });
+
+    // Intercept internal link clicks for smooth immediate feedback
+    doc.addEventListener('click', (e) => {
+      const link = e.target.closest('a');
+      if (!link) return;
+
+      const href = link.getAttribute('href');
+      if (!href) return;
+      if (href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('tel:') || href.startsWith('mailto:')) return;
+      if (link.target && link.target !== '_self') return;
+      if (link.hasAttribute('download')) return;
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.defaultPrevented) return;
+
+      try {
+        const targetUrl = new URL(link.href, window.location.origin);
+        if (targetUrl.origin !== window.location.origin) return;
+
+        // Skip if exact same URL hash or page
+        if (targetUrl.pathname === window.location.pathname && targetUrl.search === window.location.search && targetUrl.hash) return;
+
+        // Visual feedback on clicked navigation link immediately
+        if (link.closest('.nav-list')) {
+          doc.querySelectorAll('.nav-list a.is-navigating').forEach(el => el.classList.remove('is-navigating'));
+          link.classList.add('is-navigating');
+        }
+
+        startLoading();
+      } catch (err) {
+        // Fallback for relative or atypical URLs
+      }
+    });
+
+    // Also trigger loading feedback for standard form submissions
+    doc.addEventListener('submit', (e) => {
+      const form = e.target;
+      if (form && !e.defaultPrevented) {
+        if (!form.hasAttribute('data-no-progress')) {
+          startLoading();
+        }
+      }
+    });
+  })();
 })();
