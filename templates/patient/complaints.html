@@ -8,7 +8,7 @@
     <div>
       <span class="sheet-eyebrow">PATIENT ASSISTANCE DESK</span>
       <h1 class="sheet-main-title">Complaints & Support</h1>
-      <p class="sheet-subtitle">Transparent three-step support: <b>1. Generated</b> → <b>2. Under Review & Inquiring</b> → <b>3. Issue Solved</b></p>
+      <p class="sheet-subtitle">Transparent three-step assistance: <b>1. Generated</b> → <b>2. Under Review & Inquiring</b> → <b>3. Issue Solved</b></p>
     </div>
     <div class="sheet-header-actions">
       <a class="button button-primary" href="{% url 'complaint_new' %}">
@@ -20,7 +20,7 @@
   <div class="panel complaints-panel">
     <div class="panel-header">
       <div>
-        <h2>Your Active Tickets & History</h2>
+        <h2>Your Tickets & Inquiries</h2>
         <p>Communicate directly with hospital administration, answer inquiries, and track resolution.</p>
       </div>
     </div>
@@ -34,14 +34,14 @@
             <span class="ticket-number-tag">Ticket #{{ c.pk }}</span>
             <div class="ticket-type-badge">
               {% if c.is_support %}
-                <span class="badge-cat-support"><svg class="icon"><use href="#ic-help"/></svg> General Support & Help</span>
+                <span class="badge-cat-support"><svg class="icon"><use href="#ic-help"/></svg> Support & Help</span>
               {% else %}
-                <span class="badge-cat-complaint"><svg class="icon"><use href="#ic-alert"/></svg> Grievance: {{ c.get_category_display }}</span>
+                <span class="badge-cat-complaint"><svg class="icon"><use href="#ic-alert"/></svg> Complaint: {{ c.get_category_display }}</span>
               {% endif %}
             </div>
             {% if c.appointment %}
               <span class="ticket-appt-link">
-                Ref: <a href="{% url 'appointment_detail' c.appointment.pk %}">{{ c.appointment.reference }}</a> (Dr. {{ c.appointment.doctor.user.display_name }})
+                Ref: <a href="{% url 'appointment_detail' c.appointment.pk %}">{{ c.appointment.reference }}</a> · Dr. {{ c.appointment.doctor.user.display_name }}
               </span>
             {% endif %}
           </div>
@@ -64,7 +64,7 @@
             <div class="stepper-node {% if c.status_step >= 1 %}node-done{% endif %} {% if c.status_step == 1 %}node-active{% endif %}">
               <span class="node-icon">{% if c.status_step > 1 %}✓{% else %}1{% endif %}</span>
               <div class="node-text">
-                <span class="node-title">{% if c.is_support %}Support Help Generated{% else %}Complaint Generated{% endif %}</span>
+                <span class="node-title">{% if c.is_support %}Support Generated{% else %}Complaint Generated{% endif %}</span>
                 <span class="node-sub">{{ c.created_at|date:'d M, g:i A' }}</span>
               </div>
             </div>
@@ -76,7 +76,7 @@
               <span class="node-icon">{% if c.status_step > 2 %}✓{% else %}2{% endif %}</span>
               <div class="node-text">
                 <span class="node-title">Under Review & Inquiring</span>
-                <span class="node-sub">{% if c.status_step >= 2 %}Hospital Dialogue Active{% else %}Awaiting Admin Check{% endif %}</span>
+                <span class="node-sub">{% if c.status_step >= 2 %}Active Dialogue{% else %}Awaiting Review{% endif %}</span>
               </div>
             </div>
 

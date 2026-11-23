@@ -8688,56 +8688,221 @@ button.profile-trigger:hover,
 }
 
 /* ==========================================================================
-   COMPLAINTS & SUPPORT STYLES
+   COMPLAINTS & SUPPORT: CLEAN MODERN CONTAINER & FORM
    ========================================================================== */
+.patient-complaint-container {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 8px 0 24px;
+}
+
+.patient-complaints-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 8px 0 24px;
+}
+
+.compact-heading {
+  margin-bottom: 16px;
+}
+
+.complaint-card.panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 24px 28px;
+  box-shadow: 0 2px 12px rgba(10, 48, 38, 0.03);
+}
+
 .concern-type-selector {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 14px;
+  margin-bottom: 20px;
 }
 
 .type-pill-btn {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px;
+  gap: 12px;
+  padding: 14px 16px;
   background: #f8fafc;
   border: 2px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
   text-align: left;
-  transition: all 0.2s ease;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .type-pill-btn:hover {
   background: #ffffff;
   border-color: #cbd5e1;
+  transform: translateY(-1px);
 }
 
 .type-pill-btn.active {
   background: #f0fdf4;
-  border-color: #156448;
-  box-shadow: 0 0 0 1px #156448;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 1px #0f766e, 0 3px 10px rgba(15, 118, 110, 0.08);
 }
 
-.type-pill-btn .icon {
-  width: 24px;
-  height: 24px;
-  color: #156448;
+.pill-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.pill-icon-wrap.icon-support {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.pill-icon-wrap.icon-complaint {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.type-pill-btn.active .pill-icon-wrap.icon-support {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.type-pill-btn.active .pill-icon-wrap.icon-complaint {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.pill-icon-wrap .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.pill-text-wrap {
+  flex: 1;
 }
 
 .pill-text-wrap strong {
   display: block;
-  font-size: 14px;
+  font-size: 13.5px;
+  font-weight: 700;
   color: #0f172a;
 }
 
 .pill-text-wrap small {
   display: block;
-  font-size: 12px;
+  font-size: 11.5px;
   color: #64748b;
   margin-top: 2px;
+  line-height: 1.3;
+}
+
+.pill-check-indicator {
+  display: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0f766e;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.type-pill-btn.active .pill-check-indicator {
+  display: grid;
+}
+
+.field-hint {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.process-guarantee-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 16px 0;
+}
+
+.guarantee-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #0f766e;
+  margin-bottom: 8px;
+}
+
+.guarantee-header .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.guarantee-steps-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+}
+
+.g-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.g-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 10.5px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.g-step div b {
+  display: block;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.g-step div small {
+  display: block;
+  color: #64748b;
+  font-size: 10.5px;
+}
+
+.g-arrow {
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
+@media (max-width: 680px) {
+  .concern-type-selector {
+    grid-template-columns: 1fr;
+  }
+  .guarantee-steps-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .g-arrow {
+    display: none;
+  }
 }
 
 /* ==========================================================================
