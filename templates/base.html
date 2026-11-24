@@ -126,9 +126,6 @@
       <span class="brand-mark-emblem"><svg class="brand-logo-icon" viewBox="0 0 40 40"><use href="#ic-hospital-logo"/></svg></span>
       <span class="brand-text-wrap"><strong>Green Hospital</strong><small>{% if user.role == 'patient' %}Patient Portal{% else %}Clinical Management{% endif %}</small></span>
     </a>
-    <button type="button" class="sidebar-close-btn" id="sidebar-close-btn" data-close-nav aria-label="Close side menu" title="Close side menu">
-      <svg class="icon close-icon-chevron" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
   </div>
   <div class="sidebar-scroll">
     <div class="nav-eyebrow">{% if user.role == 'patient' %}PATIENT SERVICES{% else %}WORKSPACE{% endif %}</div>
@@ -172,8 +169,8 @@
   <header class="topbar">
     <div class="topbar-left">
       <button type="button" class="sidebar-toggle-btn" id="sidebar-toggle-btn" data-toggle-nav aria-label="Toggle side menu" title="Toggle side menu">
-        <svg class="icon toggle-icon-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-        <span class="sidebar-toggle-label">Menu</span>
+        <svg class="icon chevron-left" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="icon chevron-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <div class="topbar-collapsed-brand" id="topbar-collapsed-brand">
         <a class="brand" href="{% url 'dashboard' %}">
