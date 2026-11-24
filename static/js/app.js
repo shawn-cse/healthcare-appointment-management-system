@@ -12,8 +12,10 @@
   // --- Universal Sidebar Open / Close / Toggle for all screen sizes and roles ---
   function toggleNav() {
     if (window.innerWidth <= 900) {
+      doc.body.classList.remove('sidebar-collapsed');
       doc.body.classList.toggle('nav-open');
     } else {
+      doc.body.classList.remove('nav-open');
       const isCollapsed = doc.body.classList.toggle('sidebar-collapsed');
       try { localStorage.setItem('gh_sidebar_collapsed', isCollapsed ? 'true' : 'false'); } catch (e) {}
     }

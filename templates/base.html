@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link href="{% static 'css/app.css' %}?v=20261123_12" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}?v=20261124_20" rel="stylesheet">
   <link href="{% static 'css/calendar.css' %}?v=20261123_50" rel="stylesheet">
 </head>
 <body class="{% if user.is_authenticated %}app-layout{% else %}public-layout{% endif %}">
@@ -124,10 +124,10 @@
   <div class="sidebar-header-row">
     <a class="brand sidebar-brand" href="{% url 'dashboard' %}">
       <span class="brand-mark-emblem"><svg class="brand-logo-icon" viewBox="0 0 40 40"><use href="#ic-hospital-logo"/></svg></span>
-      <span><strong>Green Hospital</strong><small>{% if user.role == 'patient' %}Patient Portal{% else %}Clinical Management{% endif %}</small></span>
+      <span class="brand-text-wrap"><strong>Green Hospital</strong><small>{% if user.role == 'patient' %}Patient Portal{% else %}Clinical Management{% endif %}</small></span>
     </a>
-    <button type="button" class="icon-button sidebar-close-btn" id="sidebar-close-btn" data-close-nav aria-label="Close navigation" title="Close side menu">
-      <svg class="icon"><use href="#ic-x"/></svg>
+    <button type="button" class="sidebar-close-btn" id="sidebar-close-btn" data-close-nav aria-label="Close side menu" title="Close side menu">
+      <svg class="icon close-icon-chevron" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
   </div>
   <div class="sidebar-scroll">
@@ -172,11 +172,20 @@
 <div class="app-shell">
   <header class="topbar">
     <div class="topbar-left">
-      <button type="button" class="icon-button sidebar-toggle-btn" id="sidebar-toggle-btn" data-toggle-nav aria-label="Toggle navigation menu" title="Toggle side menu">
-        <svg class="icon"><use href="#ic-menu"/></svg>
+      <button type="button" class="sidebar-toggle-btn" id="sidebar-toggle-btn" data-toggle-nav aria-label="Toggle side menu" title="Toggle side menu">
+        <svg class="icon toggle-icon-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <span class="sidebar-toggle-label">Menu</span>
       </button>
+      <div class="topbar-collapsed-brand" id="topbar-collapsed-brand">
+        <a class="brand" href="{% url 'dashboard' %}">
+          <span class="brand-mark-emblem"><svg class="brand-logo-icon" viewBox="0 0 40 40"><use href="#ic-hospital-logo"/></svg></span>
+          <strong>Green Hospital</strong>
+        </a>
+      </div>
       <div class="topbar-breadcrumb">
-        Green Hospital <span>/</span> {% if user.role == 'admin' %}Administration{% elif user.role == 'doctor' %}Doctor Workspace{% elif user.role == 'receptionist' %}Front Desk{% else %}Patient Portal{% endif %}
+        <span class="breadcrumb-prefix">Green Hospital</span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-current">{% if user.role == 'admin' %}Administration{% elif user.role == 'doctor' %}Doctor Workspace{% elif user.role == 'receptionist' %}Front Desk{% else %}Patient Portal{% endif %}</span>
       </div>
     </div>
     <div class="topbar-right">

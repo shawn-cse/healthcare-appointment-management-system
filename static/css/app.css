@@ -28,6 +28,7 @@
   --rad-sm: 8px;
   --rad: 14px;
   --rad-lg: 20px;
+  --sidebar-w: 260px;
   --side: 260px;
 }
 
@@ -537,17 +538,19 @@ img {
   top: 0;
   left: 0;
   height: 100vh;
-  width: var(--side);
+  width: var(--sidebar-w, 260px);
   display: flex;
   flex-direction: column;
-  z-index: 25;
+  z-index: 100;
   border-right: 1px solid var(--line);
+  overflow: hidden;
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.24s, box-shadow 0.24s !important;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.03);
 }
 
 .sidebar-brand {
   margin: 0;
-  padding: 24px 22px 20px;
-  border-bottom: 1px solid #eff3f1;
+  padding: 0;
 }
 
 .brand {
@@ -824,80 +827,206 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 16px 14px 16px 18px;
+  border-bottom: 1px solid #eff3f1;
+  background: #ffffff;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .sidebar-header-row .sidebar-brand {
+  margin: 0;
+  padding: 0;
+  border-bottom: none;
   flex: 1;
+  min-width: 0;
+  text-decoration: none;
 }
 
+.brand-text-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brand-text-wrap strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sidebar Close Button */
 .sidebar-close-btn {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  color: #4b665d;
-  background: transparent;
-  border: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #d4e7dc;
+  background: #f0f7f4;
+  color: #0d4c3f;
   cursor: pointer;
-  margin-right: 12px;
-  transition: all 0.15s ease;
+  outline: none;
+  flex-shrink: 0;
+  padding: 0;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sidebar-close-btn:hover {
-  background: #e2f4ea;
-  color: #0d4c3f;
+  background: #0d4c3f;
+  border-color: #0d4c3f;
+  color: #ffffff;
+  transform: scale(1.05);
+  box-shadow: 0 3px 10px rgba(13, 76, 63, 0.22);
 }
 
-/* Sidebar Toggle Button in Topbar (Visible for all roles on all screen sizes) */
+.sidebar-close-btn:active {
+  transform: scale(0.95);
+}
+
+.sidebar-close-btn .icon {
+  width: 17px;
+  height: 17px;
+}
+
+/* Sidebar Toggle Button in Topbar */
 .sidebar-toggle-btn {
   display: inline-flex !important;
   align-items: center;
-  justify-content: center;
-  width: 38px;
+  gap: 8px;
   height: 38px;
+  padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid #d4e7dc;
-  background: #f0f7f3;
+  border: 1px solid #cce5d6;
+  background: #f0f7f4;
   color: #0d4c3f;
   cursor: pointer;
-  transition: all 0.18s ease;
+  outline: none;
   flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sidebar-toggle-btn:hover {
-  background: #e2f4ea;
-  border-color: #10b981;
-  color: #064e3b;
+  background: #0d4c3f;
+  border-color: #0d4c3f;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(13, 76, 63, 0.22);
+}
+
+.sidebar-toggle-btn:active {
+  transform: scale(0.96);
 }
 
 .sidebar-toggle-btn .icon {
   width: 18px;
   height: 18px;
+  stroke-width: 2.2;
 }
 
-/* Collapsible Desktop / Responsive Sidebar */
-.sidebar {
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease !important;
+.sidebar-toggle-btn .sidebar-toggle-label {
+  display: inline-block;
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
+@media (max-width: 600px) {
+  .sidebar-toggle-btn {
+    padding: 0 9px;
+    width: 38px;
+    justify-content: center;
+  }
+  .sidebar-toggle-btn .sidebar-toggle-label {
+    display: none;
+  }
+}
+
+/* Topbar Brand & Breadcrumb in Collapsed / Mobile Mode */
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.topbar-collapsed-brand {
+  display: none;
+  align-items: center;
+}
+
+.topbar-collapsed-brand .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+}
+
+.topbar-collapsed-brand .brand strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: #07382b;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.topbar-collapsed-brand .brand-mark-emblem {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.topbar-collapsed-brand .brand-logo-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.topbar-breadcrumb {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: #48685e;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.topbar-breadcrumb .breadcrumb-separator {
+  padding: 0 8px;
+  color: #9bb5ab;
+  font-weight: 400;
+}
+
+.topbar-breadcrumb .breadcrumb-current {
+  color: #12332a;
+  font-weight: 700;
+}
+
+/* Collapsible Desktop Sidebar */
 .app-shell {
-  transition: margin-left 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: margin-left 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 @media (min-width: 901px) {
-  body.sidebar-collapsed {
-    --side: 0px !important;
-  }
   body.sidebar-collapsed .sidebar {
     transform: translateX(-100%) !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
     box-shadow: none !important;
-    pointer-events: none;
   }
+
   body.sidebar-collapsed .app-shell {
     margin-left: 0 !important;
     width: 100% !important;
+  }
+
+  body.sidebar-collapsed .topbar-collapsed-brand {
+    display: inline-flex !important;
+  }
+
+  body.sidebar-collapsed .topbar-breadcrumb .breadcrumb-prefix {
+    display: none !important;
   }
 }
 
@@ -4724,28 +4853,34 @@ input[type="checkbox"] {
   }
 }
 
-@media (max-width: 800px) {
-  :root {
-    --side: 270px;
-  }
+@media (max-width: 900px) {
   .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: translateX(-100%) !important;
+    visibility: hidden !important;
+    z-index: 1000 !important;
     box-shadow: 15px 0 40px rgba(24, 46, 40, 0.20);
   }
-  .nav-open .sidebar {
-    transform: translateX(0);
+  body.nav-open .sidebar {
+    transform: translateX(0) !important;
+    visibility: visible !important;
   }
-  .nav-open .sidebar-scrim {
-    display: block;
+  body.nav-open .sidebar-scrim {
+    display: block !important;
     position: fixed;
     inset: 0;
     background: rgba(12, 38, 32, 0.65);
-    z-index: 24;
+    z-index: 999;
     backdrop-filter: blur(2px);
   }
   .app-shell {
-    margin-left: 0;
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  .topbar-collapsed-brand {
+    display: inline-flex !important;
+  }
+  .topbar-breadcrumb .breadcrumb-prefix {
+    display: none !important;
   }
   .mobile-toggle {
     display: inline-grid;
