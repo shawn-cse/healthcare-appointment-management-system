@@ -659,7 +659,7 @@
     });
   }
 
-  // --- Appointment Management Desk: Live Search, Filters & Quick Edit Modal ---
+  // --- Appointment Management Desk: Search, Filters & Quick Edit Modal ---
   function initAppointmentManagementDesk() {
     const filterForm = doc.getElementById('appointment-filter-form');
     const liveSearchInput = doc.getElementById('appt-live-search');
@@ -963,12 +963,23 @@
     }
   }
 
+  // --- Universal Modal Helper: Ensure Modals are Direct Children of Body ---
+  function initGlobalModals() {
+    doc.querySelectorAll('.modal-backdrop').forEach(modal => {
+      if (modal.parentElement !== doc.body) {
+        doc.body.appendChild(modal);
+      }
+    });
+  }
+
   if (doc.readyState === 'loading') {
     doc.addEventListener('DOMContentLoaded', () => {
+      initGlobalModals();
       initLiveUsernameValidation();
       initAppointmentManagementDesk();
     });
   } else {
+    initGlobalModals();
     initLiveUsernameValidation();
     initAppointmentManagementDesk();
   }

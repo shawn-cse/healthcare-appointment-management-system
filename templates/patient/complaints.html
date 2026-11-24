@@ -6,13 +6,13 @@
   <!-- Minimal Top Header -->
   <div class="page-heading complaints-page-heading">
     <div>
-      <span class="sheet-eyebrow">PATIENT ASSISTANCE</span>
-      <h1 class="sheet-main-title">Complaints & Support</h1>
+      <span class="sheet-eyebrow">{{ page_eyebrow|default:'PATIENT ASSISTANCE' }}</span>
+      <h1 class="sheet-main-title">{{ page_title|default:'Complaints & Support' }}</h1>
       <p class="sheet-subtitle">3-Step Resolution: <b>1. Generated</b> → <b>2. Under Review & Inquiring</b> → <b>3. Issue Solved</b></p>
     </div>
     <div class="sheet-header-actions">
       <a class="button button-primary" href="{% url 'complaint_new' %}">
-        <svg class="icon"><use href="#ic-plus"/></svg> New Request / Complaint
+        <svg class="icon"><use href="#ic-plus"/></svg> {% if user.role == 'doctor' or user.role == 'receptionist' %}New Support Request{% else %}New Request / Complaint{% endif %}
       </a>
     </div>
   </div>

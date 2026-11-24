@@ -155,6 +155,11 @@ class ProfileForm(forms.ModelForm, FormStyleMixin):
                 label='Doctor Designation / Title',
                 help_text='e.g. Associate Professor, ENT & Head Neck Surgery'
             )
+            self.fields['room_number'] = forms.CharField(
+                max_length=50, required=False, initial=doc.active_room,
+                label='Consultation Room',
+                help_text='e.g. Room 302, Chamber 201 (leave empty if unassigned)'
+            )
             self.fields['qualifications'] = forms.CharField(
                 widget=forms.Textarea(attrs={'rows': 4, 'placeholder': 'MBBS, FCPS (Otolaryngology), FICS (USA)\nMicro-laryngeal Surgery Specialist\nConsultant Otolaryngologist'}),
                 required=False, initial=doc.qualifications,
@@ -171,6 +176,15 @@ class ProfileForm(forms.ModelForm, FormStyleMixin):
                 doc.designation = self.cleaned_data['designation']
             if 'qualifications' in self.cleaned_data:
                 doc.qualifications = self.cleaned_data['qualifications']
+            if 'room_number' in self.cleaned_data:
+                r_val = self.cleaned_data['room_number'].strip()
+                doc.room_number = r_val
+                if not r_val:
+                    doc.chamber = None
+                else:
+                    ch = Chamber.objects.filter(room_number__iexact=r_val).first()
+                    if ch:
+                        doc.chamber = ch
             doc.save()
         return user
     def clean_username(self):
@@ -324,6 +338,8 @@ class StaffForm(forms.ModelForm, FormStyleMixin):
                         doc.room_number = ch.room_number
                         doc.chamber_address = ch.address
                         doc.contact_number = ch.contact_number
+                    else:
+                        doc.room_number = ''
                 if 'designation' in self.cleaned_data:
                     doc.designation = self.cleaned_data['designation']
                 if 'qualifications' in self.cleaned_data:
@@ -711,7 +727,12 @@ class ComplaintForm(forms.ModelForm, FormStyleMixin):
         widgets = {'message':forms.Textarea(attrs={'rows':5})}
     def __init__(self, *args, patient=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if patient: self.fields['appointment'].queryset = Appointment.objects.filter(patient=patient)
-        self.fields['appointment'].required = False
-        if 'attachment' in self.fields: self.fields['attachment'].required = False
+        if patient and getattr(patient, 'role', '') != 'patient':
+            self.fields.pop('appointment', None)
+        elif patient:
+            self.fields['appointment'].queryset = Appointment.objects.filter(patient=patient)
+        if 'appointment' in self.fields:
+            self.fields['appointment'].required = False
+        if 'attachment' in self.fields:
+            self.fields['attachment'].required = False
         self.style_fields()

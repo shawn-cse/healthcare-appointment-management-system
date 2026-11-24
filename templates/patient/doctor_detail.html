@@ -46,12 +46,14 @@
       </div>
     </div>
 
-    <!-- Clean Chamber & Consultation Meta Bar (3 Balanced Columns) -->
+    <!-- Clean Consultation Meta Bar -->
     <div class="doctor-meta-bar">
+      {% if doctor.active_room %}
       <div class="meta-bar-item">
-        <span class="meta-bar-label"><svg class="icon icon-xs"><use href="#ic-building"/></svg> Chamber Room</span>
-        <b class="meta-bar-value">{{ doctor.active_room }}{% if doctor.chamber and doctor.chamber.building %}, {{ doctor.chamber.building }}{% endif %}</b>
+        <span class="meta-bar-label"><svg class="icon icon-xs"><use href="#ic-building"/></svg> Room</span>
+        <b class="meta-bar-value">{{ doctor.active_room }}</b>
       </div>
+      {% endif %}
       <div class="meta-bar-item">
         <span class="meta-bar-label"><svg class="icon icon-xs"><use href="#ic-user"/></svg> Receptionist</span>
         <b class="meta-bar-value">{{ doctor.assigned_receptionist_name }}</b>
@@ -101,7 +103,9 @@
         <div class="session-info-block">
           <div class="session-date-line">{{ sched.upcoming_date|date:"D, d M Y"|default:sched.get_weekday_display }}</div>
           <div class="session-time-line"><svg class="icon icon-xs"><use href="#ic-clock"/></svg> {{ sched.start_time|time:"h:i A" }} – {{ sched.end_time|time:"h:i A" }}</div>
-          <div class="session-room-line"><svg class="icon icon-xs"><use href="#ic-building"/></svg> {{ doctor.active_room }}{% if doctor.chamber and doctor.chamber.building %}, {{ doctor.chamber.building }}{% endif %}</div>
+          {% if doctor.active_room %}
+          <div class="session-room-line"><svg class="icon icon-xs"><use href="#ic-building"/></svg> {{ doctor.active_room }}</div>
+          {% endif %}
         </div>
         <div class="session-action-block">
           {% if sched.slot %}

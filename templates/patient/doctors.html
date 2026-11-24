@@ -152,17 +152,19 @@
               </div>
             </div>
 
-            <!-- Chamber, Receptionist & Helpline -->
+            <!-- Room, Receptionist & Helpline -->
             <div class="doctor-chamber-section">
+              {% if d.active_room %}
               <div class="chamber-info-item">
                 <span class="chamber-icon-box chamber-icon-building">
                   <svg class="icon"><use href="#ic-building"/></svg>
                 </span>
                 <span class="chamber-info-text">
-                  <span class="chamber-lbl">Chamber:</span>
-                  <b class="chamber-val">{{ d.room_number|default:'Chamber 201' }}{% if d.chamber and d.chamber.building %}, {{ d.chamber.building }}{% elif d.chamber %}, {{ d.chamber.name }}{% endif %}</b>
+                  <span class="chamber-lbl">Room:</span>
+                  <b class="chamber-val">{{ d.active_room }}</b>
                 </span>
               </div>
+              {% endif %}
               <div class="chamber-info-item">
                 <span class="chamber-icon-box chamber-icon-user">
                   <svg class="icon"><use href="#ic-user"/></svg>

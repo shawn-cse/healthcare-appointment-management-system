@@ -2,167 +2,34 @@
 {% block title %}{{ page_title }} · Green Hospital{% endblock %}
 
 {% block content %}
-<div class="page-heading">
-  <div>
-    <a class="back-link" href="{% url 'chamber_list' %}">‹ Back to Chambers & Rooms</a>
-    <p class="eyebrow">CHAMBER CONFIGURATION</p>
-    <h1>{{ page_title }}</h1>
-    <p>Configure room information in Mirpur and allocate weekly consultation days for doctors sharing this chamber.</p>
+<div class="room-form-page" style="max-width: 500px; margin: 0 auto;">
+  <div class="page-heading">
+    <div>
+      <a class="back-link" href="{% url 'chamber_list' %}">‹ Back to Consultation Room</a>
+      <p class="eyebrow">FACILITY MANAGEMENT</p>
+      <h1>{{ page_title }}</h1>
+    </div>
+  </div>
+
+  <div class="panel padded-panel">
+    <form method="post" class="smart-form">
+      {% csrf_token %}
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="field-label" style="font-weight: 600; margin-bottom: 6px; display: block;">Room Number <span style="color: #e11d48;">*</span></label>
+        <input type="text" name="room_number" value="{{ chamber.room_number|default:'' }}" class="field-control" placeholder="e.g. Room 302" required style="width: 100%; height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 24px;">
+        <label class="field-label" style="font-weight: 600; margin-bottom: 6px; display: block;">Description / Note</label>
+        <textarea name="description" class="field-control" rows="3" placeholder="Brief note or description..." style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; resize: vertical;">{{ chamber.description|default:'' }}</textarea>
+      </div>
+
+      <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 12px;">
+        <a href="{% url 'chamber_list' %}" class="button button-outline">Cancel</a>
+        <button type="submit" class="button button-primary">Save Room</button>
+      </div>
+    </form>
   </div>
 </div>
-
-<form method="post" class="smart-form">
-  {% csrf_token %}
-  
-  <div class="checkout-layout">
-    <!-- Left Panel: Room & Location Details -->
-    <div class="panel padded-panel">
-      <div class="panel-title-section">
-        <h2>Chamber & Room Details</h2>
-        <p>Location, building, room code and helpline for patient guidance</p>
-      </div>
-
-      <div class="form-row-2">
-        <div class="form-group">
-          <label for="{{ form.building.id_for_label }}">{{ form.building.label }} <span class="required">*</span></label>
-          {{ form.building }}
-          {% if form.building.errors %}<small class="error-text">{{ form.building.errors|join:' ' }}</small>{% endif %}
-        </div>
-        <div class="form-group">
-          <label for="{{ form.room_number.id_for_label }}">{{ form.room_number.label }} <span class="required">*</span></label>
-          {{ form.room_number }}
-          {% if form.room_number.errors %}<small class="error-text">{{ form.room_number.errors|join:' ' }}</small>{% endif %}
-        </div>
-      </div>
-
-      <div class="form-row-2">
-        <div class="form-group">
-          <label for="{{ form.floor.id_for_label }}">{{ form.floor.label }}</label>
-          {{ form.floor }}
-          {% if form.floor.errors %}<small class="error-text">{{ form.floor.errors|join:' ' }}</small>{% endif %}
-        </div>
-        <div class="form-group">
-          <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
-          {{ form.description }}
-          {% if form.description.errors %}<small class="error-text">{{ form.description.errors|join:' ' }}</small>{% endif %}
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="{{ form.name.id_for_label }}">{{ form.name.label }} <span class="required">*</span></label>
-        {{ form.name }}
-        {% if form.name.errors %}<small class="error-text">{{ form.name.errors|join:' ' }}</small>{% endif %}
-      </div>
-
-      <div class="form-group">
-        <label for="{{ form.address.id_for_label }}">{{ form.address.label }} <span class="required">*</span></label>
-        {{ form.address }}
-        {% if form.address.errors %}<small class="error-text">{{ form.address.errors|join:' ' }}</small>{% endif %}
-      </div>
-
-      <div class="form-group">
-        <label for="{{ form.contact_number.id_for_label }}">{{ form.contact_number.label }} <span class="required">*</span></label>
-        {{ form.contact_number }}
-        {% if form.contact_number.errors %}<small class="error-text">{{ form.contact_number.errors|join:' ' }}</small>{% endif %}
-      </div>
-
-      <div class="form-group">
-        <label for="{{ form.department.id_for_label }}">{{ form.department.label }}</label>
-        {{ form.department }}
-        {% if form.department.errors %}<small class="error-text">{{ form.department.errors|join:' ' }}</small>{% endif %}
-      </div>
-
-      <div class="form-group">
-        <label class="check-line">
-          {{ form.is_active }}
-          <span>{{ form.is_active.label }}</span>
-        </label>
-      </div>
-    </div>
-
-    <!-- Right Panel: Doctor Assignment & Weekly Day Allocation -->
-    <div class="panel padded-panel">
-      <div class="panel-title-section">
-        <h2>Assign Doctors & Allocate Days</h2>
-        <p>Multiple doctors can share this chamber. Select which weekly days each doctor will consult here.</p>
-      </div>
-
-      <div class="form-tip" style="margin-bottom: 16px;">
-        <svg class="icon"><use href="#ic-alert"/></svg>
-        <div>
-          <b>Multi-Doctor Sharing & Day Allocation</b>
-          <p>If 2 or 3 doctors share this chamber (e.g. Doctor A on Mon/Wed/Fri and Doctor B on Tue/Thu/Sat), check each doctor and allocate their specific weekly consultation days. Recurring slots will be synchronized automatically.</p>
-        </div>
-      </div>
-
-      <div class="doctor-assignment-wrap">
-        <label class="field-label-bold">Select Doctors & Consultation Days</label>
-        <div class="doctor-checkbox-list">
-          {% for doc in all_doctors %}
-          <div class="doctor-alloc-card">
-            <div class="alloc-card-top">
-              <label class="alloc-check-label">
-                <input type="checkbox" name="doctors" value="{{ doc.pk }}"
-                  {% if chamber and doc.chamber_id == chamber.pk %}checked{% endif %}
-                  data-doc-toggle="{{ doc.pk }}">
-                <span class="alloc-doc-name">
-                  <b>{{ doc.full_doctor_title }}</b>
-                  <small>{{ doc.department.name }} · {{ doc.designation }}</small>
-                </span>
-              </label>
-            </div>
-
-            <!-- Day allocation checkboxes for this specific doctor -->
-            <div class="alloc-days-box" id="days-box-{{ doc.pk }}">
-              <span class="alloc-days-hint">Consultation days in this chamber:</span>
-              <div class="days-checkbox-grid">
-                <label class="day-check-item">
-                  <input type="checkbox" name="doctor_days_{{ doc.pk }}" value="0" {% if 0 in doc.assigned_days_list %}checked{% endif %}>
-                  <span>Mon</span>
-                </label>
-                <label class="day-check-item">
-                  <input type="checkbox" name="doctor_days_{{ doc.pk }}" value="1" {% if 1 in doc.assigned_days_list %}checked{% endif %}>
-                  <span>Tue</span>
-                </label>
-                <label class="day-check-item">
-                  <input type="checkbox" name="doctor_days_{{ doc.pk }}" value="2" {% if 2 in doc.assigned_days_list %}checked{% endif %}>
-                  <span>Wed</span>
-                </label>
-                <label class="day-check-item">
-                  <input type="checkbox" name="doctor_days_{{ doc.pk }}" value="3" {% if 3 in doc.assigned_days_list %}checked{% endif %}>
-                  <span>Thu</span>
-                </label>
-                <label class="day-check-item">
-                  <input type="checkbox" name="doctor_days_{{ doc.pk }}" value="4" {% if 4 in doc.assigned_days_list %}checked{% endif %}>
-                  <span>Fri</span>
-                </label>
-                <label class="day-check-item">
-                  <input type="checkbox" name="doctor_days_{{ doc.pk }}" value="5" {% if 5 in doc.assigned_days_list %}checked{% endif %}>
-                  <span>Sat</span>
-                </label>
-                <label class="day-check-item">
-                  <input type="checkbox" name="doctor_days_{{ doc.pk }}" value="6" {% if 6 in doc.assigned_days_list %}checked{% endif %}>
-                  <span>Sun</span>
-                </label>
-              </div>
-            </div>
-          </div>
-          {% empty %}
-          <p class="small-muted">No active doctors found in the system.</p>
-          {% endfor %}
-        </div>
-        {% if form.doctors.errors %}
-        <small class="error-text">{{ form.doctors.errors|join:' ' }}</small>
-        {% endif %}
-      </div>
-
-      <div class="form-actions" style="margin-top: 24px;">
-        <button class="button button-primary" type="submit">
-          <svg class="icon"><use href="#ic-check"/></svg> Save Chamber & Day Allocations
-        </button>
-        <a class="button button-outline" href="{% url 'chamber_list' %}">Cancel</a>
-      </div>
-    </div>
-  </div>
-</form>
 {% endblock %}

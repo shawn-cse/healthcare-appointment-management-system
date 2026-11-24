@@ -193,9 +193,9 @@ class DoctorProfile(models.Model):
 
     @property
     def active_room(self):
-        if self.chamber:
+        if self.chamber and self.chamber.room_number:
             return self.chamber.room_number
-        return self.room_number or 'Chamber 302'
+        return self.room_number or ''
 
     @property
     def active_address(self):

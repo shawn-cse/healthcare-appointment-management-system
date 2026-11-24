@@ -8758,45 +8758,79 @@ button.profile-trigger:hover,
    MODAL BACKDROP & DIALOG
    ========================================================================== */
 .modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  z-index: 9999999 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 40px 16px !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 .modal-card {
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
-  width: 100%;
-  max-width: 500px;
-  overflow: hidden;
-  animation: modalScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  position: relative !important;
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  margin: auto !important;
+  max-height: calc(100vh - 80px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  animation: modalScaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes modalScaleUp {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.96) translateY(-6px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) translateY(0);
   }
 }
 
 .modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 16px 20px !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.modal-body {
+  flex: 1 1 auto !important;
+  padding: 20px !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+}
+
+.modal-footer {
+  flex-shrink: 0 !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  padding: 14px 20px !important;
+  background: #f8fafc !important;
+  border-top: 1px solid #e2e8f0 !important;
+  border-radius: 0 0 12px 12px !important;
 }
 
 .modal-title-wrap {
@@ -11459,11 +11493,9 @@ b, strong {
 @keyframes pageSmoothEntrance {
   0% {
     opacity: 0;
-    transform: translateY(5px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -11478,6 +11510,7 @@ b, strong {
 .dashboard-page,
 .reports-page {
   animation: pageSmoothEntrance 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform: none !important;
 }
 
 /* Top Progress Bar (Brand Emerald Gradient with Glow) */

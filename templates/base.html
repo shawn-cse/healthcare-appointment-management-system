@@ -134,11 +134,10 @@
         <a href="{% url 'dashboard' %}" data-nav="dashboard"><svg class="icon"><use href="#ic-grid"/></svg> Dashboard</a>
         <a href="{% url 'doctor_directory' %}" data-nav="doctor_directory"><svg class="icon"><use href="#ic-stethoscope"/></svg> Find Doctors</a>
         <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> My Appointments</a>
-        <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Complaints & Support</a>
+        <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Complaint & Support Desk</a>
       {% else %}
         <a href="{% url 'dashboard' %}" data-nav="dashboard"><svg class="icon"><use href="#ic-grid"/></svg> Dashboard</a>
-        <a href="{% url 'staff_list' %}" data-nav="staff_list"><svg class="icon"><use href="#ic-users"/></svg> Staff & Doctors</a>
-        <a href="{% url 'public_departments' %}" data-nav="public_departments"><svg class="icon"><use href="#ic-building"/></svg> Departments</a>
+        <a href="{% url 'staff_list' %}" data-nav="staff_list"><svg class="icon"><use href="#ic-users"/></svg> Staff and Dr Management</a>
         <a href="{% url 'appointments' %}" data-nav="appointments"><svg class="icon"><use href="#ic-calendar"/></svg> Appointments</a>
         {% if user.role != 'doctor' %}
           <a href="{% url 'staff_book' %}" data-nav="staff_book"><svg class="icon"><use href="#ic-plus"/></svg> Register Booking</a>
@@ -150,13 +149,20 @@
         {% if user.role == 'admin' or user.role == 'receptionist' %}
           <a href="{% url 'refunds' %}" data-nav="refunds"><svg class="icon"><use href="#ic-wallet"/></svg> Refund Management</a>
         {% endif %}
-        <a href="{% url 'complaint_queue' %}" data-nav="complaint_queue"><svg class="icon"><use href="#ic-help"/></svg> Complaint & Support Desk</a>
+        {% if user.role == 'admin' %}
+          <a href="{% url 'complaint_queue' %}" data-nav="complaint_queue"><svg class="icon"><use href="#ic-help"/></svg> Complaint & Support Management</a>
+        {% elif user.role == 'doctor' %}
+          <a href="{% url 'complaint_queue' %}" data-nav="complaint_queue"><svg class="icon"><use href="#ic-alert"/></svg> Complaint Management</a>
+          <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Support & Requests</a>
+        {% elif user.role == 'receptionist' %}
+          <a href="{% url 'complaints' %}" data-nav="complaints"><svg class="icon"><use href="#ic-help"/></svg> Support & Requests</a>
+          <a href="{% url 'complaint_queue' %}" data-nav="complaint_queue"><svg class="icon"><use href="#ic-alert"/></svg> Complaint Management</a>
+        {% endif %}
         {% if user.role == 'admin' or user.role == 'doctor' %}
           <a href="{% url 'reports' %}" data-nav="reports"><svg class="icon"><use href="#ic-chart"/></svg> Reports & Analytics</a>
         {% endif %}
         {% if user.role == 'admin' %}
-          <div class="nav-eyebrow nav-section">ADMINISTRATION</div>
-          <a href="{% url 'chamber_list' %}" data-nav="chamber_list"><svg class="icon"><use href="#ic-building"/></svg> Chambers & Rooms</a>
+          <a href="{% url 'chamber_list' %}" data-nav="chamber_list"><svg class="icon"><use href="#ic-building"/></svg> Consultation Room</a>
           <a href="{% url 'departments' %}" data-nav="departments"><svg class="icon"><use href="#ic-building"/></svg> Manage Departments</a>
           <a href="{% url 'audit_log' %}" data-nav="audit_log"><svg class="icon"><use href="#ic-clipboard"/></svg> Activity Log</a>
           <a href="{% url 'admin:index' %}" data-nav="admin"><svg class="icon"><use href="#ic-settings"/></svg> Django Administration</a>
@@ -264,7 +270,7 @@
     <nav class="public-links" id="public-navigation">
       <a href="{% url 'home' %}">Home</a>
       <a href="{% url 'doctor_directory' %}">Find Doctors</a>
-      <a href="{% url 'public_departments' %}">Departments</a>
+      <a href="{% url 'home' %}#care">Departments</a>
     </nav>
 
     <div class="public-header-actions">
@@ -318,7 +324,7 @@
         <h4 class="footer-heading">Patient Services</h4>
         <ul class="footer-link-list">
           <li><a href="{% url 'doctor_directory' %}">Find a Specialist Doctor</a></li>
-          <li><a href="{% url 'public_departments' %}">Medical Departments</a></li>
+          <li><a href="{% url 'home' %}#care">Medical Departments</a></li>
           <li><a href="{% url 'login_screen' 'patient' %}">Patient Portal Sign In</a></li>
           <li><a href="{% url 'register' %}">Patient Registration</a></li>
           <li><a href="{% url 'login_screen' 'staff' %}">Doctor & Staff Workspace</a></li>
@@ -374,6 +380,8 @@
   </div>
 </footer>
 {% endif %}
+
+{% block modals %}{% endblock %}
 
 <script src="{% static 'js/calendar.js' %}?v=20261123_50" defer></script>
 <script src="{% static 'js/app.js' %}?v=20261123_06" defer></script>

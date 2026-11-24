@@ -107,7 +107,11 @@
 
             <!-- 4. Room -->
             <td class="cell-room">
-              <span class="sheet-room-pill">{{ a.doctor.room_number|default:'Room 707' }}</span>
+              {% if a.doctor.active_room %}
+                <span class="sheet-room-pill">{{ a.doctor.active_room }}</span>
+              {% else %}
+                <span class="muted-text" style="color: #94a3b8; font-size: 12px;">—</span>
+              {% endif %}
             </td>
 
             <!-- 5. Serial # -->
@@ -269,20 +273,20 @@
   <div>
     <p class="eyebrow">APPOINTMENT MANAGEMENT</p>
     <h1>Appointments</h1>
-    <p>Live search, filter, and quick update consultation records for assigned hospital doctors.</p>
+    <p>Search, filter, and quick update consultation records for assigned hospital doctors.</p>
   </div>
   <a class="button button-primary" href="{% url 'staff_book' %}">
     <svg class="icon"><use href="#ic-plus"/></svg> Register Booking
   </a>
 </div>
 
-<!-- Live Filter Bar (No Search button, No Apply button, Reset is OK) -->
+<!-- Filter Bar (No Search button, No Apply button, Reset is OK) -->
 <form class="panel filter-bar appointment-filter-bar wrap-filters" method="get" id="appointment-filter-form">
-  <!-- Live Search Input -->
+  <!-- Search Input -->
   <div class="search-input appointment-live-search">
     <svg class="icon"><use href="#ic-search"/></svg>
     <input type="text" name="q" id="appt-live-search" value="{{ filters.q|default:'' }}"
-           placeholder="Live search by code, patient name, phone, doctor..."
+           placeholder="Search by code, patient name, phone, doctor..."
            aria-label="Search appointments" autocomplete="off">
   </div>
 

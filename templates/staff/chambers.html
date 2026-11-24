@@ -1,216 +1,351 @@
 {% extends 'base.html' %}
-{% block title %}Chambers & Rooms · Green Hospital{% endblock %}
+{% block title %}Consultation Room · Green Hospital{% endblock %}
 
 {% block content %}
-<div class="page-heading">
-  <div>
-    <p class="eyebrow">FACILITY & CLINICAL ROOMS</p>
-    <h1>Chambers & Consultation Rooms</h1>
-    <p>Manage consultation centers in Mirpur, allocate weekly days when multiple doctors share a chamber, and maintain room descriptions.</p>
+<div class="rooms-management-page">
+  <!-- Page Header -->
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">FACILITY MANAGEMENT</p>
+      <h1>Consultation Room</h1>
+    </div>
+    <div>
+      <button type="button" class="button button-primary" id="btn-open-add-room-modal">
+        <svg class="icon"><use href="#ic-plus"/></svg> Add Room
+      </button>
+    </div>
   </div>
-  <a class="button button-primary" href="{% url 'chamber_new' %}">
-    <svg class="icon"><use href="#ic-plus"/></svg> Add Chamber / Room
-  </a>
-</div>
 
-<!-- Occupancy Stats Bar -->
-<div class="chamber-stats-bar">
-  <div class="stat-pill-card">
-    <small>Total Chambers</small>
-    <b>{{ total_count }}</b>
+  <!-- Excel Toolbar: Search Box Only -->
+  <div class="panel excel-toolbar-panel" style="margin-bottom: 16px;">
+    <div style="width: 100%; max-width: 440px;">
+      <div class="search-wrap">
+        <svg class="icon search-icon"><use href="#ic-search"/></svg>
+        <input type="text"
+               id="room-search-input"
+               class="field-control search-input-field"
+               placeholder="Search by room or description..."
+               autocomplete="off">
+        <button type="button" id="clear-room-search-btn" class="clear-search-btn" title="Clear search" style="display: none;">✕</button>
+      </div>
+    </div>
   </div>
-  <a href="?occupancy=empty" class="stat-pill-card pill-empty-link {% if selected_occupancy == 'empty' %}active-stat{% endif %}">
-    <small>🟢 Empty / Available Rooms</small>
-    <b>{{ empty_count }}</b>
-  </a>
-  <a href="?occupancy=occupied" class="stat-pill-card {% if selected_occupancy == 'occupied' %}active-stat{% endif %}">
-    <small>Occupied Rooms</small>
-    <b>{{ occupied_count }}</b>
-  </a>
-</div>
 
-<!-- Comprehensive Filter and Search Bar -->
-<div class="panel padded-panel chamber-filter-panel" style="margin-bottom: 24px;">
-  <form method="get" class="filter-form-grid">
-    <div class="filter-col-search">
-      <label for="chamber-search-input">Search Chamber or Doctor</label>
-      <input type="text" id="chamber-search-input" name="q" value="{{ query }}" class="field-control" placeholder="Search room (e.g. 302), building, description, or doctor name...">
-    </div>
-
-    <div class="filter-col-select">
-      <label for="building-filter-select">Building</label>
-      <select id="building-filter-select" name="building" class="field-control">
-        <option value="">All Buildings</option>
-        {% for b in buildings %}
-        <option value="{{ b }}" {% if selected_building == b %}selected{% endif %}>{{ b }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div class="filter-col-select">
-      <label for="floor-filter-select">Floor</label>
-      <select id="floor-filter-select" name="floor" class="field-control">
-        <option value="">All Floors</option>
-        {% for f in floors %}
-        <option value="{{ f }}" {% if selected_floor == f %}selected{% endif %}>{{ f }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div class="filter-col-select">
-      <label for="occupancy-filter-select">Occupancy</label>
-      <select id="occupancy-filter-select" name="occupancy" class="field-control">
-        <option value="all" {% if selected_occupancy == 'all' %}selected{% endif %}>All Chambers</option>
-        <option value="empty" {% if selected_occupancy == 'empty' %}selected{% endif %}>🟢 Empty Chambers ({{ empty_count }})</option>
-        <option value="occupied" {% if selected_occupancy == 'occupied' %}selected{% endif %}>Occupied Chambers ({{ occupied_count }})</option>
-      </select>
-    </div>
-
-    <div class="filter-col-select">
-      <label for="sort-filter-select">Sort By</label>
-      <select id="sort-filter-select" name="sort" class="field-control">
-        <option value="building" {% if selected_sort == 'building' %}selected{% endif %}>Building & Room</option>
-        <option value="empty_first" {% if selected_sort == 'empty_first' %}selected{% endif %}>Empty Chambers First</option>
-        <option value="doctors_desc" {% if selected_sort == 'doctors_desc' %}selected{% endif %}>Most Doctors First</option>
-        <option value="room" {% if selected_sort == 'room' %}selected{% endif %}>Room Number</option>
-        <option value="floor" {% if selected_sort == 'floor' %}selected{% endif %}>Floor Level</option>
-      </select>
-    </div>
-
-    <div class="filter-col-actions">
-      <button class="button button-primary button-sm" type="submit">Filter</button>
-      {% if query or selected_building or selected_floor or selected_occupancy != 'all' or selected_sort != 'building' %}
-      <a class="button button-outline button-sm" href="{% url 'chamber_list' %}">Reset</a>
-      {% endif %}
-    </div>
-  </form>
-</div>
-
-<!-- Chambers Grid -->
-<div class="chamber-admin-grid">
-  {% for chamber in chambers %}
-  <div class="panel padded-panel chamber-card {% if chamber.is_empty %}is-empty-card{% endif %}">
-    <div class="chamber-card-header">
-      <div>
-        <div class="chamber-code-tag">
-          <b>{{ chamber.building }}</b> · <span>{{ chamber.room_number }}</span>
-        </div>
-        <h2 class="chamber-name">{{ chamber.name }}</h2>
-        <div class="chamber-meta-line">
-          {% if chamber.floor %}
-          <span class="chamber-floor-badge">{{ chamber.floor }}</span>
-          {% endif %}
-          {% if chamber.description %}
-          <span class="chamber-desc-text">{{ chamber.description }}</span>
-          {% endif %}
+  <!-- Excel Sheet Panel Container -->
+  <div class="panel excel-sheet-panel">
+    <!-- Excel Sheet Header -->
+    <div class="excel-sheet-header-bar">
+      <div class="excel-header-left">
+        <div class="sheet-indicator">
+          <strong>Consultation Room Directory</strong> · Showing <span id="rooms-live-count">{{ chambers|length }}</span> of {{ total_count }} rooms
         </div>
       </div>
-      <div>
-        {% if chamber.is_empty %}
-        <span class="status status-empty-highlight">
-          🟢 Available / Empty Room
-        </span>
-        {% else %}
-        <span class="status status-confirmed">
-          {{ chamber.doctors_count }} Specialist{{ chamber.doctors_count|pluralize }}
-        </span>
-        {% endif %}
-      </div>
     </div>
 
-    <div class="chamber-card-details">
-      <div class="details-row align-top">
-        <span>Address</span>
-        <b>{{ chamber.address }}</b>
-      </div>
-      <div class="details-row">
-        <span>24/7 Hotline</span>
-        <b class="contact-highlight">{{ chamber.contact_number }}</b>
-      </div>
-      {% if chamber.department %}
-      <div class="details-row">
-        <span>Department</span>
-        <b>{{ chamber.department.name }}</b>
-      </div>
-      {% endif %}
-    </div>
+    <!-- Excel Table: EXACTLY 3 Columns (Room, Description / Note, Edit) -->
+    <div class="table-responsive excel-table-wrap">
+      <table class="data-table excel-grid-table" id="rooms-excel-table">
+        <thead>
+          <tr>
+            <th style="width: 32%;">Room</th>
+            <th style="width: 56%;">Description / Note</th>
+            <th style="width: 12%; text-align: center;">Edit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in chambers %}
+          <tr class="excel-row room-data-row"
+              data-id="{{ c.pk }}"
+              data-room="{{ c.room_number|escape }}"
+              data-desc="{{ c.description|default:''|escape }}"
+              data-search="{{ c.room_number|lower }} {{ c.description|default:''|lower }}">
+            
+            <!-- 1. Room -->
+            <td>
+              <span class="person-name" style="font-weight: 700; color: #0f172a; font-size: 14px;">{{ c.room_number }}</span>
+            </td>
 
-    <div class="details-divider"></div>
+            <!-- 2. Description / Note -->
+            <td>
+              <span style="color: #475569; font-size: 13px; line-height: 1.4; display: block;">
+                {{ c.description|default:"—" }}
+              </span>
+            </td>
 
-    <!-- Assigned Doctors & Days Allocation -->
-    <div class="assigned-doctors-section">
-      <div class="section-micro-header">
-        <span>Specialists & Allocated Consultation Days ({{ chamber.doctors_count }})</span>
-      </div>
-
-      <div class="assigned-doctor-list">
-        {% for doc in chamber.doctors_with_days %}
-        <div class="assigned-doc-card">
-          <div class="doc-main-row">
-            <span class="mini-avatar">{{ doc.user.first_name|first|upper }}{{ doc.user.last_name|first|upper }}</span>
-            <div class="doc-info-text">
-              <strong>{{ doc.full_doctor_title }}</strong>
-              <small>{{ doc.department.name }} · {{ doc.designation }}</small>
-            </div>
-          </div>
-
-          <div class="doc-days-strip">
-            <span class="days-label">Scheduled Days:</span>
-            <div class="day-chips-wrap">
-              {% for day in doc.assigned_days_display %}
-              <span class="day-pill-active">{{ day|upper }}</span>
-              {% empty %}
-              <span class="day-pill-unset">Unscheduled</span>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-        {% empty %}
-        <div class="empty-room-box">
-          <svg class="icon"><use href="#ic-check"/></svg>
-          <div>
-            <b>Chamber is Empty</b>
-            <p>No specialists assigned yet. This room is available for all 7 weekdays.</p>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-
-      <!-- Overlap / Conflict Alert if multiple doctors share the same day -->
-      {% if chamber.day_conflicts %}
-      <div class="conflict-alert-box" style="margin-top: 10px; background: #fff8ed; border: 1px solid #ffd8a8; padding: 8px 12px; border-radius: 6px;">
-        <svg class="icon" style="width: 16px; height: 16px; color: #d9480f; margin-right: 6px;"><use href="#ic-alert"/></svg>
-        <span style="font-size: 12px; color: #d9480f; font-weight: 700;">
-          Shared Days:
-          {% for day, docs in chamber.day_conflicts.items %}
-            <b>{{ day }}</b> ({{ docs|join:', ' }}){% if not forloop.last %}; {% endif %}
+            <!-- 3. Edit Action -->
+            <td style="text-align: center;">
+              <button type="button"
+                      class="button button-outline button-xs btn-edit-room"
+                      data-id="{{ c.pk }}"
+                      data-room="{{ c.room_number|escape }}"
+                      data-desc="{{ c.description|default:''|escape }}"
+                      title="Edit room">
+                Edit
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr id="room-empty-row">
+            <td colspan="3" class="empty-state-cell">
+              <div class="empty-state" style="padding: 40px 20px; text-align: center;">
+                <span class="empty-icon"><svg class="icon"><use href="#ic-building"/></svg></span>
+                <h3 style="margin: 8px 0; color: #0f172a;">No rooms found</h3>
+                <p style="color: #64748b; margin: 0 0 16px;">Click Add Room above to configure consultation rooms.</p>
+              </div>
+            </td>
+          </tr>
           {% endfor %}
-        </span>
+
+          <!-- Filter empty state (Hidden by default) -->
+          <tr id="room-empty-live-row" style="display: none;">
+            <td colspan="3" class="empty-state-cell">
+              <div class="empty-state" style="padding: 30px 20px; text-align: center;">
+                <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
+                <h3 style="margin: 8px 0; color: #0f172a;">No matching rooms found</h3>
+                <p style="color: #64748b; margin: 0 0 12px;">No room matches your search keywords.</p>
+                <button type="button" class="button button-outline button-sm" onclick="clearRoomSearch()">Clear Search</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // 1. Search Filter
+  const searchInput = document.getElementById('room-search-input');
+  const clearBtn = document.getElementById('clear-room-search-btn');
+  const rows = document.querySelectorAll('#rooms-excel-table tbody tr.room-data-row');
+  const emptyLiveRow = document.getElementById('room-empty-live-row');
+  const liveCount = document.getElementById('rooms-live-count');
+
+  function filterRooms() {
+    const query = (searchInput.value || '').trim().toLowerCase();
+    if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
+    let visibleCount = 0;
+
+    rows.forEach(function (row) {
+      const searchData = row.getAttribute('data-search') || '';
+      if (!query || searchData.includes(query)) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (liveCount) liveCount.textContent = visibleCount;
+    if (emptyLiveRow) {
+      emptyLiveRow.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', filterRooms);
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        filterRooms();
+      }
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      searchInput.value = '';
+      filterRooms();
+      searchInput.focus();
+    });
+  }
+
+  window.clearRoomSearch = function () {
+    if (searchInput) searchInput.value = '';
+    filterRooms();
+    if (searchInput) searchInput.focus();
+  };
+
+  // 2. Add Room Modal Controls
+  const addModal = document.getElementById('add-room-modal');
+  const btnOpenAdd = document.getElementById('btn-open-add-room-modal');
+  const btnCloseAdd = document.getElementById('btn-close-add-room-modal');
+  const btnCancelAdd = document.getElementById('btn-cancel-add-room-modal');
+  const addRoomInput = document.getElementById('add-room-number');
+
+  if (addModal && addModal.parentNode !== document.body) {
+    document.body.appendChild(addModal);
+  }
+
+  function openAddModal() {
+    if (addModal) {
+      document.body.style.overflow = 'hidden';
+      addModal.style.display = 'flex';
+      setTimeout(() => { if (addRoomInput) addRoomInput.focus(); }, 50);
+    }
+  }
+
+  function closeAddModal() {
+    if (addModal) {
+      addModal.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+  }
+
+  if (btnOpenAdd) btnOpenAdd.addEventListener('click', openAddModal);
+  if (btnCloseAdd) btnCloseAdd.addEventListener('click', closeAddModal);
+  if (btnCancelAdd) btnCancelAdd.addEventListener('click', closeAddModal);
+
+  // 3. Edit Room Modal Controls
+  const editModal = document.getElementById('edit-room-modal');
+  const btnCloseEdit = document.getElementById('btn-close-edit-room-modal');
+  const btnCancelEdit = document.getElementById('btn-cancel-edit-room-modal');
+  const editIdInput = document.getElementById('edit-room-id');
+  const editRoomInput = document.getElementById('edit-room-number');
+  const editDescInput = document.getElementById('edit-room-desc');
+
+  if (editModal && editModal.parentNode !== document.body) {
+    document.body.appendChild(editModal);
+  }
+
+  document.querySelectorAll('.btn-edit-room').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const id = this.getAttribute('data-id');
+      const room = this.getAttribute('data-room') || '';
+      const desc = this.getAttribute('data-desc') || '';
+
+      if (editIdInput) editIdInput.value = id;
+      if (editRoomInput) editRoomInput.value = room;
+      if (editDescInput) editDescInput.value = desc;
+
+      if (editModal) {
+        document.body.style.overflow = 'hidden';
+        editModal.scrollTop = 0;
+        editModal.style.display = 'flex';
+        setTimeout(() => { if (editRoomInput) editRoomInput.focus(); }, 50);
+      }
+    });
+  });
+
+  function closeEditModal() {
+    if (editModal) {
+      editModal.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+  }
+
+  if (btnCloseEdit) btnCloseEdit.addEventListener('click', closeEditModal);
+  if (btnCancelEdit) btnCancelEdit.addEventListener('click', closeEditModal);
+
+  // Delete Room from Edit Modal
+  const btnDeleteModal = document.getElementById('btn-delete-from-modal');
+  const editRoomForm = document.getElementById('edit-room-form');
+  const editActionInput = document.getElementById('edit-room-action');
+  if (btnDeleteModal && editRoomForm) {
+    btnDeleteModal.addEventListener('click', function () {
+      const roomNum = editRoomInput ? editRoomInput.value : 'this room';
+      if (confirm(`Are you sure you want to delete room "${roomNum}"? Any assigned doctors will be unlinked.`)) {
+        if (editActionInput) editActionInput.value = 'delete';
+        editRoomForm.submit();
+      }
+    });
+  }
+
+  // Close modals on outside click or Escape key
+  window.addEventListener('click', function (e) {
+    if (e.target === addModal) closeAddModal();
+    if (e.target === editModal) closeEditModal();
+  });
+
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      closeAddModal();
+      closeEditModal();
+    }
+  });
+});
+</script>
+{% endblock %}
+
+{% block modals %}
+<!-- ========================================================
+     ADD ROOM MODAL (Rendered directly in body, neat & simplified)
+     ======================================================== -->
+<div id="add-room-modal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-add-room-title">
+  <div class="modal-card" style="max-width: 480px;">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <svg class="icon modal-title-icon" style="width: 18px; height: 18px; color: #0d4c3f;"><use href="#ic-plus"/></svg>
+        <h3 id="modal-add-room-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;">Add New Room</h3>
       </div>
-      {% endif %}
+      <button type="button" class="modal-close-btn" id="btn-close-add-room-modal" aria-label="Close dialog">✕</button>
     </div>
 
-    <div class="chamber-card-actions">
-      <a class="button button-outline button-sm" href="{% url 'chamber_edit' chamber.pk %}">
-        <svg class="icon"><use href="#ic-settings"/></svg> Edit & Assign Days
-      </a>
-      <form method="post" action="{% url 'chamber_delete' chamber.pk %}" class="inline-form" onsubmit="return confirm('Delete this chamber? Doctors assigned to this chamber will be unlinked.');">
-        {% csrf_token %}
-        <button type="submit" class="button button-danger-outline button-sm">
-          Delete
-        </button>
-      </form>
+    <form method="post" action="{% url 'chamber_list' %}" class="smart-form" style="display: flex; flex-direction: column; margin: 0;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add">
+
+      <div class="modal-body">
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="add-room-number" class="field-label" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 13.5px; color: #0f172a;">Room Number <span style="color: #e11d48;">*</span></label>
+          <input type="text" id="add-room-number" name="room_number" class="field-control" placeholder="e.g. Room 302" required style="width: 100%; height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="add-room-desc" class="field-label" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 13.5px; color: #0f172a;">Description / Note</label>
+          <textarea id="add-room-desc" name="description" class="field-control" rows="3" placeholder="Brief note or description..." style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; resize: vertical;"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="button button-outline" id="btn-cancel-add-room-modal">Cancel</button>
+        <button type="submit" class="button button-primary">Save Room</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================
+     EDIT ROOM MODAL (Rendered directly in body, neat & simplified)
+     ======================================================== -->
+<div id="edit-room-modal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-edit-room-title">
+  <div class="modal-card" style="max-width: 480px;">
+    <div class="modal-header">
+      <div class="modal-title-wrap">
+        <svg class="icon modal-title-icon" style="width: 18px; height: 18px; color: #0d4c3f;"><use href="#ic-settings"/></svg>
+        <h3 id="modal-edit-room-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;">Edit Room</h3>
+      </div>
+      <button type="button" class="modal-close-btn" id="btn-close-edit-room-modal" aria-label="Close dialog">✕</button>
     </div>
+
+    <form method="post" action="{% url 'chamber_list' %}" id="edit-room-form" class="smart-form" style="display: flex; flex-direction: column; margin: 0;">
+      {% csrf_token %}
+      <input type="hidden" name="action" id="edit-room-action" value="edit">
+      <input type="hidden" name="room_id" id="edit-room-id" value="">
+
+      <div class="modal-body">
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="edit-room-number" class="field-label" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 13.5px; color: #0f172a;">Room Number <span style="color: #e11d48;">*</span></label>
+          <input type="text" id="edit-room-number" name="room_number" class="field-control" required style="width: 100%; height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="edit-room-desc" class="field-label" style="display: block; font-weight: 600; margin-bottom: 6px; font-size: 13.5px; color: #0f172a;">Description / Note</label>
+          <textarea id="edit-room-desc" name="description" class="field-control" rows="3" style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; resize: vertical;"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="button button-danger-outline button-sm" id="btn-delete-from-modal" style="color: #e11d48; border-color: #fecdd3; font-weight: 600;">
+          Delete Room
+        </button>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="button button-outline" id="btn-cancel-edit-room-modal">Cancel</button>
+          <button type="submit" class="button button-primary">Save Changes</button>
+        </div>
+      </div>
+    </form>
   </div>
-  {% empty %}
-  <div class="empty-state panel padded-panel full-width">
-    <svg class="icon empty-icon"><use href="#ic-building"/></svg>
-    <h3>No chambers match your search or filter</h3>
-    <p>Try clearing filters or search terms, or create a new chamber in Building 1, 2, or 3.</p>
-    <a class="button button-primary" href="{% url 'chamber_new' %}" style="margin-top: 14px;">
-      <svg class="icon"><use href="#ic-plus"/></svg> Add Chamber / Room
-    </a>
-  </div>
-  {% endfor %}
 </div>
 {% endblock %}

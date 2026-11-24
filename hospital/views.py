@@ -55,8 +55,12 @@ def try_action(request, callback, success_url, success_text):
 def home(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
+    # Empty departments (0 active doctors) are hidden from front-end / patients
+    active_departments = Department.objects.filter(is_active=True).annotate(
+        doc_count=Count('doctors', filter=Q(doctors__user__is_active=True, doctors__is_available=True))
+    ).filter(doc_count__gt=0)[:10]
     return render(request, 'shared/home.html', {
-        'departments': Department.objects.filter(is_active=True)[:10],
+        'departments': active_departments,
         'doctors': DoctorProfile.objects.filter(is_available=True, user__is_active=True, department__is_active=True).select_related('user','department')[:6],
         'doctor_count': DoctorProfile.objects.filter(user__is_active=True, department__is_active=True).count(),
     })
@@ -210,9 +214,10 @@ def doctor_directory(request):
     else:
         doctors = doctors.order_by('id')
 
+    # Empty departments are hidden from patients / doctor directory
     dept_list = Department.objects.filter(is_active=True).annotate(
         doc_count=Count('doctors', filter=Q(doctors__user__is_active=True, doctors__is_available=True))
-    ).order_by('name')
+    ).filter(doc_count__gt=0).order_by('name')
 
     total_count = DoctorProfile.objects.filter(is_available=True, user__is_active=True, department__is_active=True).count()
 
@@ -226,13 +231,6 @@ def doctor_directory(request):
         'selected_sort': sort,
         'total_doctors_count': total_count,
     })
-
-
-def public_departments(request):
-    deps = Department.objects.filter(is_active=True).annotate(
-        total_doctors=Count('doctors', filter=Q(doctors__user__is_active=True, doctors__is_available=True))
-    ).order_by('name')
-    return render(request, 'public/departments.html', {'departments': deps})
 
 
 def resolve_doctor(identifier):
@@ -1017,114 +1015,99 @@ def staff_edit(request,pk=None):
 
 @role_required('admin')
 def chamber_list(request):
-    q = request.GET.get('q', '').strip()
-    building_filter = request.GET.get('building', '').strip()
-    floor_filter = request.GET.get('floor', '').strip()
-    occupancy_filter = request.GET.get('occupancy', 'all')
-    sort = request.GET.get('sort', 'building')
+    if request.method == 'POST':
+        action = request.POST.get('action', '').strip()
 
-    chambers = Chamber.objects.annotate(
-        total_doctors=Count('doctors', filter=Q(doctors__user__is_active=True))
-    ).prefetch_related('doctors__user', 'doctors__weekly', 'department')
+        if action == 'delete':
+            room_id = request.POST.get('room_id')
+            chamber = get_object_or_404(Chamber, pk=room_id)
+            room_num = chamber.room_number
+            DoctorProfile.objects.filter(chamber=chamber).update(chamber=None, room_number='')
+            chamber.delete()
+            log(request.user, 'room.deleted', room_id, room_num)
+            messages.success(request, f'Consultation Room "{room_num}" deleted successfully.')
+            return redirect('chamber_list')
+
+        elif action in ('add', 'edit'):
+            room_number = request.POST.get('room_number', '').strip()
+            description = request.POST.get('description', '').strip()
+
+            if not room_number:
+                messages.error(request, 'Room Number is required.')
+                return redirect('chamber_list')
+
+            if action == 'edit':
+                room_id = request.POST.get('room_id')
+                chamber = get_object_or_404(Chamber, pk=room_id)
+            else:
+                chamber = Chamber()
+
+            chamber.room_number = room_number
+            if not chamber.building:
+                chamber.building = 'Building 1'
+            chamber.description = description
+            chamber.name = room_number if not chamber.name else chamber.name
+            chamber.address = 'Mirpur, Dhaka'
+            chamber.contact_number = '+88096100016211'
+            chamber.is_active = True
+            chamber.save()
+
+            verb = 'updated' if action == 'edit' else 'added'
+            log(request.user, f'room.{action}', chamber.pk, chamber.room_number)
+            messages.success(request, f'Consultation Room "{chamber.room_number}" {verb} successfully.')
+            return redirect('chamber_list')
+
+    q = request.GET.get('q', '').strip()
+
+    chambers = Chamber.objects.all()
 
     if q:
         chambers = chambers.filter(
-            Q(name__icontains=q) |
             Q(room_number__icontains=q) |
-            Q(building__icontains=q) |
-            Q(floor__icontains=q) |
-            Q(description__icontains=q) |
-            Q(address__icontains=q) |
-            Q(doctors__user__first_name__icontains=q) |
-            Q(doctors__user__last_name__icontains=q)
+            Q(description__icontains=q)
         ).distinct()
 
-    if building_filter:
-        chambers = chambers.filter(building__iexact=building_filter)
-
-    if floor_filter:
-        chambers = chambers.filter(floor__iexact=floor_filter)
-
-    if occupancy_filter == 'empty':
-        chambers = chambers.filter(total_doctors=0)
-    elif occupancy_filter == 'occupied':
-        chambers = chambers.filter(total_doctors__gt=0)
-
-    if sort == 'empty_first':
-        chambers = chambers.order_by('total_doctors', 'building', 'room_number')
-    elif sort == 'doctors_desc':
-        chambers = chambers.order_by('-total_doctors', 'building', 'room_number')
-    elif sort == 'room':
-        chambers = chambers.order_by('room_number', 'building')
-    elif sort == 'floor':
-        chambers = chambers.order_by('floor', 'room_number')
-    else:
-        chambers = chambers.order_by('building', 'room_number')
-
-    all_chambers = Chamber.objects.all()
-    buildings = list(all_chambers.exclude(building='').values_list('building', flat=True).distinct().order_by('building'))
-    floors = list(all_chambers.exclude(floor='').values_list('floor', flat=True).distinct().order_by('floor'))
-
-    total_count = all_chambers.count()
-    empty_count = all_chambers.annotate(total=Count('doctors', filter=Q(doctors__user__is_active=True))).filter(total=0).count()
-    occupied_count = total_count - empty_count
+    chambers = chambers.order_by('room_number')
+    total_count = Chamber.objects.count()
 
     return render(request, 'staff/chambers.html', {
         'chambers': chambers,
-        'buildings': buildings,
-        'floors': floors,
-        'selected_building': building_filter,
-        'selected_floor': floor_filter,
-        'selected_occupancy': occupancy_filter,
-        'selected_sort': sort,
         'query': q,
         'total_count': total_count,
-        'empty_count': empty_count,
-        'occupied_count': occupied_count,
     })
 
 
 @role_required('admin')
 def chamber_edit(request, pk=None):
     chamber = get_object_or_404(Chamber, pk=pk) if pk else None
-    form = ChamberForm(request.POST or None, instance=chamber)
-    all_doctors = DoctorProfile.objects.filter(user__is_active=True).select_related('user', 'department').prefetch_related('weekly')
 
-    if request.method == 'POST' and form.is_valid():
-        with transaction.atomic():
-            chamber = form.save()
-            assigned_docs = list(form.cleaned_data.get('doctors') or [])
+    if request.method == 'POST':
+        room_number = request.POST.get('room_number', '').strip()
+        description = request.POST.get('description', '').strip()
 
-            # Process day allocation for assigned doctors
-            from datetime import time
-            for doc in assigned_docs:
-                days = request.POST.getlist(f'doctor_days_{doc.pk}')
-                if days:
-                    doc.chamber_days = ','.join(str(d) for d in days)
-                    # Sync weekly availability
-                    doc.weekly.all().delete()
-                    for d_str in days:
-                        WeeklyAvailability.objects.create(
-                            doctor=doc,
-                            weekday=int(d_str),
-                            start_time=time(18, 0),
-                            end_time=time(20, 0),
-                            duration_minutes=30,
-                            capacity=2,
-                            active=True
-                        )
-                    materialize_weekly(doc, days=60)
-                doc.save()
+        if not room_number:
+            messages.error(request, 'Room Number is required.')
+        else:
+            if not chamber:
+                chamber = Chamber()
+            chamber.room_number = room_number
+            if not chamber.building:
+                chamber.building = 'Building 1'
+            chamber.description = description
+            chamber.name = room_number if not chamber.name else chamber.name
+            chamber.address = 'Mirpur, Dhaka'
+            chamber.contact_number = '+88096100016211'
+            chamber.is_active = True
+            chamber.save()
 
-            log(request.user, 'chamber.saved', chamber.pk, f'{chamber.building} {chamber.room_number}')
-            messages.success(request, f'Chamber "{chamber.display_code}" saved successfully with doctor schedules.')
+            verb = 'updated' if pk else 'created'
+            log(request.user, 'room.saved', chamber.pk, chamber.room_number)
+            messages.success(request, f'Consultation Room "{chamber.room_number}" {verb} successfully.')
             return redirect('chamber_list')
 
     return render(request, 'staff/chamber_form.html', {
-        'form': form,
         'chamber': chamber,
-        'all_doctors': all_doctors,
-        'page_title': f'Edit {chamber.display_code}' if chamber else 'Add new chamber & consultation room',
+        'page_title': f'Edit {chamber.room_number}' if chamber else 'Add New Consultation Room',
     })
 
 
@@ -1132,12 +1115,11 @@ def chamber_edit(request, pk=None):
 @role_required('admin')
 def chamber_delete(request, pk):
     chamber = get_object_or_404(Chamber, pk=pk)
-    name = chamber.name
     room = chamber.room_number
-    DoctorProfile.objects.filter(chamber=chamber).update(chamber=None)
+    DoctorProfile.objects.filter(chamber=chamber).update(chamber=None, room_number='')
     chamber.delete()
-    log(request.user, 'chamber.deleted', pk, f'{name} {room}')
-    messages.success(request, f'Chamber "{name} ({room})" deleted successfully.')
+    log(request.user, 'room.deleted', pk, room)
+    messages.success(request, f'Consultation Room "{room}" deleted successfully.')
     return redirect('chamber_list')
 
 
@@ -1205,29 +1187,45 @@ def departments(request):
                 messages.success(request, f'Department "{dep.name}" created successfully.')
             return redirect('departments')
 
-    dept_list = Department.objects.all().order_by('name')
+    dept_list = Department.objects.prefetch_related('doctors__user').all().order_by('name')
     return render(request, 'staff/departments.html', {
         'departments': dept_list,
     })
 
 
-@role_required('patient')
+@role_required('patient', 'doctor', 'receptionist')
 def complaints(request):
     complaint_list = Complaint.objects.filter(patient=request.user)\
         .select_related('appointment__slot__doctor__user', 'updated_by')\
         .prefetch_related('messages__author')\
         .order_by('-created_at')
+
+    if request.user.role == 'doctor':
+        page_title = 'Doctor Support & Requests'
+        page_eyebrow = 'DOCTOR WORKSPACE'
+        role_label = 'Doctor'
+    elif request.user.role == 'receptionist':
+        page_title = 'Staff Support & Requests'
+        page_eyebrow = 'STAFF WORKSPACE'
+        role_label = 'Staff'
+    else:
+        page_title = 'Complaint & Support Desk'
+        page_eyebrow = 'PATIENT ASSISTANCE'
+        role_label = 'Patient'
+
     return render(request, 'patient/complaints.html', {
         'complaints': complaint_list,
-        'page_title': 'Complaints & Support',
+        'page_title': page_title,
+        'page_eyebrow': page_eyebrow,
+        'role_label': role_label,
     })
 
 
-@role_required('patient')
+@role_required('patient', 'doctor', 'receptionist')
 def complaint_new(request):
     initial = {}
     appt_param = request.GET.get('appointment', '').strip()
-    if appt_param and appt_param.isdigit():
+    if appt_param and appt_param.isdigit() and request.user.role == 'patient':
         initial['appointment'] = int(appt_param)
         initial['category'] = 'doctor'
     form = ComplaintForm(request.POST or None, request.FILES or None, patient=request.user, initial=initial)
@@ -1244,20 +1242,27 @@ def complaint_new(request):
             obj.attachment = request.FILES['attachment']
         obj.save()
         log(request.user, 'complaint.submitted', obj.pk)
-        messages.success(request, f'Your request/complaint {obj.display_code} has been generated. Updates will appear in your portal.')
+        if request.user.role in ('doctor', 'receptionist'):
+            messages.success(request, f'Your support request {obj.display_code} has been submitted to hospital administration.')
+        else:
+            messages.success(request, f'Your request/complaint {obj.display_code} has been generated. Updates will appear in your portal.')
         return redirect('complaints')
-    patient_appts = Appointment.objects.filter(
-        Q(patient=request.user) | Q(guest_phone=request.user.phone)
-    ).select_related('slot__doctor__user', 'slot__doctor__department').distinct().order_by('-created_at')[:30]
+
+    patient_appts = None
+    if request.user.role == 'patient':
+        patient_appts = Appointment.objects.filter(
+            Q(patient=request.user) | Q(guest_phone=request.user.phone)
+        ).select_related('slot__doctor__user', 'slot__doctor__department').distinct().order_by('-created_at')[:30]
+
     return render(request, 'patient/complaint_new.html', {
         'form': form,
         'patient_appointments': patient_appts,
-        'page_title': 'Complaints & Support',
+        'page_title': 'Submit Support Request' if request.user.role in ('doctor', 'receptionist') else 'Create Request or File Complaint',
     })
 
 
 @require_POST
-@role_required('patient')
+@role_required('patient', 'doctor', 'receptionist')
 def complaint_patient_reply(request, pk):
     complaint = get_object_or_404(Complaint, pk=pk, patient=request.user)
     reply_text = request.POST.get('message', '').strip()
@@ -1283,11 +1288,26 @@ def complaint_queue(request):
         'appointment__slot__doctor__department',
         'updated_by'
     )
-    # Role-based visibility scoping:
-    # 1. Admin: Complete Support Desk — sees all complaints and general support requests
-    # 2. Doctor: Sees ONLY complaints/inquiries submitted for their own related appointments
-    # 3. Receptionist: Sees complaints submitted for their assigned doctors' appointments
-    if request.user.role == 'doctor':
+
+    # 1. Scoping by role:
+    # Admin manages:
+    #   - Patient Complaints & Support (user_type=patient)
+    #   - Doctor Requests & Support (user_type=doctor)
+    #   - Staff Requests & Support (user_type=staff)
+    # Doctor: Sees patient complaints for their appointments
+    # Receptionist: Sees patient complaints for their assigned doctors
+    user_type = request.GET.get('user_type', 'patient').strip().lower()
+    if user_type not in ('patient', 'doctor', 'staff'):
+        user_type = 'patient'
+
+    if request.user.role == 'admin':
+        if user_type == 'doctor':
+            qs = qs.filter(patient__role='doctor')
+        elif user_type == 'staff':
+            qs = qs.filter(patient__role='receptionist')
+        else:
+            qs = qs.filter(patient__role='patient')
+    elif request.user.role == 'doctor':
         qs = qs.filter(appointment__isnull=False, appointment__slot__doctor__user=request.user)
     elif request.user.role == 'receptionist':
         qs = qs.filter(appointment__isnull=False, appointment__slot__doctor__in=managed_doctors(request.user))
@@ -1295,19 +1315,6 @@ def complaint_queue(request):
     status_filter = request.GET.get('status', '').strip()
     if status_filter in ('submitted', 'reviewing', 'resolved'):
         qs = qs.filter(status=status_filter)
-
-    category_filter = request.GET.get('category', '').strip()
-    if category_filter == 'support':
-        qs = qs.filter(category='support')
-    elif category_filter == 'complaint':
-        qs = qs.exclude(category='support')
-
-    doctor_filter = request.GET.get('doctor', '').strip()
-    if request.user.role == 'admin' and doctor_filter:
-        if doctor_filter.isdigit():
-            qs = qs.filter(appointment__slot__doctor__pk=int(doctor_filter))
-        elif doctor_filter == 'none':
-            qs = qs.filter(appointment__isnull=True)
 
     keyword = request.GET.get('q', '').strip()
     if keyword:
@@ -1318,8 +1325,6 @@ def complaint_queue(request):
             Q(patient__last_name__icontains=keyword) |
             Q(patient__phone__icontains=keyword) |
             Q(appointment__reference__icontains=keyword) |
-            Q(appointment__slot__doctor__user__first_name__icontains=keyword) |
-            Q(appointment__slot__doctor__user__last_name__icontains=keyword) |
             Q(message__icontains=keyword)
         )
 
@@ -1336,30 +1341,33 @@ def complaint_queue(request):
     elif request.user.role == 'receptionist':
         base_qs = base_qs.filter(appointment__isnull=False, appointment__slot__doctor__in=managed_doctors(request.user))
 
+    # Calculate active tab counts
+    patient_count = base_qs.filter(patient__role='patient').count()
+    doctor_count = base_qs.filter(patient__role='doctor').count()
+    staff_count = base_qs.filter(patient__role='receptionist').count()
+
+    if request.user.role == 'admin':
+        active_tab_qs = base_qs.filter(
+            patient__role='doctor' if user_type == 'doctor' else ('receptionist' if user_type == 'staff' else 'patient')
+        )
+    else:
+        active_tab_qs = base_qs
+
     counts = {
-        'all': base_qs.count(),
-        'submitted': base_qs.filter(status='submitted').count(),
-        'reviewing': base_qs.filter(status='reviewing').count(),
-        'resolved': base_qs.filter(status='resolved').count(),
-        'support': base_qs.filter(category='support').count(),
-        'complaint': base_qs.exclude(category='support').count(),
+        'all': active_tab_qs.count(),
+        'submitted': active_tab_qs.filter(status='submitted').count(),
+        'reviewing': active_tab_qs.filter(status='reviewing').count(),
+        'resolved': active_tab_qs.filter(status='resolved').count(),
+        'patient': patient_count,
+        'doctor': doctor_count,
+        'staff': staff_count,
     }
 
-    all_doctors = (
-        DoctorProfile.objects.filter(user__is_active=True)
-        .select_related('user', 'department')
-        .order_by('user__first_name')
-        if request.user.role == 'admin'
-        else None
-    )
-
     return render(request, 'staff/complaints.html', {
-        'complaints': qs[:300],
+        'complaints': qs[:400],
         'counts': counts,
         'active_status': status_filter,
-        'active_category': category_filter,
-        'active_doctor': doctor_filter,
-        'all_doctors': all_doctors,
+        'active_user_type': user_type,
         'query': keyword,
         'sort': sort_param,
     })

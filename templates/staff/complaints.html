@@ -1,20 +1,51 @@
 {% extends 'base.html' %}
-{% block title %}Complaints & Support Desk · Green Hospital{% endblock %}
+{% block title %}{% if user.role == 'admin' %}Complaint & Support Management{% elif user.role == 'doctor' %}Complaint Management{% else %}Support & Complaints Desk{% endif %} · Green Hospital{% endblock %}
 
 {% block content %}
 <div class="staff-complaints-page">
   <!-- Clean Page Header -->
   <div class="page-heading">
     <div>
-      <p class="eyebrow">SERVICE QUALITY &amp; PATIENT ASSISTANCE</p>
-      <h1>Complaints &amp; Support Desk</h1>
+      <p class="eyebrow">{% if user.role == 'admin' %}SERVICE QUALITY &amp; HOSPITAL SUPPORT{% elif user.role == 'doctor' %}PATIENT CARE QUALITY{% else %}FRONT DESK ASSISTANCE{% endif %}</p>
+      <h1>{% if user.role == 'admin' %}Complaint &amp; Support Management{% elif user.role == 'doctor' %}Complaint Management{% else %}Patient Complaints Desk{% endif %}</h1>
       {% if user.role == 'doctor' %}
-        <p>Showing patient complaints and inquiries submitted for your consultations and related appointments. 3-Step Lifecycle: <b>1. Generated</b> → <b>2. Under Review &amp; Inquiring</b> → <b>3. Issue Solved</b></p>
+        <p>Patient complaints and inquiries submitted for your consultations and related appointments. 3-Step Lifecycle: <b>1. Generated</b> → <b>2. Under Review &amp; Inquiring</b> → <b>3. Issue Solved</b></p>
+      {% elif user.role == 'admin' %}
+        <p>Hospital complaint and request management across Patients, Doctors, and Staff. 3-Step Lifecycle: <b>1. Generated</b> → <b>2. Under Review &amp; Inquiring</b> → <b>3. Issue Solved</b></p>
       {% else %}
-        <p>Complete hospital complaint registry and patient support desk. 3-Step Lifecycle: <b>1. Generated</b> → <b>2. Under Review &amp; Inquiring</b> → <b>3. Issue Solved</b></p>
+        <p>Support desk for patient complaints and operational inquiries. 3-Step Lifecycle: <b>1. Generated</b> → <b>2. Under Review &amp; Inquiring</b> → <b>3. Issue Solved</b></p>
       {% endif %}
     </div>
   </div>
+
+  {% if user.role == 'admin' %}
+  <!-- Admin 3-Segment Management Tabs (Patients, Doctors, Staff) -->
+  <div class="panel excel-tabs-panel" style="margin-bottom: 16px; padding: 10px 14px; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-md);">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <a href="?user_type=patient{% if active_status %}&status={{ active_status }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}"
+         class="button {% if active_user_type == 'patient' %}button-primary{% else %}button-outline{% endif %} button-sm"
+         style="border-radius: 8px; font-weight: 600;">
+        <svg class="icon"><use href="#ic-user"/></svg>
+        Patient Complaints &amp; Support
+        <span class="badge" style="margin-left: 6px; background: {% if active_user_type == 'patient' %}rgba(255,255,255,0.25){% else %}#e2e8f0{% endif %}; color: {% if active_user_type == 'patient' %}#ffffff{% else %}#1e293b{% endif %}; padding: 2px 7px; border-radius: 12px; font-size: 11px;">{{ counts.patient }}</span>
+      </a>
+      <a href="?user_type=doctor{% if active_status %}&status={{ active_status }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}"
+         class="button {% if active_user_type == 'doctor' %}button-primary{% else %}button-outline{% endif %} button-sm"
+         style="border-radius: 8px; font-weight: 600;">
+        <svg class="icon"><use href="#ic-stethoscope"/></svg>
+        Doctor Requests &amp; Support
+        <span class="badge" style="margin-left: 6px; background: {% if active_user_type == 'doctor' %}rgba(255,255,255,0.25){% else %}#e2e8f0{% endif %}; color: {% if active_user_type == 'doctor' %}#ffffff{% else %}#1e293b{% endif %}; padding: 2px 7px; border-radius: 12px; font-size: 11px;">{{ counts.doctor }}</span>
+      </a>
+      <a href="?user_type=staff{% if active_status %}&status={{ active_status }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}"
+         class="button {% if active_user_type == 'staff' %}button-primary{% else %}button-outline{% endif %} button-sm"
+         style="border-radius: 8px; font-weight: 600;">
+        <svg class="icon"><use href="#ic-users"/></svg>
+        Staff Requests &amp; Support
+        <span class="badge" style="margin-left: 6px; background: {% if active_user_type == 'staff' %}rgba(255,255,255,0.25){% else %}#e2e8f0{% endif %}; color: {% if active_user_type == 'staff' %}#ffffff{% else %}#1e293b{% endif %}; padding: 2px 7px; border-radius: 12px; font-size: 11px;">{{ counts.staff }}</span>
+      </a>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- Metric Summary Cards -->
   <div class="metric-grid four-metrics" style="margin-bottom: 20px;">
@@ -24,7 +55,7 @@
         <span class="metric-icon"><svg class="icon"><use href="#ic-clipboard"/></svg></span>
       </div>
       <strong>{{ counts.all }}</strong>
-      <small>{% if user.role == 'doctor' %}Your appointment tickets{% else %}All hospital tickets{% endif %}</small>
+      <small>{% if user.role == 'doctor' %}Your appointment tickets{% elif active_user_type == 'doctor' %}Doctor requests{% elif active_user_type == 'staff' %}Staff requests{% else %}Patient tickets{% endif %}</small>
     </div>
     <div class="metric-card">
       <div class="metric-top">
@@ -32,7 +63,7 @@
         <span class="metric-icon blue"><svg class="icon"><use href="#ic-alert"/></svg></span>
       </div>
       <strong>{{ counts.submitted }}</strong>
-      <small>New patient requests</small>
+      <small>New tickets</small>
     </div>
     <div class="metric-card">
       <div class="metric-top">
@@ -40,7 +71,7 @@
         <span class="metric-icon amber"><svg class="icon"><use href="#ic-clock"/></svg></span>
       </div>
       <strong>{{ counts.reviewing }}</strong>
-      <small>Inquiring / investigating</small>
+      <small>Inquiring / reviewing</small>
     </div>
     <div class="metric-card">
       <div class="metric-top">
@@ -53,26 +84,25 @@
   </div>
 
   <!-- Excel Filter & Search Toolbar -->
-  <div class="panel excel-toolbar-panel">
+  <div class="panel excel-toolbar-panel" style="margin-bottom: 16px;">
     <form method="get" class="excel-filter-form" id="complaints-filter-form">
+      {% if active_user_type %}<input type="hidden" name="user_type" value="{{ active_user_type }}">{% endif %}
       <div class="filter-controls-row">
-        <!-- Search Keyword -->
-        <div class="filter-field-group search-field-group">
-          <label for="search-input">Search Keywords</label>
+        <!-- Search Field -->
+        <div class="filter-field-group search-field-group" style="flex: 1 1 320px;">
+          <label for="complaints-live-search">Search Keywords</label>
           <div class="search-wrap">
             <svg class="icon search-icon"><use href="#ic-search"/></svg>
-            <input type="text" name="q" id="search-input" value="{{ query }}"
+            <input type="text" name="q" id="complaints-live-search" value="{{ query }}"
                    class="field-control search-input-field"
-                   placeholder="{% if user.role == 'doctor' %}Search your appointment tickets by patient, phone, ticket code, subject...{% else %}Search by patient, doctor, phone, ticket code, subject, or appointment ref...{% endif %}"
+                   placeholder="Search tickets by code, requester, phone, subject, or message..."
                    autocomplete="off">
-            {% if query %}
-              <a href="?{% if active_status %}status={{ active_status }}&amp;{% endif %}{% if active_category %}category={{ active_category }}&amp;{% endif %}{% if active_doctor %}doctor={{ active_doctor }}&amp;{% endif %}{% if sort %}sort={{ sort }}{% endif %}" class="clear-search-btn" title="Clear search">✕</a>
-            {% endif %}
+            <button type="button" id="clear-search-btn" class="clear-search-btn" title="Clear search" style="{% if not query %}display: none;{% endif %}">✕</button>
           </div>
         </div>
 
         <!-- Status Filter -->
-        <div class="filter-field-group">
+        <div class="filter-field-group" style="min-width: 220px;">
           <label for="filter-status">Status Lifecycle</label>
           <select name="status" id="filter-status" class="field-control" onchange="this.form.submit()">
             <option value="" {% if not active_status %}selected{% endif %}>All Statuses ({{ counts.all }})</option>
@@ -82,46 +112,13 @@
           </select>
         </div>
 
-        <!-- Stream Filter -->
-        <div class="filter-field-group">
-          <label for="filter-category">Type Stream</label>
-          <select name="category" id="filter-category" class="field-control" onchange="this.form.submit()">
-            <option value="" {% if not active_category %}selected{% endif %}>All Streams ({{ counts.all }})</option>
-            <option value="support" {% if active_category == 'support' %}selected{% endif %}>General Support &amp; Help ({{ counts.support }})</option>
-            <option value="complaint" {% if active_category == 'complaint' %}selected{% endif %}>Formal Complaints ({{ counts.complaint }})</option>
-          </select>
-        </div>
-
-        <!-- Doctor Filter for Admin -->
-        {% if all_doctors %}
-        <div class="filter-field-group">
-          <label for="filter-doctor">Doctor Filter</label>
-          <select name="doctor" id="filter-doctor" class="field-control" onchange="this.form.submit()">
-            <option value="" {% if not active_doctor %}selected{% endif %}>All Doctors &amp; General ({{ counts.all }})</option>
-            <option value="none" {% if active_doctor == 'none' %}selected{% endif %}>General / No Doctor Linked</option>
-            {% for doc in all_doctors %}
-              <option value="{{ doc.pk }}" {% if active_doctor == doc.pk|stringformat:'s' %}selected{% endif %}>Dr. {{ doc.user.display_name }} ({{ doc.department.name|default:'General' }})</option>
-            {% endfor %}
-          </select>
-        </div>
-        {% endif %}
-
-        <!-- Sort Filter: Oldest to Newest, Newest to Oldest -->
-        <div class="filter-field-group">
+        <!-- Sort Order: Newest First, Oldest First -->
+        <div class="filter-field-group" style="min-width: 180px;">
           <label for="filter-sort">Sort Order</label>
           <select name="sort" id="filter-sort" class="field-control" onchange="this.form.submit()">
-            <option value="newest" {% if sort != 'oldest' %}selected{% endif %}>Newest to Oldest (Latest First)</option>
-            <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest to Newest</option>
+            <option value="newest" {% if sort != 'oldest' %}selected{% endif %}>Newest First</option>
+            <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest First</option>
           </select>
-        </div>
-
-        <!-- Filter Submit Button -->
-        <div class="filter-button-group">
-          <label>&nbsp;</label>
-          <button type="submit" class="button button-primary">Apply Filters</button>
-          {% if query or active_status or active_category or active_doctor or sort == 'oldest' %}
-            <a href="{% url 'complaint_queue' %}" class="button button-outline" title="Reset all filters">Reset</a>
-          {% endif %}
         </div>
       </div>
     </form>
@@ -131,12 +128,12 @@
   <form method="post" action="{% url 'complaint_bulk' %}" id="bulk-complaint-form">
     {% csrf_token %}
     <div class="panel excel-sheet-panel">
-      <!-- Excel Sheet Header with Bulk Status Controls -->
+      <!-- Excel Sheet Header Bar -->
       <div class="excel-sheet-header-bar">
         <div class="excel-header-left">
           <div class="sheet-indicator">
             <span class="live-dot-pulse"></span>
-            <strong>Live Support Registry</strong> · Showing {{ complaints|length }} of {{ counts.all }} {% if user.role == 'doctor' %}tickets for your appointments{% else %}recorded hospital tickets{% endif %}
+            <strong>Live Support Registry</strong> · Showing <span id="complaints-live-count">{{ complaints|length }}</span> of {{ counts.all }} records
           </div>
         </div>
 
@@ -160,20 +157,22 @@
               <th style="width: 36px; text-align: center;">
                 <input type="checkbox" id="select-all-complaints" title="Select all tickets on this page">
               </th>
-              <th style="width: 105px;">Ticket #</th>
-              <th style="width: 130px;">Date & Time</th>
-              <th style="width: 170px;">Patient & Phone</th>
-              <th style="width: 135px;">Stream & Area</th>
-              <th>Subject & Inquiry Details</th>
-              <th style="width: 110px;">Patient File</th>
-              <th style="width: 155px;">Status</th>
+              <th style="width: 110px;">Ticket #</th>
+              <th style="width: 125px;">Date &amp; Time</th>
+              <th style="width: 180px;">Requester</th>
+              <th style="width: 130px;">Area &amp; Stream</th>
+              <th>Subject &amp; Inquiry Details</th>
+              <th style="width: 110px;">File</th>
+              <th style="width: 145px;">Status</th>
               <th style="width: 175px;">Hospital Resolution</th>
-              <th style="width: 120px; text-align: right;">Action</th>
+              <th style="width: 100px; text-align: right;">Action</th>
             </tr>
           </thead>
           <tbody>
             {% for c in complaints %}
-            <tr class="excel-row {% if c.status == 'resolved' %}row-solved{% elif c.status == 'reviewing' %}row-reviewing{% else %}row-generated{% endif %}" id="row-{{ c.pk }}">
+            <tr class="excel-row complaint-data-row {% if c.status == 'resolved' %}row-solved{% elif c.status == 'reviewing' %}row-reviewing{% else %}row-generated{% endif %}"
+                id="row-{{ c.pk }}"
+                data-search="{{ c.display_code|lower }} {{ c.patient.display_name|lower }} {{ c.patient.phone|default:''|lower }} {{ c.subject|lower }} {{ c.message|lower }} {% if c.appointment %}{{ c.appointment.reference|lower }} Dr. {{ c.appointment.doctor.user.display_name|lower }}{% endif %}">
               <!-- Checkbox -->
               <td style="text-align: center;">
                 <input type="checkbox" name="selected_complaints" value="{{ c.pk }}" class="complaint-row-checkbox">
@@ -191,7 +190,13 @@
                   </div>
                 {% else %}
                   <div class="cell-sub-link">
-                    <span class="muted-text" style="font-size: 11px;">General (No Appt)</span>
+                    {% if c.patient.role == 'doctor' %}
+                      <span class="badge" style="background: #ecfdf5; color: #047857; font-size: 10px; padding: 1px 5px; border-radius: 4px;">Doctor Request</span>
+                    {% elif c.patient.role == 'receptionist' %}
+                      <span class="badge" style="background: #fef3c7; color: #92400e; font-size: 10px; padding: 1px 5px; border-radius: 4px;">Staff Request</span>
+                    {% else %}
+                      <span class="muted-text" style="font-size: 11px;">General Support</span>
+                    {% endif %}
                   </div>
                 {% endif %}
               </td>
@@ -202,12 +207,25 @@
                 <small class="muted-text">{{ c.created_at|date:'g:i A' }}</small>
               </td>
 
-              <!-- Patient & Phone -->
+              <!-- Requester & Phone -->
               <td>
                 <div class="patient-cell-profile">
-                  <span class="cell-avatar">{{ c.patient.first_name|first|upper }}</span>
+                  <span class="cell-avatar">
+                    {% if c.patient.role == 'doctor' %}🩺{% elif c.patient.role == 'receptionist' %}💼{% else %}{{ c.patient.first_name|first|upper }}{% endif %}
+                  </span>
                   <div class="cell-patient-meta">
-                    <strong>{{ c.patient.display_name }}</strong>
+                    <strong>
+                      {% if c.patient.role == 'doctor' %}Dr. {% endif %}{{ c.patient.display_name }}
+                    </strong>
+                    <div style="display: flex; gap: 4px; align-items: center; margin-top: 1px;">
+                      {% if c.patient.role == 'doctor' %}
+                        <span class="badge" style="background: #ecfdf5; color: #047857; font-size: 10px; padding: 1px 5px; border-radius: 4px;">Doctor</span>
+                      {% elif c.patient.role == 'receptionist' %}
+                        <span class="badge" style="background: #fef3c7; color: #92400e; font-size: 10px; padding: 1px 5px; border-radius: 4px;">Receptionist</span>
+                      {% else %}
+                        <span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 10px; padding: 1px 5px; border-radius: 4px;">Patient</span>
+                      {% endif %}
+                    </div>
                     <small class="cell-phone">{{ c.patient.phone|default:'No Phone' }}</small>
                   </div>
                 </div>
@@ -225,16 +243,16 @@
               <!-- Subject & Details -->
               <td>
                 <strong class="cell-subject">{{ c.subject }}</strong>
-                <p class="cell-message-preview">{{ c.message|truncatewords:20 }}</p>
-                {% if c.message|length > 120 %}
+                <p class="cell-message-preview">{{ c.message|truncatewords:18 }}</p>
+                {% if c.message|length > 100 %}
                   <button type="button" class="btn-read-more" onclick="showTicketDetail('{{ c.display_code }}', '{{ c.subject|escapejs }}', '{{ c.message|escapejs }}', '{{ c.patient.display_name|escapejs }}', '{{ c.created_at|date:'d M Y, g:i A' }}', '{{ c.get_status_display }}')">Read full text ▾</button>
                 {% endif %}
               </td>
 
-              <!-- Patient Attachment -->
+              <!-- Requester Attachment -->
               <td>
                 {% if c.attachment %}
-                  <a href="{{ c.attachment.url }}" target="_blank" class="table-attachment-link" download title="Download patient file">
+                  <a href="{{ c.attachment.url }}" target="_blank" class="table-attachment-link" download title="Download file">
                     <svg class="icon"><use href="#ic-download"/></svg> Attachment
                   </a>
                 {% else %}
@@ -242,7 +260,7 @@
                 {% endif %}
               </td>
 
-              <!-- Status Badge (3 colors: Blue, Amber, Green) -->
+              <!-- Status Badge (1. Generated, 2. Reviewing, 3. Solved) -->
               <td>
                 {% if c.status == 'resolved' %}
                   <span class="status-badge status-solved">
@@ -286,22 +304,40 @@
               </td>
             </tr>
             {% empty %}
-            <tr>
+            <tr id="empty-state-row">
               <td colspan="10" class="empty-state-cell">
                 <div class="empty-state">
                   <span class="empty-icon"><svg class="icon"><use href="#ic-clipboard"/></svg></span>
                   {% if user.role == 'doctor' %}
                     <h3>No complaints or support tickets for your appointments</h3>
                     <p>There are no patient complaints or inquiries registered against your consultations matching the selected filters.</p>
+                  {% elif active_user_type == 'doctor' %}
+                    <h3>No doctor requests or support tickets</h3>
+                    <p>No support requests have been submitted by doctors in this view.</p>
+                  {% elif active_user_type == 'staff' %}
+                    <h3>No staff requests or support tickets</h3>
+                    <p>No operational requests have been submitted by staff members in this view.</p>
                   {% else %}
-                    <h3>No complaints or support tickets match criteria</h3>
+                    <h3>No patient complaints or support tickets match criteria</h3>
                     <p>Try clearing search keywords or switching filters to view other records.</p>
                   {% endif %}
-                  <a href="{% url 'complaint_queue' %}" class="button button-outline button-sm">Clear Filters</a>
+                  <a href="?{% if active_user_type %}user_type={{ active_user_type }}{% endif %}" class="button button-outline button-sm">Clear Filters</a>
                 </div>
               </td>
             </tr>
             {% endfor %}
+
+            <!-- Dynamic Search Empty State Row (Hidden by default) -->
+            <tr id="search-empty-row" style="display: none;">
+              <td colspan="10" class="empty-state-cell">
+                <div class="empty-state">
+                  <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
+                  <h3>No matching tickets found</h3>
+                  <p>No ticket on this page matches your search keywords.</p>
+                  <button type="button" class="button button-outline button-sm" onclick="clearLiveSearch()">Clear Search</button>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -309,50 +345,52 @@
   </form>
 </div>
 
-<!-- Modal 1: Update Single Complaint (Status, Comment, File) -->
-<div class="modal-backdrop" id="complaint-update-modal" style="display: none;">
-  <div class="modal-dialog modal-md">
-    <div class="modal-header">
+<!-- ========================================================
+     MODAL 1: UPDATE TICKET (Status, Resolution Comment, File)
+     ======================================================== -->
+<div class="modal-backdrop" id="complaint-update-modal" style="display: none;" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width: 520px;">
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
       <div>
-        <h3 id="modal-ticket-title">Update Ticket Status</h3>
-        <p class="modal-sub" id="modal-ticket-sub">Hospital Administration Actions</p>
+        <h3 id="modal-ticket-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;">Update Ticket Status</h3>
+        <p class="modal-sub" id="modal-ticket-sub" style="margin: 2px 0 0; font-size: 12px; color: #64748b;">Hospital Administration Actions</p>
       </div>
-      <button type="button" class="modal-close-btn" onclick="closeUpdateModal()">✕</button>
+      <button type="button" class="modal-close-btn" onclick="closeUpdateModal()" style="background: transparent; border: none; font-size: 18px; color: #64748b; cursor: pointer;">✕</button>
     </div>
-    <form method="post" enctype="multipart/form-data" id="complaint-update-form" class="smart-form">
+    <form method="post" enctype="multipart/form-data" id="complaint-update-form" class="smart-form" style="display: flex; flex-direction: column; margin: 0;">
       {% csrf_token %}
-      <div class="modal-body">
+      <div class="modal-body" style="padding: 20px; overflow-y: auto;">
         <!-- Status Picker (3 Steps) -->
-        <div class="form-group">
-          <label for="modal-status-select">Status Lifecycle <span class="required">*</span></label>
-          <select name="status" id="modal-status-select" class="field-control" required>
-            <option value="submitted">1. Complaint Generated</option>
-            <option value="reviewing">2. Under Review & Inquiring</option>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="modal-status-select" style="display: block; font-weight: 600; margin-bottom: 6px;">Status Lifecycle <span class="required" style="color: #e11d48;">*</span></label>
+          <select name="status" id="modal-status-select" class="field-control" required style="width: 100%;">
+            <option value="submitted">1. Complaint / Request Generated</option>
+            <option value="reviewing">2. Under Review &amp; Inquiring</option>
             <option value="resolved">3. Issue Solved</option>
           </select>
         </div>
 
         <!-- Optional Admin Comment / Resolution Note -->
-        <div class="form-group">
-          <label for="modal-response-textarea">
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="modal-response-textarea" style="display: block; font-weight: 600; margin-bottom: 6px;">
             Resolution Comment / Admin Note (Optional)
           </label>
           <textarea name="response" id="modal-response-textarea" class="field-control" rows="3"
-                    placeholder="Optional: write an explanation or resolution summary for the patient (leave blank if not needed)..."></textarea>
-          <small class="field-hint">You can leave this blank if you only want to change the status.</small>
+                    placeholder="Write an explanation, instructions, or resolution summary..." style="width: 100%;"></textarea>
+          <small class="field-hint" style="font-size: 11.5px; color: #64748b; display: block; margin-top: 4px;">Leave blank if only updating status without a new comment.</small>
         </div>
 
         <!-- Optional Hospital File Attachment -->
         <div class="form-group">
-          <label for="modal-admin-attachment">
+          <label for="modal-admin-attachment" style="display: block; font-weight: 600; margin-bottom: 6px;">
             Attach Document / Report (Optional)
           </label>
           <input type="file" name="admin_attachment" id="modal-admin-attachment" class="field-control file-input-control"
-                 accept="image/*,.pdf,.doc,.docx,.txt">
-          <small class="field-hint">Upload investigation reports, receipts, or official letters (JPG, PNG, PDF up to 5MB).</small>
+                 accept="image/*,.pdf,.doc,.docx,.txt" style="width: 100%;">
+          <small class="field-hint" style="font-size: 11.5px; color: #64748b; display: block; margin-top: 4px;">Upload investigation reports, invoices, or official letters (JPG, PNG, PDF up to 5MB).</small>
         </div>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 12px 12px;">
         <button type="button" class="button button-outline" onclick="closeUpdateModal()">Cancel</button>
         <button type="submit" class="button button-primary">Save Ticket Changes</button>
       </div>
@@ -360,21 +398,23 @@
   </div>
 </div>
 
-<!-- Modal 2: View Full Ticket Message -->
-<div class="modal-backdrop" id="ticket-detail-modal" style="display: none;">
-  <div class="modal-dialog modal-md">
-    <div class="modal-header">
+<!-- ========================================================
+     MODAL 2: VIEW FULL TICKET MESSAGE
+     ======================================================== -->
+<div class="modal-backdrop" id="ticket-detail-modal" style="display: none;" role="dialog" aria-modal="true">
+  <div class="modal-card" style="max-width: 520px;">
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
       <div>
-        <h3 id="view-detail-title">Ticket Details</h3>
-        <p class="modal-sub" id="view-detail-meta"></p>
+        <h3 id="view-detail-title" style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;">Ticket Details</h3>
+        <p class="modal-sub" id="view-detail-meta" style="margin: 2px 0 0; font-size: 12px; color: #64748b;"></p>
       </div>
-      <button type="button" class="modal-close-btn" onclick="closeDetailModal()">✕</button>
+      <button type="button" class="modal-close-btn" onclick="closeDetailModal()" style="background: transparent; border: none; font-size: 18px; color: #64748b; cursor: pointer;">✕</button>
     </div>
-    <div class="modal-body">
-      <h4 id="view-detail-subject" style="margin-bottom: 8px; color: #0c3328;"></h4>
-      <div id="view-detail-body" class="ticket-full-text-box"></div>
+    <div class="modal-body" style="padding: 20px; overflow-y: auto;">
+      <h4 id="view-detail-subject" style="margin-bottom: 8px; color: #0c3328; font-size: 15px;"></h4>
+      <div id="view-detail-body" class="ticket-full-text-box" style="white-space: pre-wrap; font-size: 13.5px; line-height: 1.5; color: #334155;"></div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="display: flex; justify-content: flex-end; padding: 16px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 12px 12px;">
       <button type="button" class="button button-primary" onclick="closeDetailModal()">Close</button>
     </div>
   </div>
@@ -382,6 +422,65 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // 1. Move modals to <body> to escape any parent transform / positioning constraints
+  const updateModal = document.getElementById('complaint-update-modal');
+  const detailModal = document.getElementById('ticket-detail-modal');
+  if (updateModal && updateModal.parentNode !== document.body) {
+    document.body.appendChild(updateModal);
+  }
+  if (detailModal && detailModal.parentNode !== document.body) {
+    document.body.appendChild(detailModal);
+  }
+
+  // 2. Real-time search across table rows
+  const searchInput = document.getElementById('complaints-live-search');
+  const clearSearchBtn = document.getElementById('clear-search-btn');
+  const rows = document.querySelectorAll('#complaints-excel-table tbody tr.complaint-data-row');
+  const searchEmptyRow = document.getElementById('search-empty-row');
+  const liveCountSpan = document.getElementById('complaints-live-count');
+
+  function filterTicketsLive() {
+    const q = (searchInput.value || '').trim().toLowerCase();
+    if (clearSearchBtn) clearSearchBtn.style.display = q ? 'flex' : 'none';
+    let visible = 0;
+
+    rows.forEach(function(row) {
+      const searchData = row.getAttribute('data-search') || '';
+      if (!q || searchData.includes(q)) {
+        row.style.display = '';
+        visible++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (liveCountSpan) liveCountSpan.textContent = visible;
+    if (searchEmptyRow) {
+      searchEmptyRow.style.display = (visible === 0 && rows.length > 0) ? '' : 'none';
+    }
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', filterTicketsLive);
+  }
+
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', function() {
+      searchInput.value = '';
+      filterTicketsLive();
+      searchInput.focus();
+    });
+  }
+
+  window.clearLiveSearch = function() {
+    if (searchInput) {
+      searchInput.value = '';
+      filterTicketsLive();
+      searchInput.focus();
+    }
+  };
+
+  // 3. Bulk actions
   const selectAll = document.getElementById('select-all-complaints');
   const rowCheckboxes = document.querySelectorAll('.complaint-row-checkbox');
   const bulkToolbar = document.getElementById('bulk-actions-toolbar');
@@ -414,6 +513,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+// Modal Open / Close Functions
 function openUpdateModal(pk, code, status, response) {
   const modal = document.getElementById('complaint-update-modal');
   const form = document.getElementById('complaint-update-form');
@@ -424,36 +524,49 @@ function openUpdateModal(pk, code, status, response) {
 
   form.action = '/service/complaints/' + pk + '/';
   title.textContent = 'Update Ticket ' + code;
-  sub.textContent = 'Hospital Administration Quick Status & Resolution';
+  sub.textContent = 'Hospital Administration Resolution & Actions';
   statusSelect.value = status;
   responseText.value = response || '';
 
+  document.body.style.overflow = 'hidden';
   modal.style.display = 'flex';
 }
 
 function closeUpdateModal() {
-  document.getElementById('complaint-update-modal').style.display = 'none';
+  const modal = document.getElementById('complaint-update-modal');
+  if (modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
 }
 
 function showTicketDetail(code, subject, message, patient, date, status) {
   const modal = document.getElementById('ticket-detail-modal');
   document.getElementById('view-detail-title').textContent = 'Ticket ' + code + ' · ' + status;
-  document.getElementById('view-detail-meta').textContent = 'Patient: ' + patient + ' · Logged: ' + date;
+  document.getElementById('view-detail-meta').textContent = 'Requester: ' + patient + ' · Logged: ' + date;
   document.getElementById('view-detail-subject').textContent = subject;
   document.getElementById('view-detail-body').textContent = message;
+  document.body.style.overflow = 'hidden';
   modal.style.display = 'flex';
 }
 
 function closeDetailModal() {
-  document.getElementById('ticket-detail-modal').style.display = 'none';
+  const modal = document.getElementById('ticket-detail-modal');
+  if (modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
 }
 
-// Close modals on Escape key
+// Close modals on Escape key or backdrop click
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
     closeUpdateModal();
     closeDetailModal();
   }
+});
+
+window.addEventListener('click', function(e) {
+  const updateModal = document.getElementById('complaint-update-modal');
+  const detailModal = document.getElementById('ticket-detail-modal');
+  if (e.target === updateModal) closeUpdateModal();
+  if (e.target === detailModal) closeDetailModal();
 });
 </script>
 {% endblock %}

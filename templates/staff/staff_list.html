@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
-{% block title %}Staff & Doctors · Green Hospital{% endblock %}
+{% block title %}Staff and Dr Management · Green Hospital{% endblock %}
 
 {% block content %}
 <div class="staff-directory-page">
   <!-- Clean Page Heading -->
   <div class="page-heading">
     <div>
-      <p class="eyebrow">HOSPITAL PERSONNEL & CHAMBERS</p>
-      <h1>Staff &amp; Doctors</h1>
+      <p class="eyebrow">HOSPITAL PERSONNEL</p>
+      <h1>Staff and Dr Management</h1>
     </div>
     {% if user.role == 'admin' %}
     <div class="heading-actions">
@@ -29,19 +29,19 @@
             <svg class="icon search-icon"><use href="#ic-search"/></svg>
             <input type="text" name="q" id="staff-search-input" value="{{ query }}"
                    class="field-control search-input-field"
-                   placeholder="Search by name, phone no, room no, chamber, or department..."
+                   placeholder="Search by name, phone no, room no, or department..."
                    autocomplete="off">
             <button type="button" class="clear-search-btn" id="clear-search-btn" title="Clear search" style="{% if not query %}display: none;{% endif %}">✕</button>
           </div>
         </div>
 
-        <!-- Inline Role Filter Select: All is default, Dr, Staff, Administration -->
+        <!-- Inline Role Filter Select: All is default, Dr, Receptionist, Administration -->
         <div class="filter-field-group">
           <label for="filter-role-select">Role Filter</label>
           <select name="role" id="filter-role-select" class="field-control">
             <option value="" {% if not role_filter %}selected{% endif %}>All (Default)</option>
             <option value="doctor" {% if role_filter == 'doctor' %}selected{% endif %}>Dr (Doctors)</option>
-            <option value="receptionist" {% if role_filter == 'receptionist' %}selected{% endif %}>Staff (Reception)</option>
+            <option value="receptionist" {% if role_filter == 'receptionist' %}selected{% endif %}>Receptionist</option>
             <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Administration</option>
           </select>
         </div>
@@ -65,9 +65,9 @@
       <table class="data-table excel-grid-table" id="staff-excel-table">
         <thead>
           <tr>
-            <th class="col-staff" style="width: 22%;">Staff</th>
+            <th class="col-staff" style="width: 22%;">Staff &amp; Designation</th>
             <th class="col-dept" style="width: 20%;">Department</th>
-            <th class="col-chamber" style="width: 11%;">Chamber &amp; Room</th>
+            <th class="col-chamber" style="width: 11%;">Room</th>
             <th class="col-assigned" style="width: 14%;">Assigned Personnel</th>
             <th class="col-phone" style="width: 12%;">Contact Phone</th>
             <th class="col-email" style="width: 15%;">Email / Username</th>
@@ -85,9 +85,9 @@
               data-room="{% if person.role == 'doctor' and person.doctor_profile %}{{ person.doctor_profile.room_number|default:''|lower }}{% endif %}"
               data-chamber="{% if person.role == 'doctor' and person.doctor_profile and person.doctor_profile.chamber %}{{ person.doctor_profile.chamber.name|lower }} {{ person.doctor_profile.chamber.building|lower }}{% endif %}"
               data-department="{% if person.role == 'doctor' and person.doctor_profile and person.doctor_profile.department %}{{ person.doctor_profile.department.name|lower }}{% endif %}"
-              data-search="{{ person.display_name|lower }} {{ person.username|lower }} {{ person.phone|default:''|lower }} {{ person.email|default:''|lower }} {% if person.role == 'doctor' and person.doctor_profile %}{{ person.doctor_profile.room_number|default:''|lower }} {{ person.doctor_profile.chamber.name|default:''|lower }} {{ person.doctor_profile.chamber.building|default:''|lower }} {{ person.doctor_profile.department.name|default:''|lower }}{% elif person.role == 'receptionist' %}reception front desk opd counter{% else %}admin administration office{% endif %} {{ person.get_role_display|lower }}">
+              data-search="{{ person.display_name|lower }} {{ person.username|lower }} {{ person.phone|default:''|lower }} {{ person.email|default:''|lower }} {% if person.role == 'doctor' and person.doctor_profile %}{{ person.doctor_profile.room_number|default:''|lower }} {{ person.doctor_profile.chamber.name|default:''|lower }} {{ person.doctor_profile.chamber.building|default:''|lower }} {{ person.doctor_profile.department.name|default:''|lower }}{% elif person.role == 'receptionist' %}reception receptionist front desk opd counter{% else %}admin administration office{% endif %} {{ person.get_role_display|lower }}">
             
-            <!-- Member & Role -->
+            <!-- Staff & Designation -->
             <td>
               <div class="identity-text-box">
                 <span class="person-name">
@@ -103,7 +103,7 @@
                   {% if person.role == 'doctor' %}
                     <span class="badge-role role-doctor"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-stethoscope"/></svg> Doctor</span>
                   {% elif person.role == 'receptionist' %}
-                    <span class="badge-role role-receptionist"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-user"/></svg> Staff (Reception)</span>
+                    <span class="badge-role role-receptionist"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-user"/></svg> Receptionist</span>
                   {% elif person.role == 'admin' %}
                     <span class="badge-role role-admin"><svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-settings"/></svg> Administration</span>
                   {% endif %}
@@ -122,24 +122,22 @@
               {% endif %}
             </td>
 
-            <!-- Chamber / Room -->
+            <!-- Room -->
             <td>
-              {% if person.role == 'doctor' and person.doctor_profile %}
+              {% if person.role == 'doctor' and person.doctor_profile and person.doctor_profile.active_room %}
                 <div class="cell-chamber-box">
                   <span class="room-chip">
                     <svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-building"/></svg>
-                    {{ person.doctor_profile.room_number|default:'Chamber 101' }}
+                    {{ person.doctor_profile.active_room }}
                   </span>
-                  {% if person.doctor_profile.chamber %}
-                    <small class="muted-text">{{ person.doctor_profile.chamber.building|default:person.doctor_profile.chamber.name }}</small>
-                  {% endif %}
                 </div>
+              {% elif person.role == 'doctor' %}
+                <span class="muted-text" style="color: #94a3b8; font-style: italic;">Unassigned</span>
               {% elif person.role == 'receptionist' %}
                 <div class="cell-chamber-box">
                   <span class="room-chip">
                     <svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-building"/></svg> Front Desk
                   </span>
-                  <small class="muted-text">Reception Counters</small>
                 </div>
               {% else %}
                 <span class="muted-text">Admin Office</span>

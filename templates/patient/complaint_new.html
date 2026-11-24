@@ -6,10 +6,10 @@
   <!-- Top Navigation & Heading -->
   <div class="page-heading compact-heading">
     <div>
-      <a class="back-link" href="{% url 'complaints' %}">‹ Back to Complaints & Support</a>
-      <p class="eyebrow">PATIENT ASSISTANCE</p>
-      <h1>Create Request or File Complaint</h1>
-      <p>Select the type of assistance you require. Your ticket will follow our 3-step resolution process.</p>
+      <a class="back-link" href="{% url 'complaints' %}">‹ Back to Support Desk</a>
+      <p class="eyebrow">{% if user.role == 'doctor' %}DOCTOR WORKSPACE{% elif user.role == 'receptionist' %}STAFF WORKSPACE{% else %}PATIENT ASSISTANCE{% endif %}</p>
+      <h1>{% if user.role == 'doctor' %}Submit Doctor Support Request{% elif user.role == 'receptionist' %}Submit Staff Support Request{% else %}Create Request or File Complaint{% endif %}</h1>
+      <p>{% if user.role == 'doctor' or user.role == 'receptionist' %}Submit chamber, schedule, IT, or operational requests to hospital administration. 3-step lifecycle: Generated → Under Review → Solved.{% else %}Select the type of assistance you require. Your ticket will follow our 3-step resolution process.{% endif %}</p>
     </div>
   </div>
 

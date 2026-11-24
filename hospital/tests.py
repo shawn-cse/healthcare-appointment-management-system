@@ -299,10 +299,19 @@ class AppointmentSystemTests(TestCase):
         self.assertEqual(fav_response.status_code, 301)
         self.assertEqual(fav_response.url, '/static/favicon.svg')
 
-        # 4. Public Departments directory is accessible
-        response = self.client.get(reverse('public_departments'))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Specialized Medical Departments')
+    def test_empty_departments_hidden_from_patients_visible_to_admin(self):
+        empty_dept = Department.objects.create(name='Orthopedics Empty', slug='orthopedics-empty')
+        # 1. Not visible on home page for patients
+        res_home = self.client.get(reverse('home'))
+        self.assertNotContains(res_home, 'Orthopedics Empty')
+        # 2. Not visible on doctor directory filters for patients
+        res_docs = self.client.get(reverse('doctor_directory'))
+        self.assertNotContains(res_docs, 'Orthopedics Empty')
+        # 3. Visible in admin Manage Departments (/departments/)
+        self.client.force_login(self.admin)
+        res_admin = self.client.get(reverse('departments'))
+        self.assertEqual(res_admin.status_code, 200)
+        self.assertContains(res_admin, 'Orthopedics Empty')
 
     def test_doctor_profile_displays_chamber_details_and_schedules(self):
         # Doctor Profile is accessible via semantic slug without authentication
@@ -428,11 +437,11 @@ class AppointmentSystemTests(TestCase):
         self.assertIn('resolution_notes', file_complaint.admin_attachment.name)
 
     def test_doctor_panel_navigation_and_team_directory(self):
-        # 1. Doctor navigates to dashboard: navigation shows 'Dashboard' and 'Staff & Doctors'
+        # 1. Doctor navigates to dashboard: navigation shows 'Dashboard' and 'Staff and Dr Management'
         self.client.force_login(self.doctor)
         resp_dash = self.client.get(reverse('dashboard'))
         self.assertEqual(resp_dash.status_code, 200)
-        self.assertContains(resp_dash, 'Staff & Doctors')
+        self.assertContains(resp_dash, 'Staff and Dr Management')
         self.assertContains(resp_dash, 'Dashboard')
         self.assertNotContains(resp_dash, 'Overview')
 
@@ -440,7 +449,7 @@ class AppointmentSystemTests(TestCase):
         self.client.force_login(self.reception)
         resp_rec_dash = self.client.get(reverse('dashboard'))
         self.assertEqual(resp_rec_dash.status_code, 200)
-        self.assertContains(resp_rec_dash, 'Staff & Doctors')
+        self.assertContains(resp_rec_dash, 'Staff and Dr Management')
         self.assertContains(resp_rec_dash, 'Dashboard')
         self.assertNotContains(resp_rec_dash, 'Overview')
         self.assertEqual(reverse('staff_list'), '/staff/')
@@ -452,15 +461,15 @@ class AppointmentSystemTests(TestCase):
         resp_legacy = self.client.get('/team/')
         self.assertRedirects(resp_legacy, '/staff/')
 
-        # 3. Doctor accesses /staff/ (Staff & Doctor directory)
+        # 3. Doctor accesses /staff/ (Staff and Dr Management directory)
         self.client.force_login(self.doctor)
         resp_team = self.client.get(reverse('staff_list'))
         self.assertEqual(resp_team.status_code, 200)
-        self.assertContains(resp_team, 'Staff &amp; Doctors')
+        self.assertContains(resp_team, 'Staff and Dr Management')
         self.assertContains(resp_team, 'Dr. Karim')
         self.assertContains(resp_team, 'reception_one')
         self.assertContains(resp_team, reverse('doctor_detail', args=[self.doc.profile_slug]))
-        # Excel sheet live search and filter controls
+        # Excel sheet search and filter controls
         self.assertContains(resp_team, 'staff-search-input')
         self.assertContains(resp_team, 'Personnel Registry')
         self.assertNotContains(resp_team, 'btn-staff-search')
@@ -518,12 +527,12 @@ class AppointmentSystemTests(TestCase):
             message='Is elevator 2 working?'
         )
 
-        # Doctor 1 accesses Complaint & Support Desk
+        # Doctor 1 accesses Complaint Management
         self.client.force_login(self.doctor)
         resp_doc = self.client.get(reverse('complaint_queue'))
         self.assertEqual(resp_doc.status_code, 200)
-        # Verify navigation has Complaint & Support Desk
-        self.assertContains(resp_doc, 'Complaint & Support Desk')
+        # Verify navigation has Complaint Management
+        self.assertContains(resp_doc, 'Complaint Management')
         self.assertNotContains(resp_doc, 'Patient Concerns')
         # Doctor 1 sees ONLY ticket linked to their own appointment
         self.assertContains(resp_doc, c_doc1.display_code)
@@ -539,20 +548,40 @@ class AppointmentSystemTests(TestCase):
         c_doc1.refresh_from_db()
         self.assertEqual(c_doc1.status, 'resolved')
 
-        # Admin accesses Complaint & Support Desk
+        # Create doctor support request and staff support request
+        c_doc_req = Complaint.objects.create(
+            patient=self.doctor,
+            category='support',
+            subject='Chamber AC maintenance request',
+            message='Chamber 201 AC requires cooling check.'
+        )
+        c_staff_req = Complaint.objects.create(
+            patient=self.reception,
+            category='support',
+            subject='Stationery and printer ink supply',
+            message='Counter 2 printer needs black toner replacement.'
+        )
+
+        # Admin accesses Complaint & Support Management (Patient view by default)
         self.client.force_login(self.admin)
         resp_admin = self.client.get(reverse('complaint_queue'))
         self.assertEqual(resp_admin.status_code, 200)
-        # Admin sees complete support desk (all 3 tickets)
+        self.assertContains(resp_admin, 'Complaint & Support Management')
+        # Admin sees patient complaints in patient tab
         self.assertContains(resp_admin, c_doc1.display_code)
         self.assertContains(resp_admin, c_doc2.display_code)
         self.assertContains(resp_admin, c_general.display_code)
+        self.assertNotContains(resp_admin, c_doc_req.display_code)
 
-        # Admin filters by Doctor 1
-        resp_admin_filtered = self.client.get(reverse('complaint_queue') + f'?doctor={self.doc.pk}')
-        self.assertContains(resp_admin_filtered, c_doc1.display_code)
-        self.assertNotContains(resp_admin_filtered, c_doc2.display_code)
-        self.assertNotContains(resp_admin_filtered, c_general.display_code)
+        # Admin switches to Doctor tab (?user_type=doctor)
+        resp_admin_doc = self.client.get(reverse('complaint_queue') + '?user_type=doctor')
+        self.assertContains(resp_admin_doc, c_doc_req.display_code)
+        self.assertNotContains(resp_admin_doc, c_general.display_code)
+
+        # Admin switches to Staff tab (?user_type=staff)
+        resp_admin_staff = self.client.get(reverse('complaint_queue') + '?user_type=staff')
+        self.assertContains(resp_admin_staff, c_staff_req.display_code)
+        self.assertNotContains(resp_admin_staff, c_general.display_code)
 
     def test_clinical_timepicker_formats_and_widget(self):
         from hospital.forms import TIME, SlotForm, WeeklyForm
@@ -728,6 +757,71 @@ class AppointmentSystemTests(TestCase):
             {'visit_type': 'followup'}
         )
         self.assertEqual(res_denied.status_code, 404)
+
+    def test_rooms_excel_table_and_multi_doctor_sharing(self):
+        # 1. Admin accesses /chambers/
+        self.client.force_login(self.admin)
+        res = self.client.get(reverse('chamber_list'))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Consultation Room')
+        self.assertContains(res, 'Consultation Room Directory')
+        self.assertContains(res, 'Description / Note')
+        self.assertNotContains(res, 'Floor Level')
+        self.assertNotContains(res, 'Assigned Doctors')
+        self.assertNotContains(res, 'Total Chambers')
+        self.assertNotContains(res, 'Live Search')
+
+        # 2. Admin adds a new room
+        res_add = self.client.post(reverse('chamber_list'), {
+            'action': 'add',
+            'room_number': 'Room 505',
+            'description': '5th Floor, Outpatient Clinic Note',
+        })
+        self.assertEqual(res_add.status_code, 302)
+        room_505 = Chamber.objects.get(room_number='Room 505')
+        self.assertEqual(room_505.description, '5th Floor, Outpatient Clinic Note')
+
+        # 3. View table shows Room 505 and Description / Note
+        res_view = self.client.get(reverse('chamber_list'))
+        self.assertContains(res_view, 'Room 505')
+        self.assertContains(res_view, '5th Floor, Outpatient Clinic Note')
+
+        # 4. Search by room number
+        res_search = self.client.get(reverse('chamber_list') + '?q=505')
+        self.assertContains(res_search, 'Room 505')
+
+        # 5. When doctor has no room assigned, room number does not show in frontend
+        self.doc.chamber = None
+        self.doc.room_number = ''
+        self.doc.save()
+        res_doc = self.client.get(reverse('doctor_detail', args=[self.doc.profile_slug]))
+        self.assertEqual(self.doc.active_room, '')
+        self.assertNotContains(res_doc, 'Chamber 302')
+
+        # 6. Doctor can update room number from profile
+        self.client.force_login(self.doctor)
+        res_prof = self.client.post(reverse('profile'), {
+            'first_name': 'Karim', 'last_name': 'Doctor', 'username': 'doctor_one',
+            'phone': '01811111111', 'room_number': 'Room 909'
+        })
+        self.assertEqual(res_prof.status_code, 302)
+        self.doc.refresh_from_db()
+        self.assertEqual(self.doc.active_room, 'Room 909')
+
+        # 7. Delete room safely clears doctor room assignment
+        self.client.force_login(self.admin)
+        self.doc.chamber = room_505
+        self.doc.room_number = room_505.room_number
+        self.doc.save()
+        res_del = self.client.post(reverse('chamber_list'), {
+            'action': 'delete',
+            'room_id': str(room_505.pk)
+        })
+        self.assertEqual(res_del.status_code, 302)
+        self.assertFalse(Chamber.objects.filter(pk=room_505.pk).exists())
+        self.doc.refresh_from_db()
+        self.assertIsNone(self.doc.chamber)
+        self.assertEqual(self.doc.active_room, '')
 
 
 
