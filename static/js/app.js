@@ -966,6 +966,9 @@
   // --- Universal Modal Helper: Ensure Modals are Direct Children of Body ---
   function initGlobalModals() {
     doc.querySelectorAll('.modal-backdrop').forEach(modal => {
+      if (!modal.style.display || modal.style.display !== 'flex') {
+        modal.style.display = 'none';
+      }
       if (modal.parentElement !== doc.body) {
         doc.body.appendChild(modal);
       }
