@@ -57,8 +57,8 @@ def home(request):
         return redirect('dashboard')
     return render(request, 'shared/home.html', {
         'departments': Department.objects.filter(is_active=True)[:10],
-        'doctors': DoctorProfile.objects.filter(is_available=True, user__is_active=True).select_related('user','department')[:6],
-        'doctor_count': DoctorProfile.objects.filter(user__is_active=True).count(),
+        'doctors': DoctorProfile.objects.filter(is_available=True, user__is_active=True, department__is_active=True).select_related('user','department')[:6],
+        'doctor_count': DoctorProfile.objects.filter(user__is_active=True, department__is_active=True).count(),
     })
 
 
@@ -186,7 +186,7 @@ def doctor_directory(request):
 
     q = request.GET.get('q', '').strip()
     sort = request.GET.get('sort', 'default')
-    doctors = DoctorProfile.objects.filter(is_available=True, user__is_active=True).select_related('user', 'department', 'chamber').prefetch_related('weekly')
+    doctors = DoctorProfile.objects.filter(is_available=True, user__is_active=True, department__is_active=True).select_related('user', 'department', 'chamber').prefetch_related('weekly')
     if dept_ids:
         doctors = doctors.filter(department_id__in=dept_ids)
     if len(genders) == 1:
@@ -214,7 +214,7 @@ def doctor_directory(request):
         doc_count=Count('doctors', filter=Q(doctors__user__is_active=True, doctors__is_available=True))
     ).order_by('name')
 
-    total_count = DoctorProfile.objects.filter(is_available=True, user__is_active=True).count()
+    total_count = DoctorProfile.objects.filter(is_available=True, user__is_active=True, department__is_active=True).count()
 
     return render(request, 'patient/doctors.html', {
         'doctors': doctors,
@@ -290,12 +290,14 @@ def doctor_detail(request, identifier=None, pk=None):
     doc = resolve_doctor(ident)
     if not doc:
         raise Http404("Specialist doctor not found.")
+    is_staff = request.user.is_authenticated and request.user.role in ('doctor', 'receptionist', 'admin')
+    if not is_staff and doc.department and not doc.department.is_active:
+        raise Http404("Specialist doctor is currently unavailable.")
     # Ensure recurring weekly consultation slots exist
     materialize_weekly(doc, days=45)
 
     today = timezone.localdate()
     now = timezone.now()
-    is_staff = request.user.is_authenticated and request.user.role in ('doctor', 'receptionist', 'admin')
 
     # Fetch next 45 days open slots for this doctor
     upcoming_slots = list(AppointmentSlot.objects.filter(
@@ -355,6 +357,9 @@ def patient_book(request, slot_id):
         pk=slot_id
     )
     is_staff_booking = request.user.role in ('doctor', 'receptionist', 'admin')
+    if not is_staff_booking and slot.doctor.department and not slot.doctor.department.is_active:
+        messages.error(request, "This department is currently unavailable for appointment bookings.")
+        return redirect('doctor_directory')
     try:
         valid_slot(slot, is_staff_booking=is_staff_booking)
     except ValidationError as exc:
@@ -1152,17 +1157,72 @@ def chamber_delete(request, pk):
 
 @role_required('admin')
 def departments(request):
-    if request.method=='POST':
-        name=request.POST.get('name','').strip()
-        from django.utils.text import slugify
-        if not name: messages.error(request,'Department name is required.')
-        elif Department.objects.filter(name__iexact=name).exists(): messages.error(request,'Department already exists.')
+    from django.utils.text import slugify
+    if request.method == 'POST':
+        action = request.POST.get('action', '').strip()
+
+        if action == 'edit':
+            dept_id = request.POST.get('department_id')
+            dept = get_object_or_404(Department, pk=dept_id)
+            name = request.POST.get('name', '').strip()
+            desc = request.POST.get('description', '').strip()[:255]
+            if not name:
+                messages.error(request, 'Department name is required.')
+            elif Department.objects.filter(name__iexact=name).exclude(pk=dept.pk).exists():
+                messages.error(request, f'Department "{name}" already exists.')
+            else:
+                dept.name = name
+                dept.slug = slugify(name)
+                dept.description = desc
+                dept.save()
+                log(request.user, 'department.updated', dept.pk, dept.name)
+                messages.success(request, f'Department "{dept.name}" updated successfully.')
+            return redirect('departments')
+
+        elif action == 'toggle_status':
+            dept_id = request.POST.get('department_id')
+            dept = get_object_or_404(Department, pk=dept_id)
+            if dept.is_active:
+                # Check for open appointments
+                open_appts = Appointment.objects.filter(
+                    slot__doctor__department=dept,
+                    status__in=[Appointment.Status.PENDING, Appointment.Status.CONFIRMED]
+                )
+                open_count = open_appts.count()
+                if open_count > 0:
+                    messages.error(
+                        request,
+                        f'Cannot deactivate department "{dept.name}": There are {open_count} open appointment(s) scheduled for doctors in this department.'
+                    )
+                    return redirect('departments')
+                dept.is_active = False
+                dept.save(update_fields=['is_active'])
+                log(request.user, 'department.deactivated', dept.pk, dept.name)
+                messages.success(request, f'Department "{dept.name}" deactivated successfully.')
+            else:
+                dept.is_active = True
+                dept.save(update_fields=['is_active'])
+                log(request.user, 'department.activated', dept.pk, dept.name)
+                messages.success(request, f'Department "{dept.name}" activated successfully.')
+            return redirect('departments')
+
         else:
-            dep=Department.objects.create(name=name,slug=slugify(name),description=request.POST.get('description','')[:255])
-            log(request.user,'department.created',dep.pk)
-            messages.success(request,'Department created.')
-        return redirect('departments')
-    return render(request,'staff/departments.html',{'departments':Department.objects.annotate(total=Count('doctors')).order_by('name')})
+            name = request.POST.get('name', '').strip()
+            desc = request.POST.get('description', '').strip()[:255]
+            if not name:
+                messages.error(request, 'Department name is required.')
+            elif Department.objects.filter(name__iexact=name).exists():
+                messages.error(request, f'Department "{name}" already exists.')
+            else:
+                dep = Department.objects.create(name=name, slug=slugify(name), description=desc, is_active=True)
+                log(request.user, 'department.created', dep.pk, dep.name)
+                messages.success(request, f'Department "{dep.name}" created successfully.')
+            return redirect('departments')
+
+    dept_list = Department.objects.all().order_by('name')
+    return render(request, 'staff/departments.html', {
+        'departments': dept_list,
+    })
 
 
 @role_required('patient')
