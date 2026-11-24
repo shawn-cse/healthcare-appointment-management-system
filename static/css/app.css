@@ -11988,35 +11988,56 @@ body.is-page-loading .main-content {
 }
 
 .excel-table-wrap {
+  width: 100%;
+  max-height: calc(100vh - 270px);
+  min-height: 380px;
+  overflow-y: auto;
   overflow-x: auto;
-  max-width: 100%;
+  position: relative;
+  border-top: 1px solid #e2e8f0;
 }
 
 .excel-grid-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .excel-grid-table th {
-  background: #f1f5f9;
-  color: #334155;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #f4f8f6;
+  color: #0d4c3f;
   font-weight: 700;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  padding: 8px 12px;
-  border-bottom: 2px solid #cbd5e1;
+  padding: 10px 12px;
+  border-bottom: 2px solid #c2e2d0;
   border-right: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   white-space: nowrap;
 }
 
 .excel-grid-table td {
-  padding: 8px 12px;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 9px 12px;
+  border-bottom: 1px solid #edf4f0;
   border-right: 1px solid #f8fafc;
   vertical-align: middle;
   color: #1e293b;
+}
+
+.person-name-link {
+  color: #0d4c3f;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+
+.person-name-link:hover {
+  text-decoration: underline;
+  color: #166151;
 }
 
 .excel-grid-table tr:hover td {

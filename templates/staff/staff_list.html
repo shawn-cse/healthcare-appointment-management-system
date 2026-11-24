@@ -46,14 +46,11 @@
           </select>
         </div>
 
-        <!-- Sort Filter -->
-        <div class="filter-field-group">
-          <label for="filter-sort">Sort Order</label>
-          <select name="sort" id="filter-sort" class="field-control">
-            <option value="name" {% if sort == 'name' %}selected{% endif %}>Name A–Z</option>
-            <option value="role" {% if sort == 'role' %}selected{% endif %}>Role</option>
-            <option value="username" {% if sort == 'username' %}selected{% endif %}>Username</option>
-          </select>
+        <!-- Reset Button -->
+        <div class="filter-field-group filter-actions-group" style="align-self: flex-end;">
+          <button type="button" class="button button-outline" id="btn-reset-staff" onclick="resetStaffFilters()" title="Reset search and filters">
+            <svg class="icon" style="width: 14px; height: 14px;"><use href="#ic-refresh"/></svg> Reset
+          </button>
         </div>
       </div>
     </form>
@@ -75,14 +72,13 @@
       <table class="data-table excel-grid-table" id="staff-excel-table">
         <thead>
           <tr>
-            <th>Member &amp; Role</th>
-            <th>Department</th>
-            <th>Chamber &amp; Room</th>
-            <th>Assigned Personnel</th>
-            <th>Contact Phone</th>
-            <th>Email / Username</th>
-            <th style="text-align: center;">Status</th>
-            <th style="text-align: right;">Action</th>
+            <th style="min-width: 180px;">Member &amp; Role</th>
+            <th style="min-width: 130px;">Department</th>
+            <th style="min-width: 140px;">Chamber &amp; Room</th>
+            <th style="min-width: 160px;">Assigned Personnel</th>
+            <th style="min-width: 130px;">Contact Phone</th>
+            <th style="min-width: 160px;">Email / Username</th>
+            <th style="width: 85px; text-align: center;">Status</th>
           </tr>
         </thead>
         <tbody>
@@ -102,7 +98,13 @@
             <td>
               <div class="identity-text-box">
                 <span class="person-name">
-                  {% if person.role == 'doctor' %}Dr. {% endif %}{{ person.display_name }}
+                  {% if user.role == 'admin' %}
+                    <a href="{% url 'staff_edit' person.pk %}" class="person-name-link" title="Edit {{ person.display_name }}">{% if person.role == 'doctor' %}Dr. {% endif %}{{ person.display_name }}</a>
+                  {% elif person.role == 'doctor' and person.doctor_profile %}
+                    <a href="{% url 'doctor_detail' person.doctor_profile.profile_slug %}" class="person-name-link" title="View doctor profile">Dr. {{ person.display_name }}</a>
+                  {% else %}
+                    {% if person.role == 'doctor' %}Dr. {% endif %}{{ person.display_name }}
+                  {% endif %}
                 </span>
                 <div>
                   {% if person.role == 'doctor' %}
@@ -196,30 +198,10 @@
                 {% if person.is_active %}Active{% else %}Inactive{% endif %}
               </span>
             </td>
-
-            <!-- Action Buttons -->
-            <td style="text-align: right;">
-              <div class="table-actions-group">
-                <!-- For Doctors: Link to view public profile as patient sees it -->
-                {% if person.role == 'doctor' and person.doctor_profile %}
-                  <a class="button button-outline button-xs" href="{% url 'doctor_detail' person.doctor_profile.profile_slug %}" title="View doctor public profile as patient sees it">
-                    <svg class="icon" style="width: 12px; height: 12px;"><use href="#ic-stethoscope"/></svg> Profile
-                  </a>
-                {% endif %}
-
-                <!-- Admin Action Buttons -->
-                {% if user.role == 'admin' %}
-                  <a class="button button-outline button-xs" href="{% url 'staff_edit' person.pk %}" title="Edit staff account">Edit</a>
-                  {% if person.role == 'doctor' and person.doctor_profile %}
-                    <a class="button button-outline button-xs" href="{% url 'doctor_rules' person.doctor_profile.pk %}" title="Doctor rules and fees">Rules</a>
-                  {% endif %}
-                {% endif %}
-              </div>
-            </td>
           </tr>
           {% empty %}
           <tr id="staff-initial-empty-row">
-            <td colspan="8" class="empty-state-cell">
+            <td colspan="7" class="empty-state-cell">
               <div class="empty-state">
                 <span class="empty-icon"><svg class="icon"><use href="#ic-users"/></svg></span>
                 <h3>No staff or doctors found</h3>
@@ -232,7 +214,7 @@
 
           <!-- Dynamic Search Empty State (Hidden by default) -->
           <tr id="staff-empty-live-row" style="display: none;">
-            <td colspan="8" class="empty-state-cell">
+            <td colspan="7" class="empty-state-cell">
               <div class="empty-state">
                 <span class="empty-icon"><svg class="icon"><use href="#ic-search"/></svg></span>
                 <h3>No matching personnel found</h3>
@@ -268,7 +250,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const searchInput = document.getElementById('staff-search-input');
   const clearBtn = document.getElementById('clear-search-btn');
   const roleSelect = document.getElementById('filter-role-select');
-  const sortSelect = document.getElementById('filter-sort');
   const rows = document.querySelectorAll('#staff-excel-table tbody tr.staff-data-row');
   const emptyRow = document.getElementById('staff-empty-live-row');
   const liveCount = document.getElementById('staff-live-count');
@@ -319,25 +300,6 @@ document.addEventListener('DOMContentLoaded', function() {
     roleSelect.addEventListener('change', filterStaffRows);
   }
 
-  if (sortSelect) {
-    sortSelect.addEventListener('change', function() {
-      const currentUrl = new URL(window.location.href);
-      currentUrl.searchParams.set('sort', this.value);
-      if (searchInput && searchInput.value) {
-        currentUrl.searchParams.set('q', searchInput.value);
-      } else {
-        currentUrl.searchParams.delete('q');
-      }
-      if (roleSelect && roleSelect.value) {
-        currentUrl.searchParams.set('role', roleSelect.value);
-      } else {
-        currentUrl.searchParams.delete('role');
-      }
-      currentUrl.searchParams.delete('page');
-      window.location.href = currentUrl.toString();
-    });
-  }
-
   if (clearBtn) {
     clearBtn.addEventListener('click', function() {
       if (searchInput) {
@@ -353,6 +315,16 @@ document.addEventListener('DOMContentLoaded', function() {
     if (roleSelect) roleSelect.value = '';
     filterStaffRows();
     if (searchInput) searchInput.focus();
+  };
+
+  window.resetStaffFilters = function() {
+    if (searchInput) searchInput.value = '';
+    if (roleSelect) roleSelect.value = '';
+    filterStaffRows();
+    const currentUrl = new URL(window.location.href);
+    if (currentUrl.searchParams.has('q') || currentUrl.searchParams.has('role') || currentUrl.searchParams.has('page') || currentUrl.searchParams.has('sort')) {
+      window.location.href = window.location.pathname;
+    }
   };
 });
 </script>
