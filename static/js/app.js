@@ -54,8 +54,132 @@
   doc.querySelectorAll('[data-check-all]').forEach(box=>box.addEventListener('change',()=>{const form=box.closest('form');(form||doc).querySelectorAll('.bulk-check').forEach(cb=>cb.checked=box.checked);updateSelected()}));
   doc.querySelectorAll('.bulk-check').forEach(cb=>cb.addEventListener('change',updateSelected));
   function updateSelected(){const counter=doc.getElementById('selected-count');if(counter)counter.textContent=doc.querySelectorAll('.bulk-check:checked').length;}
-  // Confirm destructive or financial operations using accessible native prompts.
-  doc.querySelectorAll('[data-confirm]').forEach(button=>button.addEventListener('click',e=>{if(!window.confirm(button.dataset.confirm)){e.preventDefault();e.stopPropagation()}}));
+  // --- Universal Custom Confirmation Modal ---
+  window.showConfirmModal = function({
+    title = 'Please Confirm',
+    message = 'Are you sure you want to proceed?',
+    confirmText = 'Yes, Proceed',
+    cancelText = 'Cancel',
+    type = 'danger',
+    onConfirm = null
+  }) {
+    let modal = doc.getElementById('gh-confirm-modal');
+    if (!modal) {
+      modal = doc.createElement('div');
+      modal.id = 'gh-confirm-modal';
+      modal.innerHTML = `
+        <div class="gh-confirm-card" role="dialog" aria-modal="true" aria-labelledby="gh-confirm-title">
+          <div class="gh-confirm-icon-wrap" id="gh-confirm-icon"></div>
+          <h3 class="gh-confirm-title" id="gh-confirm-title"></h3>
+          <p class="gh-confirm-message" id="gh-confirm-message"></p>
+          <div class="gh-confirm-actions">
+            <button type="button" class="gh-confirm-btn gh-confirm-btn-cancel" id="gh-confirm-cancel"></button>
+            <button type="button" class="gh-confirm-btn gh-confirm-btn-confirm" id="gh-confirm-ok"></button>
+          </div>
+        </div>
+      `;
+      doc.body.appendChild(modal);
+    }
+
+    const iconWrap = modal.querySelector('#gh-confirm-icon');
+    const titleEl = modal.querySelector('#gh-confirm-title');
+    const msgEl = modal.querySelector('#gh-confirm-message');
+    const cancelBtn = modal.querySelector('#gh-confirm-cancel');
+    const okBtn = modal.querySelector('#gh-confirm-ok');
+
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    cancelBtn.textContent = cancelText;
+    okBtn.textContent = confirmText;
+
+    iconWrap.className = `gh-confirm-icon-wrap type-${type}`;
+    okBtn.className = `gh-confirm-btn gh-confirm-btn-confirm type-${type}`;
+
+    if (type === 'danger') {
+      iconWrap.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      `;
+    } else if (type === 'warning') {
+      iconWrap.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      `;
+    } else {
+      iconWrap.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+      `;
+    }
+
+    function closeModal() {
+      modal.classList.remove('is-open');
+      modal.style.display = 'none';
+      doc.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKey);
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Escape') closeModal();
+    }
+
+    cancelBtn.onclick = closeModal;
+    modal.onclick = function(e) {
+      if (e.target === modal) closeModal();
+    };
+
+    okBtn.onclick = function() {
+      closeModal();
+      if (typeof onConfirm === 'function') onConfirm();
+    };
+
+    window.addEventListener('keydown', handleKey);
+    doc.body.style.overflow = 'hidden';
+    modal.style.display = 'flex';
+    modal.classList.add('is-open');
+    okBtn.focus();
+  };
+
+  // Confirm destructive operations using custom modal
+  doc.querySelectorAll('[data-confirm]').forEach(button => {
+    button.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const message = button.dataset.confirm;
+      const form = button.closest('form');
+      const isDanger = button.classList.contains('button-danger') || button.classList.contains('button-danger-outline');
+      window.showConfirmModal({
+        title: isDanger ? 'Delete Confirmation' : 'Please Confirm',
+        message: message,
+        confirmText: isDanger ? 'Yes, Delete' : 'Yes, Proceed',
+        cancelText: 'Cancel',
+        type: isDanger ? 'danger' : 'warning',
+        onConfirm: () => {
+          if (button.type === 'submit' && form) {
+            if (button.name) {
+              const hidden = doc.createElement('input');
+              hidden.type = 'hidden';
+              hidden.name = button.name;
+              hidden.value = button.value;
+              form.appendChild(hidden);
+            }
+            form.submit();
+          } else if (button.href) {
+            window.location.href = button.href;
+          }
+        }
+      });
+    });
+  });
 
   // --- Profile Dropdown Menu in Topbar ---
   const profileDropdown = doc.getElementById('profile-dropdown-wrap');

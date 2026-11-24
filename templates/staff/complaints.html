@@ -140,10 +140,10 @@
         <!-- Bulk Action Controls -->
         <div class="excel-header-right" id="bulk-actions-toolbar" style="display: none;">
           <span class="bulk-selected-label"><b id="bulk-count-num">0</b> ticket(s) selected:</span>
-          <button type="submit" name="bulk_status" value="reviewing" class="button button-warning button-sm" onclick="return confirm('Change status of selected tickets to Under Review & Inquiring?')">
+          <button type="submit" name="bulk_status" value="reviewing" class="button button-warning button-sm" data-confirm="Change status of selected tickets to Under Review &amp; Inquiring?">
             <svg class="icon"><use href="#ic-clock"/></svg> Mark: Under Review
           </button>
-          <button type="submit" name="bulk_status" value="resolved" class="button button-primary button-sm" onclick="return confirm('Change status of selected tickets to Issue Solved?')">
+          <button type="submit" name="bulk_status" value="resolved" class="button button-primary button-sm" data-confirm="Change status of selected tickets to Issue Solved?">
             <svg class="icon"><use href="#ic-check"/></svg> Mark: Issue Solved
           </button>
         </div>

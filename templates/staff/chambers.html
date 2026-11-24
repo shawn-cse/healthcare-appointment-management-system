@@ -238,14 +238,26 @@ document.addEventListener('DOMContentLoaded', function () {
   if (btnCloseEdit) btnCloseEdit.addEventListener('click', closeEditModal);
   if (btnCancelEdit) btnCancelEdit.addEventListener('click', closeEditModal);
 
-  // Delete Room from Edit Modal
+  // Delete Room from Edit Modal using Beautiful Custom Warning Modal
   const btnDeleteModal = document.getElementById('btn-delete-from-modal');
   const editRoomForm = document.getElementById('edit-room-form');
   const editActionInput = document.getElementById('edit-room-action');
   if (btnDeleteModal && editRoomForm) {
     btnDeleteModal.addEventListener('click', function () {
       const roomNum = editRoomInput ? editRoomInput.value : 'this room';
-      if (confirm(`Are you sure you want to delete room "${roomNum}"? Any assigned doctors will be unlinked.`)) {
+      if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal({
+          title: 'Delete Consultation Room',
+          message: `Are you sure you want to delete room "${roomNum}"? Any assigned doctors will be unlinked from this room.`,
+          confirmText: 'Yes, Delete Room',
+          cancelText: 'Cancel',
+          type: 'danger',
+          onConfirm: function () {
+            if (editActionInput) editActionInput.value = 'delete';
+            editRoomForm.submit();
+          }
+        });
+      } else {
         if (editActionInput) editActionInput.value = 'delete';
         editRoomForm.submit();
       }
