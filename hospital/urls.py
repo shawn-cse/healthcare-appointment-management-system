@@ -38,7 +38,6 @@ urlpatterns = [
     path('schedules/slot/<int:pk>/toggle/', views.slot_toggle, name='slot_toggle'),
     path('schedules/copy/', views.slot_copy, name='slot_copy'),
     path('doctors/<int:pk>/rules/', views.doctor_rules, name='doctor_rules'),
-    path('policy/', views.policy, name='policy'),
     path('staff/', views.staff_list, name='staff_list'),
     path('staff/new/', views.staff_edit, name='staff_new'),
     path('staff/<int:pk>/', views.staff_edit, name='staff_edit'),

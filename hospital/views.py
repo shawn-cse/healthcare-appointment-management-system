@@ -21,7 +21,7 @@ from django.conf import settings
 from .models import (User, DoctorProfile, Department, Appointment, AppointmentSlot,
                      WeeklyAvailability, PaymentTransaction, RefundRequest, Complaint, ComplaintMessage, HospitalPolicy, AuditEvent, Chamber)
 from .forms import (RegisterForm, ProfileForm, StaffForm, DoctorSettingsForm, WeeklyForm, SlotForm,
-                    PatientBookingForm, ReceptionBookingForm, ComplaintForm, PolicyForm,
+                    PatientBookingForm, ReceptionBookingForm, ComplaintForm,
                     StaffAssistedBookingForm, ChamberForm)
 from .services import (create_appointment, materialize_weekly, record_cash_payment, cancel_appointment,
                        change_visit_status, approve_refund, finalize_cash_refund,
@@ -899,20 +899,6 @@ def doctor_rules(request,pk):
     return render(request,'shared/form.html',{'form':form,'page_title':'Consultation fees & rules',
             'page_desc':f'{doc} · Fees in BDT. These changes apply to new bookings; confirmed booking prices stay unchanged.',
             'submit_label':'Save doctor settings'})
-
-
-@role_required('admin')
-def policy(request):
-    obj = HospitalPolicy.current()
-    form = PolicyForm(request.POST or None,instance=obj)
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        log(request.user,'hospital.policy_defaults',obj.pk)
-        messages.success(request,'Hospital defaults updated. Existing doctor overrides are unchanged.')
-        return redirect('policy')
-    return render(request,'shared/form.html',{'form':form,'page_title':'Hospital policy defaults',
-        'page_desc':'Default rules for newly added doctors. Existing doctor settings are intentionally preserved.',
-        'submit_label':'Save policy'})
 
 
 @role_required('admin', 'doctor', 'receptionist')

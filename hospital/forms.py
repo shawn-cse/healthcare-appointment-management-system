@@ -715,24 +715,3 @@ class ComplaintForm(forms.ModelForm, FormStyleMixin):
         self.fields['appointment'].required = False
         if 'attachment' in self.fields: self.fields['attachment'].required = False
         self.style_fields()
-
-
-class PolicyForm(forms.ModelForm, FormStyleMixin):
-    class Meta:
-        model = HospitalPolicy
-        fields = ['default_notice_hours','default_advance_days','default_payment_hours',
-                  'default_cancel_mode','default_cancel_value','default_hospital_mode','default_hospital_value']
-    def __init__(self,*args,**kwargs):
-        super().__init__(*args,**kwargs)
-        self.style_fields()
-    def clean(self):
-        data = super().clean()
-        if data.get('default_advance_days') is not None and data['default_advance_days'] < 1:
-            self.add_error('default_advance_days','Advance booking period must be at least one day.')
-        if data.get('default_payment_hours') is not None and data['default_payment_hours'] < 1:
-            self.add_error('default_payment_hours','Payment deadline must be at least one hour.')
-        for mode_field,value_field in (('default_cancel_mode','default_cancel_value'),
-                                       ('default_hospital_mode','default_hospital_value')):
-            if data.get(mode_field) == 'percent' and data.get(value_field) is not None and data[value_field] > 100:
-                self.add_error(value_field,'A percentage cannot exceed 100%.')
-        return data
