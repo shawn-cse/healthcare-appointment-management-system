@@ -11997,6 +11997,79 @@ body.is-page-loading .main-content {
   border-top: 1px solid #e2e8f0;
 }
 
+/* Staff Directory Table: Compact layout fits 100% in one window with zero horizontal scroll */
+.staff-directory-page .excel-table-wrap {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+.staff-directory-page .excel-grid-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.staff-directory-page .excel-grid-table th {
+  padding: 8px 6px;
+  font-size: 11px;
+}
+
+.staff-directory-page .excel-grid-table td {
+  padding: 6px 6px;
+  font-size: 11.5px;
+}
+
+.staff-directory-page .person-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.staff-directory-page .badge-role {
+  font-size: 10px;
+  padding: 1px 5px;
+}
+
+.staff-directory-page .dept-subtitle {
+  font-size: 11px;
+}
+
+.staff-directory-page .room-chip {
+  font-size: 10.5px;
+  padding: 1px 5px;
+}
+
+.staff-directory-page .person-assoc-box {
+  font-size: 11px;
+  gap: 1px;
+}
+
+.staff-directory-page .assoc-lbl {
+  font-size: 9px;
+}
+
+.staff-directory-page .phone-link {
+  font-size: 11px;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.staff-directory-page .email-link {
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.staff-directory-page .email-user-wrap small {
+  font-size: 10px;
+}
+
+.staff-directory-page .status {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
 .excel-grid-table {
   width: 100%;
   border-collapse: collapse;
