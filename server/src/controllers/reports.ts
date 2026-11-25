@@ -441,8 +441,12 @@ function buildAuditFilter(req: Request): Prisma.AuditEventWhereInput {
   }
 
   const category = String(req.query.category || 'all').trim().toLowerCase();
-  if (category === 'booking') {
+  if (category === 'bookings' || category === 'booking') {
     filters.push({ action: { startsWith: 'appointment', mode: 'insensitive' } });
+  } else if (category === 'payments') {
+    filters.push({ action: { startsWith: 'payment', mode: 'insensitive' } });
+  } else if (category === 'refunds') {
+    filters.push({ action: { startsWith: 'refund', mode: 'insensitive' } });
   } else if (category === 'finance') {
     filters.push({
       OR: [
@@ -450,13 +454,40 @@ function buildAuditFilter(req: Request): Prisma.AuditEventWhereInput {
         { action: { startsWith: 'refund', mode: 'insensitive' } },
       ],
     });
-  } else if (category === 'schedule') {
+  } else if (category === 'schedules' || category === 'schedule') {
     filters.push({
       OR: [
         { action: { startsWith: 'schedule', mode: 'insensitive' } },
         { action: { startsWith: 'slot', mode: 'insensitive' } },
       ],
     });
+  } else if (category === 'staff') {
+    filters.push({
+      OR: [
+        { action: { startsWith: 'staff', mode: 'insensitive' } },
+        { action: { startsWith: 'doctor', mode: 'insensitive' } },
+      ],
+    });
+  } else if (category === 'patients') {
+    filters.push({
+      OR: [
+        { action: { startsWith: 'patient', mode: 'insensitive' } },
+        { action: { startsWith: 'profile', mode: 'insensitive' } },
+      ],
+    });
+  } else if (category === 'rooms') {
+    filters.push({
+      OR: [
+        { action: { startsWith: 'room', mode: 'insensitive' } },
+        { action: { startsWith: 'chamber', mode: 'insensitive' } },
+      ],
+    });
+  } else if (category === 'departments') {
+    filters.push({ action: { startsWith: 'department', mode: 'insensitive' } });
+  } else if (category === 'complaints') {
+    filters.push({ action: { startsWith: 'complaint', mode: 'insensitive' } });
+  } else if (category === 'reports') {
+    filters.push({ action: { startsWith: 'report', mode: 'insensitive' } });
   } else if (category === 'account') {
     filters.push({
       OR: [
@@ -489,10 +520,21 @@ function buildAuditFilter(req: Request): Prisma.AuditEventWhereInput {
   const today = localTodayDate();
   if (dateFilter === 'today') {
     filters.push({ createdAt: { gte: today } });
+  } else if (dateFilter === '2d') {
+    filters.push({ createdAt: { gte: addDaysDate(today, -1) } });
   } else if (dateFilter === '7d') {
     filters.push({ createdAt: { gte: addDaysDate(today, -7) } });
   } else if (dateFilter === '30d') {
     filters.push({ createdAt: { gte: addDaysDate(today, -30) } });
+  } else if (dateFilter === 'custom') {
+    const fromParsed = parseIsoDate(String(req.query.from || ''));
+    const toParsed = parseIsoDate(String(req.query.to || ''));
+    if (fromParsed) {
+      filters.push({ createdAt: { gte: fromParsed } });
+    }
+    if (toParsed) {
+      filters.push({ createdAt: { lt: addDaysDate(toParsed, 1) } });
+    }
   }
 
   return filters.length ? { AND: filters } : {};

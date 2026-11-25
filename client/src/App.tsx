@@ -228,13 +228,14 @@ export default function App() {
         }
       />
       <Route
-        path="/audit"
+        path="/activity-log"
         element={
           <RequireRole roles={['admin']}>
             <AuditLogPage />
           </RequireRole>
         }
       />
+      <Route path="/audit" element={<Navigate to="/activity-log" replace />} />
       <Route
         path="/profile"
         element={

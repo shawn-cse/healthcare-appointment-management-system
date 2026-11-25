@@ -132,7 +132,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       navItems.push(
         { to: '/rooms', label: 'Consultation Room', icon: 'ic-building' },
         { to: '/departments', label: 'Manage Departments', icon: 'ic-building' },
-        { to: '/audit', label: 'Activity Log', icon: 'ic-clipboard' }
+        { to: '/activity-log', label: 'Activity Log', icon: 'ic-clipboard' }
       );
     }
   }
