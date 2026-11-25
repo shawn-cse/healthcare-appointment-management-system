@@ -12354,13 +12354,15 @@ body.is-page-loading .main-content {
   font-weight: 600;
 }
 
-.excel-grid-table {
+.excel-grid-table,
+.excel-sheet {
   width: 100%;
   border-collapse: collapse;
   font-size: 12.5px;
 }
 
-.excel-grid-table th {
+.excel-grid-table th,
+.excel-sheet th {
   position: sticky;
   top: 0;
   z-index: 5;
@@ -12368,6 +12370,7 @@ body.is-page-loading .main-content {
   color: #0d4c3f;
   font-weight: 700;
   font-size: 11px;
+  text-align: left;
   text-transform: uppercase;
   letter-spacing: 0.4px;
   padding: 10px 12px;
@@ -12377,12 +12380,106 @@ body.is-page-loading .main-content {
   white-space: nowrap;
 }
 
-.excel-grid-table td {
+.excel-grid-table td,
+.excel-sheet td {
   padding: 9px 12px;
   border-bottom: 1px solid #edf4f0;
   border-right: 1px solid #f8fafc;
   vertical-align: middle;
   color: #1e293b;
+}
+
+/* Crisp Horizontal Filter Tabs across Directory, Appointments, Refunds & Complaints */
+.filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.filter-tab:hover {
+  border-color: #10b981;
+  color: #0d5c46;
+  background: #f0fdf4;
+}
+
+.filter-tab.active {
+  background: #0d5c46;
+  border-color: #0d5c46;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(13, 92, 70, 0.22);
+}
+
+.staff-live-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.staff-live-search-wrap {
+  position: relative;
+  flex: 1 1 300px;
+  max-width: 520px;
+}
+
+.staff-live-search-wrap .search-ic {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.staff-live-search-wrap input {
+  padding-left: 36px;
+  padding-right: 32px;
+}
+
+.staff-live-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: #e2e8f0;
+  color: #334155;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.staff-directory-page .excel-table-wrap {
+  overflow-x: auto;
+}
+
+.staff-directory-page .excel-grid-table {
+  min-width: 980px;
 }
 
 .person-name-link {

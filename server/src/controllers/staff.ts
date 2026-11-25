@@ -131,6 +131,8 @@ export async function listStaff(req: Request, res: Response): Promise<void> {
         { lastName: { contains: q, mode: 'insensitive' } },
         { chamber: { roomNumber: { contains: q, mode: 'insensitive' } } },
         { doctorProfile: { department: { name: { contains: q, mode: 'insensitive' } } } },
+        { doctorProfile: { designation: { contains: q, mode: 'insensitive' } } },
+        { doctorProfile: { qualifications: { contains: q, mode: 'insensitive' } } },
         { doctorProfile: { chamber: { name: { contains: q, mode: 'insensitive' } } } },
         { doctorProfile: { chamber: { building: { contains: q, mode: 'insensitive' } } } },
         { doctorProfile: { roomNumber: { contains: q, mode: 'insensitive' } } },

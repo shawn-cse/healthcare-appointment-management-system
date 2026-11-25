@@ -381,263 +381,295 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     setConsultationDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
   };
 
-  const setParam = (updates: Record<string, string | null>) => {
-    const next = new URLSearchParams(searchParams);
-    for (const [k, v] of Object.entries(updates)) {
-      if (v) next.set(k, v);
-      else next.delete(k);
-    }
-    if (!('page' in updates)) next.set('page', '1');
-    setSearchParams(next);
-  };
+  const setParam = useCallback(
+    (updates: Record<string, string | null>) => {
+      const next = new URLSearchParams(searchParams);
+      for (const [k, v] of Object.entries(updates)) {
+        if (v) next.set(k, v);
+        else next.delete(k);
+      }
+      if (!('page' in updates)) next.set('page', '1');
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
+
+  // Instant live typing search (no Search / Apply / Reset buttons needed)
+  useEffect(() => {
+    const clean = searchInput.trim();
+    if (clean === q) return;
+    const timer = window.setTimeout(() => {
+      setParam({ q: clean || null });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [searchInput, q, setParam]);
 
   const counts = data?.counts || { all: 0, doctor: 0, receptionist: 0, admin: 0 };
 
   return (
     <AppLayout>
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">CLINICAL ROSTER &amp; ACCOUNTS</p>
-          <h1>Staff &amp; Doctor Management</h1>
-          <p>
-            Onboard doctors, receptionists, and administrators, assign consultation rooms without
-            schedule conflicts, and control portal access from one unified console.
-          </p>
-        </div>
-        {isAdmin && (
-          <div className="heading-actions">
-            <button type="button" className="button button-primary" onClick={openCreateModal}>
-              <Icon id="ic-plus" /> Onboard Staff / Doctor
-            </button>
+      <div className="staff-directory-page">
+        <div className="page-heading">
+          <div>
+            <p className="eyebrow">CLINICAL ROSTER &amp; ACCOUNTS</p>
+            <h1>Staff &amp; Doctor Management</h1>
+            <p>
+              Onboard doctors, receptionists, and administrators, assign consultation rooms without
+              schedule conflicts, and control portal access from one unified console.
+            </p>
           </div>
-        )}
-      </div>
-
-      {/* Role Filter Tabs */}
-      <div className="filter-tabs" style={{ marginBottom: 14 }}>
-        {[
-          ['', `All Staff (${counts.all})`],
-          ['doctor', `Doctors (${counts.doctor})`],
-          ['receptionist', `Receptionists (${counts.receptionist})`],
-          ['admin', `Administrators (${counts.admin})`],
-        ].map(([val, lbl]) => (
-          <button
-            key={val || 'all'}
-            type="button"
-            className={`filter-tab ${roleFilter === val ? 'active' : ''}`}
-            onClick={() => setParam({ role: val || null })}
-          >
-            {lbl}
-          </button>
-        ))}
-      </div>
-
-      {/* Search & Sort Bar */}
-      <div className="panel" style={{ padding: 14, marginBottom: 16 }}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setParam({ q: searchInput.trim() || null });
-          }}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}
-        >
-          <input
-            type="search"
-            className="field-control"
-            style={{ flex: '1 1 240px' }}
-            placeholder="Search name, username, email, phone, department, room number..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-          <select
-            className="field-control"
-            style={{ width: 'auto' }}
-            value={sort}
-            onChange={(e) => setParam({ sort: e.target.value })}
-          >
-            <option value="name">Sort by Name</option>
-            <option value="username">Sort by Username</option>
-            <option value="role">Sort by Role</option>
-            <option value="recent">Newest Added</option>
-          </select>
-          <button type="submit" className="button button-primary button-small">
-            <Icon id="ic-search" /> Search
-          </button>
-          {(roleFilter || q) && (
-            <button
-              type="button"
-              className="button button-outline button-small"
-              onClick={() => {
-                setSearchInput('');
-                setSearchParams(new URLSearchParams());
-              }}
-            >
-              Reset
-            </button>
-          )}
-        </form>
-      </div>
-
-      <div className="panel">
-        {loading ? (
-          <LoadingScreen />
-        ) : !data || data.staff.length === 0 ? (
-          <div className="empty-state" style={{ padding: 48 }}>
-            <h3>No staff accounts matched</h3>
-            <p className="muted">Try another keyword or clear filters.</p>
-          </div>
-        ) : (
-          <div className="excel-table-wrap">
-            <table className="excel-sheet">
-              <thead>
-                <tr>
-                  <th>Name &amp; Username</th>
-                  <th>Role</th>
-                  <th>Contact (Email / Phone)</th>
-                  <th>Room &amp; Clinical Assignment</th>
-                  <th>Account Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.staff.map((m) => {
-                  const roomLabel = m.room_number || m.doctor_profile?.active_room || '';
-                  return (
-                    <tr key={m.id}>
-                      <td>
-                        <strong>{m.display_name}</strong>
-                        <div className="muted" style={{ fontSize: '0.8rem' }}>
-                          @{m.username}
-                          {m.doctor_profile?.designation ? ` · ${m.doctor_profile.designation}` : ''}
-                        </div>
-                      </td>
-                      <td>
-                        <span className="role-pill-badge">{m.role_display}</span>
-                      </td>
-                      <td>
-                        <div>{m.email || '—'}</div>
-                        <div className="muted" style={{ fontSize: '0.8rem' }}>
-                          {m.phone || 'No phone set'}
-                        </div>
-                      </td>
-                      <td>
-                        {m.doctor_profile ? (
-                          <div>
-                            <strong>
-                              {m.doctor_profile.department?.name || 'No Department'}
-                            </strong>
-                            <div className="muted" style={{ fontSize: '0.8rem' }}>
-                              {roomLabel ? `Room: ${roomLabel}` : 'No Room'}
-                              {m.doctor_profile.assigned_days_text
-                                ? ` · ${m.doctor_profile.assigned_days_text}`
-                                : ''}
-                            </div>
-                          </div>
-                        ) : (
-                          <div>
-                            <strong>{roomLabel ? `Room: ${roomLabel}` : 'No Room Assigned'}</strong>
-                            {m.role === 'receptionist' && (
-                              <div className="muted" style={{ fontSize: '0.8rem' }}>
-                                Desk Doctors: {m.assigned_doctors_count}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        {isAdmin ? (
-                          <button
-                            type="button"
-                            className={`sm-status-toggle ${m.is_active ? 'active' : 'inactive'}`}
-                            disabled={m.id === user?.id || togglingId === m.id}
-                            title={
-                              m.id === user?.id
-                                ? 'Cannot deactivate your own account'
-                                : m.is_active
-                                  ? 'Click to deactivate'
-                                  : 'Click to activate'
-                            }
-                            onClick={() => handleToggleActive(m)}
-                          >
-                            <span>{m.is_active ? '●' : '○'}</span>
-                            <span>{m.is_active ? 'Active' : 'Deactivated'}</span>
-                          </button>
-                        ) : (
-                          <span className={`sm-status-toggle ${m.is_active ? 'active' : 'inactive'}`}>
-                            {m.is_active ? 'Active' : 'Deactivated'}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {isAdmin && (
-                            <button
-                              type="button"
-                              className="button button-small button-outline"
-                              onClick={() => openEditModal(m)}
-                            >
-                              Edit Account
-                            </button>
-                          )}
-                          {m.doctor_profile && (isAdmin || user?.id === m.id) && (
-                            <>
-                              <Link
-                                className="button button-small button-outline"
-                                to={`/doctors/${m.doctor_profile.id}/rules`}
-                              >
-                                Fees &amp; Rules
-                              </Link>
-                              <Link
-                                className="button button-small button-outline"
-                                to={`/schedules?doctor=${m.doctor_profile.id}`}
-                              >
-                                Schedules
-                              </Link>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {data && data.total_pages > 1 && (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '14px 18px',
-              borderTop: '1px solid var(--line)',
-            }}
-          >
-            <span className="muted">
-              Page {data.page} of {data.total_pages} ({data.total} staff)
-            </span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                className="button button-small button-outline"
-                disabled={data.page <= 1}
-                onClick={() => setParam({ page: String(data.page - 1) })}
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                className="button button-small button-outline"
-                disabled={data.page >= data.total_pages}
-                onClick={() => setParam({ page: String(data.page + 1) })}
-              >
-                Next
+          {isAdmin && (
+            <div className="heading-actions">
+              <button type="button" className="button button-primary" onClick={openCreateModal}>
+                <Icon id="ic-plus" /> Onboard Staff / Doctor
               </button>
             </div>
+          )}
+        </div>
+
+        {/* Instant Role Filter Pills */}
+        <div className="filter-tabs" style={{ marginBottom: 14 }}>
+          {[
+            ['', `All (${counts.all})`],
+            ['doctor', `Doctor (${counts.doctor})`],
+            ['receptionist', `Receptionist (${counts.receptionist})`],
+            ['admin', `Administrator (${counts.admin})`],
+          ].map(([val, lbl]) => (
+            <button
+              key={val || 'all'}
+              type="button"
+              className={`filter-tab ${roleFilter === val ? 'active' : ''}`}
+              onClick={() => setParam({ role: val || null })}
+            >
+              {lbl}
+            </button>
+          ))}
+        </div>
+
+        {/* Excel Sheet Roster Panel */}
+        <div className="excel-sheet-panel">
+          <div className="excel-sheet-header-bar">
+            <div className="staff-live-toolbar">
+              <div className="staff-live-search-wrap">
+                <Icon id="ic-search" className="icon search-ic" />
+                <input
+                  type="text"
+                  className="field-control"
+                  placeholder="Type to filter by name, username, room no, email, phone, department..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  autoComplete="off"
+                />
+                {searchInput && (
+                  <button
+                    type="button"
+                    className="staff-live-search-clear"
+                    title="Clear search"
+                    onClick={() => setSearchInput('')}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="sheet-indicator">
+                  <span className="live-dot-pulse" />
+                  <span>
+                    Showing <strong>{data?.staff.length ?? 0}</strong> of{' '}
+                    <strong>{data?.total ?? 0}</strong> accounts
+                  </span>
+                </div>
+                <select
+                  className="field-control"
+                  style={{ width: 'auto', paddingTop: 7, paddingBottom: 7 }}
+                  value={sort}
+                  onChange={(e) => setParam({ sort: e.target.value })}
+                  aria-label="Sort staff list"
+                >
+                  <option value="name">Sort: Name</option>
+                  <option value="username">Sort: Username</option>
+                  <option value="role">Sort: Role</option>
+                  <option value="recent">Sort: Newest</option>
+                </select>
+              </div>
+            </div>
           </div>
-        )}
+
+          {loading && !data ? (
+            <LoadingScreen />
+          ) : !data || data.staff.length === 0 ? (
+            <div className="empty-state" style={{ padding: 48 }}>
+              <h3>No staff accounts matched</h3>
+              <p className="muted">Try typing another keyword or selecting All above.</p>
+            </div>
+          ) : (
+            <div className="excel-table-wrap">
+              <table className="excel-grid-table">
+                <colgroup>
+                  <col style={{ width: '21%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '19%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '11%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Name &amp; Username</th>
+                    <th>Room No</th>
+                    <th>Role</th>
+                    <th>Contact</th>
+                    <th>Clinical Assignment</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.staff.map((m) => {
+                    const roomLabel = m.room_number || m.doctor_profile?.active_room || '';
+                    return (
+                      <tr key={m.id}>
+                        <td>
+                          <div className="person-name">{m.display_name}</div>
+                          <div className="muted" style={{ fontSize: '0.78rem' }}>
+                            @{m.username}
+                            {m.doctor_profile?.designation
+                              ? ` · ${m.doctor_profile.designation}`
+                              : ''}
+                          </div>
+                        </td>
+                        <td>
+                          {roomLabel ? (
+                            <span className="room-chip role-pill-badge">{roomLabel}</span>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className="badge-role role-pill-badge">{m.role_display}</span>
+                        </td>
+                        <td>
+                          <div className="email-link">{m.email || '—'}</div>
+                          <div className="muted" style={{ fontSize: '0.78rem', marginTop: 2 }}>
+                            {m.phone || '—'}
+                          </div>
+                        </td>
+                        <td>
+                          {m.doctor_profile ? (
+                            <div className="person-assoc-box">
+                              <div className="dept-subtitle">
+                                {m.doctor_profile.department?.name || 'No Department'}
+                              </div>
+                              <div className="muted" style={{ fontSize: '0.78rem' }}>
+                                {m.doctor_profile.assigned_days_text || 'Unscheduled'}
+                              </div>
+                            </div>
+                          ) : m.role === 'receptionist' ? (
+                            <div className="muted" style={{ fontSize: '0.8rem' }}>
+                              Desk Doctors: <strong>{m.assigned_doctors_count}</strong>
+                            </div>
+                          ) : (
+                            <span className="muted">Hospital Admin</span>
+                          )}
+                        </td>
+                        <td>
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              className={`sm-status-toggle ${m.is_active ? 'active' : 'inactive'}`}
+                              disabled={m.id === user?.id || togglingId === m.id}
+                              title={
+                                m.id === user?.id
+                                  ? 'Cannot deactivate your own account'
+                                  : m.is_active
+                                    ? 'Click to deactivate'
+                                    : 'Click to activate'
+                              }
+                              onClick={() => handleToggleActive(m)}
+                            >
+                              <span>{m.is_active ? '●' : '○'}</span>
+                              <span>{m.is_active ? 'Active' : 'Deactivated'}</span>
+                            </button>
+                          ) : (
+                            <span className={`sm-status-toggle ${m.is_active ? 'active' : 'inactive'}`}>
+                              {m.is_active ? 'Active' : 'Deactivated'}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                className="button button-small button-outline"
+                                onClick={() => openEditModal(m)}
+                              >
+                                Edit
+                              </button>
+                            )}
+                            {m.doctor_profile && (isAdmin || user?.id === m.id) && (
+                              <>
+                                <Link
+                                  className="button button-small button-outline"
+                                  to={`/doctors/${m.doctor_profile.id}/rules`}
+                                >
+                                  Rules
+                                </Link>
+                                <Link
+                                  className="button button-small button-outline"
+                                  to={`/schedules?doctor=${m.doctor_profile.id}`}
+                                >
+                                  Slots
+                                </Link>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {data && data.total_pages > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 16px',
+                borderTop: '1px solid #e2e8f0',
+                background: '#f8fafc',
+              }}
+            >
+              <span className="muted">
+                Page {data.page} of {data.total_pages} ({data.total} staff)
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="button button-small button-outline"
+                  disabled={data.page <= 1}
+                  onClick={() => setParam({ page: String(data.page - 1) })}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  className="button button-small button-outline"
+                  disabled={data.page >= data.total_pages}
+                  onClick={() => setParam({ page: String(data.page + 1) })}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Unified Onboard / Edit Modal Workspace (Same Page) */}
