@@ -2820,20 +2820,22 @@ input[type="checkbox"] {
    ========================================================================== */
 
 .auth-background {
-  min-height: calc(100vh - 164px);
+  min-height: calc(100vh - 116px);
   background: radial-gradient(circle at 5% 5%, #e2f4e9, transparent 35%),
               linear-gradient(135deg, #f7fbf8, #edf7f1);
-  padding: 60px 0 75px;
+  padding: 20px 0 28px;
+  display: flex;
+  align-items: center;
 }
 
 .auth-heading {
   text-align: center;
   max-width: 650px;
-  margin: 0 auto 34px;
+  margin: 0 auto 24px;
 }
 
 .auth-heading h1 {
-  font-size: 36px;
+  font-size: 32px;
   color: #0c2e24;
 }
 
@@ -2843,21 +2845,23 @@ input[type="checkbox"] {
 }
 
 .portal-grid {
-  max-width: 900px;
+  max-width: 880px;
   margin: auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 22px;
 }
 
 .portal-card {
   background: #ffffff;
   border: 2px solid #e2e8f0;
   border-radius: 20px;
-  padding: 34px;
+  padding: 26px 28px;
   display: block;
   color: var(--ink);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
   text-decoration: none;
 }
@@ -2942,7 +2946,7 @@ input[type="checkbox"] {
 .auth-bottom {
   text-align: center;
   font-size: 12.8px;
-  margin: 26px 0 0;
+  margin: 14px 0 0;
   color: var(--muted);
 }
 
@@ -2953,16 +2957,17 @@ input[type="checkbox"] {
 }
 
 .auth-container {
-  max-width: 990px;
+  width: 100%;
+  max-width: 940px;
   display: grid;
-  grid-template-columns: 1fr 0.95fr;
+  grid-template-columns: 1fr 0.92fr;
   gap: 0;
-  padding-top: 25px;
-  padding-bottom: 25px;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
 .auth-card {
-  padding: 42px 44px;
+  padding: 26px 34px;
   background: #ffffff;
   border: 1px solid #dce8e0;
   border-radius: 20px 0 0 20px;
@@ -2974,33 +2979,45 @@ input[type="checkbox"] {
 .auth-icon {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 42px;
+  height: 42px;
   color: #1f7754;
   background: #edf7f0;
-  border-radius: 14px;
-  margin: 16px 0 22px;
+  border-radius: 12px;
+  margin: 10px 0 10px;
   border: 1px solid #cee8d6;
 }
 
 .auth-icon .icon {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
 }
 
 .auth-card h1 {
-  font-size: 30px;
+  font-size: 26px;
+  line-height: 1.2;
+  margin: 4px 0 6px;
   color: #0c2e24;
 }
 
 .auth-intro {
   font-size: 13px;
-  margin-bottom: 24px;
+  line-height: 1.45;
+  margin: 0 0 14px;
   color: var(--muted);
 }
 
+.auth-form .form-group {
+  margin-bottom: 12px;
+}
+
+.auth-form .field-control {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
 .auth-form .button {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .password-wrap {
@@ -3014,16 +3031,17 @@ input[type="checkbox"] {
 .password-toggle {
   position: absolute;
   right: 8px;
-  top: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   border: 0;
   background: #edf5f0;
   color: #4b6b60;
   font-size: 11px;
   font-weight: 700;
-  padding: 6px 10px;
+  padding: 5px 10px;
   border-radius: 7px;
   cursor: pointer;
-  transition: all 0.16s;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
 .password-toggle:hover {
@@ -3034,7 +3052,7 @@ input[type="checkbox"] {
 .auth-side {
   border-radius: 0 20px 20px 0;
   background: #104b42;
-  padding: 65px 42px;
+  padding: 36px 34px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -3059,16 +3077,17 @@ input[type="checkbox"] {
 }
 
 .auth-side h2 {
-  font-size: 32px;
+  font-size: 28px;
+  line-height: 1.25;
   color: #ffffff;
-  margin: 14px 0;
+  margin: 10px 0;
   position: relative;
 }
 
 .auth-side p:not(.eyebrow) {
   color: #c9e8dc;
   font-size: 13.5px;
-  line-height: 1.8;
+  line-height: 1.65;
   position: relative;
 }
 
@@ -3088,7 +3107,7 @@ input[type="checkbox"] {
   align-items: center;
   color: #b9e0cf;
   font-size: 11.5px;
-  margin-top: 60px;
+  margin-top: 26px;
 }
 
 .register-container {
@@ -11498,17 +11517,43 @@ b, strong {
   }
 }
 
-/* Fallback & Enhanced Smooth Page Entrance for all browsers */
+/* Smooth Page Transitions & Interactive Controls across Entire Site */
 @keyframes pageSmoothEntrance {
   0% {
     opacity: 0;
+    transform: translateY(8px);
   }
   100% {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
+.gh-page-transition {
+  animation: pageSmoothEntrance 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
+}
+
+.button,
+.filter-tab,
+.field-control,
+.panel,
+.metric-card,
+.doctor-card,
+.dept-card,
+.portal-card,
+.dropdown-link-item,
+.public-links a,
+.excel-sheet tbody tr,
+.sidebar,
+.app-shell {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity, margin-left, width;
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .main-content,
+.public-main-content,
 .public-content,
 .departments-page,
 .doctor-directory-page,
@@ -11518,8 +11563,15 @@ b, strong {
 .auth-page,
 .dashboard-page,
 .reports-page {
-  animation: pageSmoothEntrance 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  transform: none !important;
+  animation: pageSmoothEntrance 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gh-page-transition,
+  .main-content,
+  .public-main-content {
+    animation: none !important;
+  }
 }
 
 /* Top Progress Bar (Brand Emerald Gradient with Glow) */

@@ -38,10 +38,25 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     };
   }, [collapsed, mobileNavOpen]);
 
+  const [progressWidth, setProgressWidth] = useState(0);
+  const [progressActive, setProgressActive] = useState(false);
+
   useEffect(() => {
     setMobileNavOpen(false);
     setDropdownOpen(false);
-  }, [location.pathname]);
+    setProgressActive(true);
+    setProgressWidth(68);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const t1 = window.setTimeout(() => setProgressWidth(100), 110);
+    const t2 = window.setTimeout(() => {
+      setProgressActive(false);
+      setProgressWidth(0);
+    }, 340);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -337,7 +352,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="main-content" id="main-content">
-          {children}
+          <div className={`page-progress-bar ${progressActive ? 'is-active' : ''}`} aria-hidden="true">
+            <div className="page-progress-inner" style={{ width: `${progressWidth}%` }} />
+          </div>
+          <div key={location.pathname + location.search} className="gh-page-transition">
+            {children}
+          </div>
           <footer className="app-footer">
             <span>
               © {new Date().getFullYear()} Green Hospital. Clinical Care &amp; Patient Management
@@ -352,7 +372,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
 export function PublicLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const location = useLocation();
   const [navExpanded, setNavExpanded] = useState(false);
+
+  useEffect(() => {
+    setNavExpanded(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     document.body.classList.remove('app-layout', 'sidebar-collapsed', 'nav-open');
@@ -439,7 +465,11 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="public-main-content">{children}</main>
+      <main className="public-main-content">
+        <div key={location.pathname + location.search} className="gh-page-transition">
+          {children}
+        </div>
+      </main>
 
       <footer className="public-footer">
         <div className="container">
