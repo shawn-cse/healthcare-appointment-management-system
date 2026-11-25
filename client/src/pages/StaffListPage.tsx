@@ -215,7 +215,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     if (!editorOpen) return;
     const clean = username.trim();
     if (!clean) {
-      setUsernameCheck({ valid: false, message: 'Username is required' });
+      setUsernameCheck(null);
       return;
     }
     const timer = window.setTimeout(() => {
@@ -234,7 +234,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     if (!editorOpen) return;
     const clean = email.trim();
     if (!clean) {
-      setEmailCheck({ valid: false, message: 'Email is required for staff' });
+      setEmailCheck(null);
       return;
     }
     const timer = window.setTimeout(() => {
