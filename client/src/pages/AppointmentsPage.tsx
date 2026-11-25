@@ -36,7 +36,7 @@ export default function AppointmentsPage() {
   const dateFrom = searchParams.get('date_from') || '';
   const dateTo = searchParams.get('date_to') || '';
   const doctor = searchParams.get('doctor') || '';
-  const sort = searchParams.get('sort') || 'newest_date';
+  const sort = searchParams.get('sort') || 'date_desc';
   const page = Number(searchParams.get('page') || 1) || 1;
 
   const [searchInput, setSearchInput] = useState(q);
@@ -94,15 +94,33 @@ export default function AppointmentsPage() {
     }
   }, [searchParams, showToast]);
 
-  const setParam = (updates: Record<string, string | null>) => {
-    const next = new URLSearchParams(searchParams);
-    for (const [k, v] of Object.entries(updates)) {
-      if (v) next.set(k, v);
-      else next.delete(k);
-    }
-    if (!('page' in updates)) next.set('page', '1');
-    setSearchParams(next);
-  };
+  const setParam = useCallback(
+    (updates: Record<string, string | null>) => {
+      const next = new URLSearchParams(searchParams);
+      for (const [k, v] of Object.entries(updates)) {
+        if (v) next.set(k, v);
+        else next.delete(k);
+      }
+      if (!('page' in updates)) next.set('page', '1');
+      setSearchParams(next);
+    },
+    [searchParams, setSearchParams]
+  );
+
+  // Sync URL ?q -> local input if navigated externally
+  useEffect(() => {
+    setSearchInput(q);
+  }, [q]);
+
+  // Instant live typing search (debounced)
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    if (trimmed === q) return;
+    const t = window.setTimeout(() => {
+      setParam({ q: trimmed || null });
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [searchInput, q, setParam]);
 
   const openQuickModal = (ap: Appointment) => {
     setQuickTarget(ap);
@@ -269,198 +287,208 @@ export default function AppointmentsPage() {
         </div>
       </div>
 
-      {/* Status filter tabs */}
-      <div className="filter-tabs no-print" style={{ marginBottom: 14 }}>
-        {statusTabs.map(([val, lbl]) => (
-          <button
-            key={val || 'all'}
-            type="button"
-            className={`filter-tab ${status === val ? 'active' : ''}`}
-            onClick={() => setParam({ status: val || null })}
-          >
-            {lbl}
-          </button>
-        ))}
-      </div>
+      {/* Unified Excel Sheet Appointments Container */}
+      <div className="excel-sheet-panel">
+        <div className="excel-sheet-header-bar no-print">
+          <div className="activity-filter-toolbar" style={{ marginBottom: 10 }}>
+            <div className="staff-live-search-wrap" style={{ flex: '1 1 280px', maxWidth: 460 }}>
+              <Icon id="ic-search" className="icon search-ic" />
+              <input
+                type="text"
+                className="field-control"
+                placeholder={
+                  isPatient
+                    ? 'Type to search reference or doctor...'
+                    : 'Type to search ref, patient name, phone, doctor...'
+                }
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                autoComplete="off"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  className="staff-live-search-clear"
+                  title="Clear search"
+                  onClick={() => setSearchInput('')}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
 
-      {/* Filter toolbar */}
-      <div className="panel no-print" style={{ padding: 16, marginBottom: 18 }}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setParam({ q: searchInput.trim() || null });
-          }}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}
-        >
-          <div style={{ flex: '1 1 240px', position: 'relative' }}>
-            <input
-              type="search"
-              className="field-control"
-              placeholder={
-                isPatient
-                  ? 'Search reference or doctor...'
-                  : 'Search ref, patient name, phone, doctor...'
-              }
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
+            <div className="sheet-indicator" style={{ marginLeft: 'auto' }}>
+              <span className="live-dot-pulse" />
+              <span>
+                Showing <strong>{appts.length}</strong> of <strong>{data?.total ?? 0}</strong>{' '}
+                bookings
+              </span>
+            </div>
           </div>
 
-          {!isPatient && (
-            <>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[
-                  ['', 'Any Date'],
-                  ['today', 'Today'],
-                  ['upcoming', 'Upcoming'],
-                  ['week', '7 Days'],
-                ].map(([val, lbl]) => (
-                  <button
-                    key={val || 'any'}
-                    type="button"
-                    className={`button button-small ${datePreset === val && !dateFrom && !dateTo ? 'button-primary' : 'button-outline'}`}
-                    onClick={() =>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 10,
+              alignItems: 'center',
+            }}
+          >
+            <select
+              className="field-control activity-select"
+              aria-label="Filter by status"
+              value={status}
+              onChange={(e) => setParam({ status: e.target.value || null })}
+            >
+              {statusTabs.map(([val, lbl]) => (
+                <option key={val || 'all'} value={val}>
+                  {val === '' ? (isPatient ? 'All Statuses' : 'All Statuses') : lbl}
+                </option>
+              ))}
+            </select>
+
+            {!isPatient && (
+              <>
+                <select
+                  className="field-control activity-select"
+                  aria-label="Filter by date range"
+                  value={dateFrom || dateTo ? 'custom' : datePreset}
+                  onChange={(e) => {
+                    const nextVal = e.target.value;
+                    if (nextVal === 'custom') {
+                      setParam({ date_preset: 'custom' });
+                    } else {
                       setParam({
-                        date_preset: val || null,
+                        date_preset: nextVal || null,
                         date_from: null,
                         date_to: null,
-                      })
+                      });
                     }
-                  >
-                    {lbl}
-                  </button>
-                ))}
-              </div>
-
-              <div style={{ width: 155 }}>
-                <GreenDatePicker
-                  value={dateFrom}
-                  onChange={(v) => setParam({ date_from: v || null, date_preset: null })}
-                  placeholder="From Date"
-                />
-              </div>
-              <div style={{ width: 155 }}>
-                <GreenDatePicker
-                  value={dateTo}
-                  onChange={(v) => setParam({ date_to: v || null, date_preset: null })}
-                  placeholder="To Date"
-                />
-              </div>
-
-              {data?.doctor_options && data.doctor_options.length > 1 && (
-                <select
-                  className="field-control"
-                  style={{ width: 'auto', minWidth: 180 }}
-                  value={doctor}
-                  onChange={(e) => setParam({ doctor: e.target.value || null })}
+                  }}
                 >
-                  <option value="">All Specialists</option>
-                  {data.doctor_options.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
+                  <option value="">Any Date</option>
+                  <option value="today">Today</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                  <option value="custom">Custom Date Range</option>
                 </select>
-              )}
 
+                {(datePreset === 'custom' || dateFrom || dateTo) && (
+                  <>
+                    <div style={{ width: 150 }}>
+                      <GreenDatePicker
+                        value={dateFrom}
+                        onChange={(v) => setParam({ date_from: v || null, date_preset: 'custom' })}
+                        placeholder="From Date"
+                      />
+                    </div>
+                    <div style={{ width: 150 }}>
+                      <GreenDatePicker
+                        value={dateTo}
+                        onChange={(v) => setParam({ date_to: v || null, date_preset: 'custom' })}
+                        placeholder="To Date"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {data?.doctor_options && data.doctor_options.length > 1 && (
+                  <select
+                    className="field-control activity-select"
+                    aria-label="Filter by specialist"
+                    value={doctor}
+                    onChange={(e) => setParam({ doctor: e.target.value || null })}
+                  >
+                    <option value="">All Specialists</option>
+                    {data.doctor_options.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <select
+                  className="field-control activity-select"
+                  aria-label="Filter by payment status"
+                  value={payment}
+                  onChange={(e) => setParam({ payment: e.target.value || null })}
+                >
+                  <option value="">All Payments</option>
+                  <option value="unpaid">Unpaid</option>
+                  <option value="paid">Paid</option>
+                  <option value="refund_pending">Refund Pending</option>
+                  <option value="partially_refunded">Partly Refunded</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+              </>
+            )}
+
+            <select
+              className="field-control activity-select"
+              aria-label="Sort appointments"
+              value={sort}
+              onChange={(e) => setParam({ sort: e.target.value })}
+            >
+              <option value="date_desc">Latest Schedule Date</option>
+              <option value="date_asc">Earliest Schedule Date</option>
+              <option value="newest">Recently Booked</option>
+              <option value="fee_desc">Highest Fee</option>
+              <option value="fee_asc">Lowest Fee</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Staff Bulk Bar */}
+        {!isPatient && selectedIds.length > 0 && (
+          <form
+            onSubmit={handleBulkSubmit}
+            className="notice notice-info no-print"
+            style={{
+              margin: '12px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 12,
+            }}
+          >
+            <strong>{selectedIds.length} appointment(s) selected</strong>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <select
                 className="field-control"
                 style={{ width: 'auto' }}
-                value={payment}
-                onChange={(e) => setParam({ payment: e.target.value || null })}
+                value={bulkAction}
+                onChange={(e) => setBulkAction(e.target.value)}
+                required
               >
-                <option value="">All Payments</option>
-                <option value="unpaid">Unpaid</option>
-                <option value="paid">Paid</option>
-                <option value="refund_pending">Refund Pending</option>
-                <option value="partially_refunded">Partly Refunded</option>
-                <option value="refunded">Refunded</option>
+                <option value="">Choose bulk action...</option>
+                <option value="cash">Record Cash Payment</option>
+                <option value="completed">Mark Completed</option>
+                <option value="no_show">Mark Did Not Attend</option>
+                {(user?.role === 'doctor' || user?.role === 'admin') && (
+                  <option value="doctor_cancel">Cancel by Doctor (Full Refund)</option>
+                )}
               </select>
-            </>
-          )}
+              <button type="submit" className="button button-primary button-small">
+                Run Action
+              </button>
+            </div>
+          </form>
+        )}
 
-          <select
-            className="field-control"
-            style={{ width: 'auto' }}
-            value={sort}
-            onChange={(e) => setParam({ sort: e.target.value })}
-          >
-            <option value="newest_date">Latest Schedule Date</option>
-            <option value="oldest_date">Earliest Schedule Date</option>
-            <option value="created_desc">Recently Booked</option>
-            <option value="fee_desc">Highest Fee</option>
-            <option value="fee_asc">Lowest Fee</option>
-          </select>
-
-          <button type="submit" className="button button-primary button-small">
-            <Icon id="ic-search" /> Apply
-          </button>
-
-          {(status || payment || q || datePreset || dateFrom || dateTo || doctor) && (
-            <button
-              type="button"
-              className="button button-outline button-small"
-              onClick={() => {
-                setSearchInput('');
-                setSearchParams(new URLSearchParams());
-              }}
-            >
-              Reset
-            </button>
-          )}
-        </form>
-      </div>
-
-      {/* Staff Bulk Bar */}
-      {!isPatient && selectedIds.length > 0 && (
-        <form
-          onSubmit={handleBulkSubmit}
-          className="notice notice-info no-print"
-          style={{
-            marginBottom: 14,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 12,
-          }}
-        >
-          <strong>{selectedIds.length} appointment(s) selected</strong>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <select
-              className="field-control"
-              style={{ width: 'auto' }}
-              value={bulkAction}
-              onChange={(e) => setBulkAction(e.target.value)}
-              required
-            >
-              <option value="">Choose bulk action...</option>
-              <option value="cash">Record Cash Payment</option>
-              <option value="completed">Mark Completed</option>
-              <option value="no_show">Mark Did Not Attend</option>
-              {(user?.role === 'doctor' || user?.role === 'admin') && (
-                <option value="doctor_cancel">Cancel by Doctor (Full Refund)</option>
-              )}
-            </select>
-            <button type="submit" className="button button-primary button-small">
-              Run Action
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Excel Sheet Table */}
-      <div className="panel">
+        {/* Excel Sheet Table */}
         {loading ? (
           <LoadingScreen label="Loading consultation sheet..." />
         ) : appts.length === 0 ? (
           <div className="empty-state" style={{ padding: 48 }}>
             <h3>No appointments match these filters</h3>
-            <p className="muted">Try clearing filters or registering a new booking.</p>
+            <p className="muted">Try another search keyword or adjust dropdown filters.</p>
           </div>
         ) : (
           <div className="excel-table-wrap">
-            <table className="excel-sheet">
+            <table className="excel-grid-table">
               <thead>
                 <tr>
                   {!isPatient && (
@@ -478,7 +506,7 @@ export default function AppointmentsPage() {
                   <th>Ref &amp; Serial</th>
                   <th>Schedule Date &amp; Slot</th>
                   {!isPatient && <th>Patient Details</th>}
-                  <th>Specialist &amp; Room</th>
+                  <th>Specialist &amp; Room No</th>
                   <th>Visit &amp; Fee</th>
                   <th>Status</th>
                   <th>Payment</th>
@@ -656,20 +684,11 @@ export default function AppointmentsPage() {
           }}
         >
           <div className="panel" style={{ width: '100%', maxWidth: 520, padding: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div>
-                <h2 style={{ margin: 0 }}>Quick Update — {quickTarget.reference}</h2>
-                <p className="muted" style={{ margin: '4px 0 0' }}>
-                  {quickTarget.patient_name} · {quickTarget.doctor.name}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="button button-small button-outline"
-                onClick={() => setQuickTarget(null)}
-              >
-                ✕
-              </button>
+            <div style={{ marginBottom: 14 }}>
+              <h2 style={{ margin: 0 }}>Quick Update — {quickTarget.reference}</h2>
+              <p className="muted" style={{ margin: '4px 0 0' }}>
+                {quickTarget.patient_name} · {quickTarget.doctor.name}
+              </p>
             </div>
 
             <form onSubmit={submitQuickUpdate} className="form-grid two-col">

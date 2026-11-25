@@ -67,7 +67,9 @@ export async function listAppointments(req: Request, res: Response): Promise<voi
 
   if (datePreset === 'today') {
     filters.push({ slot: { date: today } });
-  } else if (datePreset === '7d') {
+  } else if (datePreset === 'upcoming') {
+    filters.push({ slot: { date: { gte: today } } });
+  } else if (datePreset === '7d' || datePreset === 'week') {
     filters.push({ slot: { date: { gte: addDaysDate(today, -7), lte: today } } });
   } else if (datePreset === '30d') {
     filters.push({ slot: { date: { gte: addDaysDate(today, -30), lte: today } } });
@@ -118,10 +120,15 @@ export async function listAppointments(req: Request, res: Response): Promise<voi
       orderBy = [{ paymentStatus: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }];
       break;
     case 'date_asc':
+    case 'oldest_date':
       orderBy = [{ slot: { date: 'asc' } }, { slot: { startTime: 'asc' } }, { id: 'asc' }];
       break;
     case 'date_desc':
+    case 'newest_date':
       orderBy = [{ slot: { date: 'desc' } }, { slot: { startTime: 'desc' } }, { id: 'asc' }];
+      break;
+    case 'created_desc':
+      orderBy = [{ createdAt: 'desc' }, { id: 'asc' }];
       break;
     case 'patient':
       orderBy = [{ guestName: 'asc' }, { id: 'asc' }];
