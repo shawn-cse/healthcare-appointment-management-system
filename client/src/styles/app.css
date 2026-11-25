@@ -12258,8 +12258,7 @@ body.is-page-loading .main-content {
 
 .excel-table-wrap {
   width: 100%;
-  max-height: calc(100vh - 270px);
-  min-height: 380px;
+  max-height: calc(100vh - 250px);
   overflow-y: auto;
   overflow-x: auto;
   position: relative;
@@ -12382,11 +12381,42 @@ body.is-page-loading .main-content {
 
 .excel-grid-table td,
 .excel-sheet td {
-  padding: 9px 12px;
-  border-bottom: 1px solid #edf4f0;
-  border-right: 1px solid #f8fafc;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #eef2f7;
   vertical-align: middle;
   color: #1e293b;
+}
+
+.excel-grid-table td:last-child,
+.excel-sheet td:last-child,
+.excel-grid-table th:last-child,
+.excel-sheet th:last-child {
+  border-right: 0;
+}
+
+.activity-filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.activity-select-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.activity-select {
+  width: auto !important;
+  min-width: 148px;
+  padding-top: 7px !important;
+  padding-bottom: 7px !important;
+  font-size: 12.5px !important;
+  font-weight: 600;
 }
 
 /* Crisp Horizontal Filter Tabs across Directory, Appointments, Refunds & Complaints */
