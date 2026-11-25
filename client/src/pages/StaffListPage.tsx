@@ -892,7 +892,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
               <div className="sm-room-box" style={{ marginBottom: role === 'doctor' ? 18 : 0 }}>
                 <div className="form-grid two-col">
                   <div className="form-group full" style={{ marginBottom: 8 }}>
-                    <label htmlFor="sm-room">Consultation Room (Optional — Any Staff Role)</label>
+                    <label htmlFor="sm-room">Room (Optional — Any Staff Role)</label>
                     <select
                       id="sm-room"
                       className="field-control"
@@ -902,7 +902,8 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                       <option value="">No Room / Leave Blank</option>
                       {meta?.chambers.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.room_number} — {c.building} ({c.floor}) · {c.doctors_count ?? 0}{' '}
+                          {c.room_number}
+                          {c.description ? ` — ${c.description}` : ''} · {c.doctors_count ?? 0}{' '}
                           doctor(s)
                         </option>
                       ))}

@@ -130,7 +130,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
     if (user.role === 'admin') {
       navItems.push(
-        { to: '/rooms', label: 'Consultation Room', icon: 'ic-building' },
+        { to: '/rooms', label: 'Rooms', icon: 'ic-building' },
         { to: '/departments', label: 'Manage Departments', icon: 'ic-building' },
         { to: '/activity-log', label: 'Activity Log', icon: 'ic-clipboard' }
       );

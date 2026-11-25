@@ -557,11 +557,11 @@ export async function listChambers(req: Request, res: Response): Promise<void> {
 
 export async function createChamber(req: Request, res: Response): Promise<void> {
   const roomNumber = String(req.body?.room_number || '').trim();
-  if (!roomNumber) throw new HttpError(400, 'Room Number is required.');
+  if (!roomNumber) throw new HttpError(400, 'Room No / Name is required.');
 
-  const building = String(req.body?.building || 'Building 1').trim() || 'Building 1';
+  const building = String(req.body?.building || '').trim();
   const description = String(req.body?.description || '').trim().slice(0, 255);
-  const floor = String(req.body?.floor || '1st Floor').trim();
+  const floor = String(req.body?.floor || '').trim();
   const name = String(req.body?.name || roomNumber).trim() || roomNumber;
   const address = String(req.body?.address || 'Mirpur, Dhaka').trim();
   const contactNumber = String(req.body?.contact_number || '+88096100016211').trim();
@@ -582,28 +582,28 @@ export async function createChamber(req: Request, res: Response): Promise<void> 
   await logAudit(req.user, 'room.add', Number(chamber.id), chamber.roomNumber);
   res.status(201).json({
     chamber: serializeChamber(chamber),
-    message: `Consultation Room "${chamber.roomNumber}" added successfully.`,
+    message: `Room "${chamber.roomNumber}" added successfully.`,
   });
 }
 
 export async function updateChamber(req: Request, res: Response): Promise<void> {
   const id = BigInt(req.params.id);
   const existing = await prisma.chamber.findUnique({ where: { id } });
-  if (!existing) throw new HttpError(404, 'Consultation room not found.');
+  if (!existing) throw new HttpError(404, 'Room not found.');
 
   const roomNumber = String(req.body?.room_number ?? existing.roomNumber).trim();
-  if (!roomNumber) throw new HttpError(400, 'Room Number is required.');
+  if (!roomNumber) throw new HttpError(400, 'Room No / Name is required.');
 
   const description = String(req.body?.description ?? existing.description).trim().slice(0, 255);
   const updated = await prisma.chamber.update({
     where: { id },
     data: {
       roomNumber,
+      name: roomNumber,
       description,
-      building: existing.building || 'Building 1',
-      name: existing.name || roomNumber,
-      address: 'Mirpur, Dhaka',
-      contactNumber: '+88096100016211',
+      building: existing.building || '',
+      address: existing.address || 'Mirpur, Dhaka',
+      contactNumber: existing.contactNumber || '+88096100016211',
       isActive: true,
     },
   });
@@ -616,14 +616,14 @@ export async function updateChamber(req: Request, res: Response): Promise<void> 
   await logAudit(req.user, 'room.edit', Number(updated.id), updated.roomNumber);
   res.json({
     chamber: serializeChamber(updated),
-    message: `Consultation Room "${updated.roomNumber}" updated successfully.`,
+    message: `Room "${updated.roomNumber}" updated successfully.`,
   });
 }
 
 export async function deleteChamber(req: Request, res: Response): Promise<void> {
   const id = BigInt(req.params.id);
   const chamber = await prisma.chamber.findUnique({ where: { id } });
-  if (!chamber) throw new HttpError(404, 'Consultation room not found.');
+  if (!chamber) throw new HttpError(404, 'Room not found.');
 
   await prisma.$transaction(async (tx) => {
     await tx.doctorProfile.updateMany({
@@ -638,7 +638,7 @@ export async function deleteChamber(req: Request, res: Response): Promise<void> 
     await logAudit(req.user, 'room.deleted', Number(id), chamber.roomNumber, tx);
   });
 
-  res.json({ message: `Consultation Room "${chamber.roomNumber}" deleted successfully.` });
+  res.json({ message: `Room "${chamber.roomNumber}" deleted successfully.` });
 }
 
 // ---------- Schedules & Slots ----------

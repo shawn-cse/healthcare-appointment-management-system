@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
 import { AppLayout } from '../components/Layout.tsx';
@@ -13,38 +13,50 @@ export default function RoomsPage() {
 
   const [chambers, setChambers] = useState<Chamber[]>([]);
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState('');
+  const [search, setSearch] = useState('');
+  const [occupancyFilter, setOccupancyFilter] = useState<'all' | 'occupied' | 'empty'>('all');
 
-  // Modal state
+  // Add / Edit Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Chamber | null>(null);
   const [roomNumber, setRoomNumber] = useState('');
-  const [building, setBuilding] = useState('Building 1');
-  const [floor, setFloor] = useState('1st Floor');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const loadRooms = useCallback(
-    (search = q) => {
-      setLoading(true);
-      api
-        .get<{ chambers: Chamber[] }>(`/catalog/chambers?q=${encodeURIComponent(search)}`)
-        .then((res) => setChambers(res.data.chambers || []))
-        .catch((err) => showToast(getApiErrorMessage(err, 'Failed to load rooms.'), 'error'))
-        .finally(() => setLoading(false));
-    },
-    [q, showToast]
-  );
+  const loadRooms = useCallback(() => {
+    setLoading(true);
+    api
+      .get<{ chambers: Chamber[] }>('/catalog/chambers')
+      .then((res) => setChambers(res.data.chambers || []))
+      .catch((err) => showToast(getApiErrorMessage(err, 'Failed to load rooms.'), 'error'))
+      .finally(() => setLoading(false));
+  }, [showToast]);
 
   useEffect(() => {
-    loadRooms('');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    loadRooms();
+  }, [loadRooms]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return chambers.filter((c) => {
+      const hasPeople =
+        (c.doctors_count ?? (c.doctors?.length || 0)) > 0 || (c.staff_users?.length || 0) > 0;
+      if (occupancyFilter === 'occupied' && !hasPeople) return false;
+      if (occupancyFilter === 'empty' && hasPeople) return false;
+      if (!q) return true;
+      return (
+        c.room_number.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q) ||
+        (c.doctors || []).some((d) => d.name.toLowerCase().includes(q)) ||
+        (c.staff_users || []).some((s) => s.name.toLowerCase().includes(q))
+      );
+    });
+  }, [chambers, search, occupancyFilter]);
 
   const openNew = () => {
     setEditing(null);
     setRoomNumber('');
-    setBuilding('Building 1');
-    setFloor('1st Floor');
     setDescription('');
     setModalOpen(true);
   };
@@ -52,9 +64,7 @@ export default function RoomsPage() {
   const openEdit = (c: Chamber) => {
     setEditing(c);
     setRoomNumber(c.room_number);
-    setBuilding(c.building);
-    setFloor(c.floor);
-    setDescription(c.description);
+    setDescription(c.description || '');
     setModalOpen(true);
   };
 
@@ -64,8 +74,6 @@ export default function RoomsPage() {
     try {
       const payload = {
         room_number: roomNumber.trim(),
-        building: building.trim(),
-        floor: floor.trim(),
         description: description.trim(),
       };
       const res = editing
@@ -73,7 +81,7 @@ export default function RoomsPage() {
         : await api.post<{ message: string }>('/catalog/chambers', payload);
       showToast(res.data.message, 'success');
       setModalOpen(false);
-      loadRooms(q);
+      loadRooms();
     } catch (err) {
       showToast(getApiErrorMessage(err, 'Could not save room.'), 'error');
     } finally {
@@ -81,211 +89,255 @@ export default function RoomsPage() {
     }
   };
 
-  const handleDelete = async (c: Chamber) => {
+  const handleDeleteInModal = async () => {
+    if (!editing) return;
     const ok = await confirm({
-      title: 'Delete Consultation Room',
-      message: `Delete "${c.room_number}"? Assigned doctors will have their room assignment cleared.`,
+      title: 'Delete Room',
+      message: `Delete "${editing.room_number}"? Assigned doctors and staff will have their room cleared.`,
       confirmText: 'Delete Room',
       type: 'danger',
     });
     if (!ok) return;
+    setDeleting(true);
     try {
-      const res = await api.delete<{ message: string }>(`/catalog/chambers/${c.id}`);
+      const res = await api.delete<{ message: string }>(`/catalog/chambers/${editing.id}`);
       showToast(res.data.message, 'success');
-      loadRooms(q);
+      setModalOpen(false);
+      loadRooms();
     } catch (err) {
       showToast(getApiErrorMessage(err, 'Could not delete room.'), 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
   return (
     <AppLayout>
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">HOSPITAL INFRASTRUCTURE</p>
-          <h1>Consultation Rooms</h1>
-          <p>Manage OPD consultation rooms, building wings, and doctor &amp; staff room occupancy.</p>
+      <div className="staff-directory-page">
+        <div className="page-heading">
+          <div>
+            <p className="eyebrow">HOSPITAL ROOMS</p>
+            <h1>Rooms</h1>
+            <p>Manage rooms, short descriptions, and doctor &amp; staff room occupancy.</p>
+          </div>
+          <div className="heading-actions">
+            <button type="button" className="button button-primary" onClick={openNew}>
+              <Icon id="ic-plus" /> Add Room
+            </button>
+          </div>
         </div>
-        <div className="heading-actions">
-          <button type="button" className="button button-primary" onClick={openNew}>
-            <Icon id="ic-plus" /> Add Consultation Room
-          </button>
-        </div>
-      </div>
 
-      <div className="panel" style={{ padding: 16, marginBottom: 20 }}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            loadRooms(q);
-          }}
-          style={{ display: 'flex', gap: 10 }}
-        >
-          <input
-            type="search"
-            className="field-control"
-            placeholder="Search room number, building, or description..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <button type="submit" className="button button-primary button-small">
-            <Icon id="ic-search" /> Filter
-          </button>
-        </form>
-      </div>
-
-      {loading ? (
-        <LoadingScreen />
-      ) : chambers.length === 0 ? (
-        <div className="panel empty-state" style={{ padding: 48 }}>
-          <h3>No consultation rooms found</h3>
-        </div>
-      ) : (
-        <div className="doctors-grid">
-          {chambers.map((c) => (
-            <div key={c.id} className="panel" style={{ padding: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 14 }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span className="role-pill-badge">{c.building}</span>
-                  <span className="muted" style={{ fontSize: '0.82rem' }}>{c.floor}</span>
-                </div>
-                <h2 style={{ margin: '0 0 6px' }}>{c.room_number}</h2>
-                {c.description && (
-                  <p className="muted" style={{ margin: '0 0 12px', fontSize: '0.9rem' }}>
-                    {c.description}
-                  </p>
+        <div className="excel-sheet-panel">
+          <div className="excel-sheet-header-bar">
+            <div className="activity-filter-toolbar">
+              <div className="staff-live-search-wrap" style={{ flex: '1 1 260px', maxWidth: 420 }}>
+                <Icon id="ic-search" className="icon search-ic" />
+                <input
+                  type="text"
+                  className="field-control"
+                  placeholder="Type to search room no, description, or doctor name..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  autoComplete="off"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    className="staff-live-search-clear"
+                    title="Clear search"
+                    onClick={() => setSearch('')}
+                  >
+                    ✕
+                  </button>
                 )}
-
-                <div style={{ borderTop: '1px solid var(--line)', paddingTop: 10 }}>
-                  <strong style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
-                    Assigned Specialists ({c.doctors_count ?? (c.doctors?.length || 0)})
-                  </strong>
-                  {c.doctors && c.doctors.length > 0 ? (
-                    <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: '0.86rem' }}>
-                      {c.doctors.map((d) => (
-                        <li key={d.id} style={{ marginBottom: 4 }}>
-                          <strong>{d.name}</strong>
-                          {d.schedules && d.schedules.length > 0 ? (
-                            <div className="muted" style={{ fontSize: '0.8rem' }}>
-                              {d.schedules
-                                .map((s) => `${s.weekday_short} (${s.start_time_12h}–${s.end_time_12h})`)
-                                .join(' · ')}
-                            </div>
-                          ) : d.assigned_days_text ? (
-                            <span className="muted"> — {d.assigned_days_text}</span>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="muted" style={{ margin: '6px 0 0', fontSize: '0.86rem' }}>
-                      No doctors assigned
-                    </p>
-                  )}
-                  {c.staff_users && c.staff_users.length > 0 && (
-                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--line)', fontSize: '0.82rem' }}>
-                      <strong className="muted">Staff Assigned: </strong>
-                      {c.staff_users.map((su) => `${su.name} (${su.role_display})`).join(', ')}
-                    </div>
-                  )}
-                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 8, paddingTop: 10, borderTop: '1px solid var(--line)' }}>
-                <button
-                  type="button"
-                  className="button button-small button-outline"
-                  style={{ flex: 1 }}
-                  onClick={() => openEdit(c)}
-                >
-                  Edit Room
-                </button>
-                <button
-                  type="button"
-                  className="button button-small button-outline"
-                  style={{ color: 'var(--red)', borderColor: 'rgba(220,38,38,0.3)' }}
-                  onClick={() => handleDelete(c)}
-                >
-                  Delete
-                </button>
+              <select
+                className="field-control activity-select"
+                aria-label="Filter rooms by occupancy"
+                value={occupancyFilter}
+                onChange={(e) =>
+                  setOccupancyFilter(e.target.value as 'all' | 'occupied' | 'empty')
+                }
+              >
+                <option value="all">All Rooms</option>
+                <option value="occupied">Assigned Only</option>
+                <option value="empty">Unassigned Only</option>
+              </select>
+
+              <div className="sheet-indicator" style={{ marginLeft: 'auto' }}>
+                <span className="live-dot-pulse" />
+                <span>
+                  Showing <strong>{filtered.length}</strong> of <strong>{chambers.length}</strong>{' '}
+                  rooms
+                </span>
               </div>
             </div>
-          ))}
+          </div>
+
+          {loading ? (
+            <LoadingScreen />
+          ) : filtered.length === 0 ? (
+            <div className="empty-state" style={{ padding: '36px 24px' }}>
+              <h3>No rooms matched</h3>
+              <p className="muted">Try another keyword or add a new room.</p>
+            </div>
+          ) : (
+            <div className="excel-table-wrap">
+              <table className="excel-grid-table">
+                <colgroup>
+                  <col style={{ width: '6%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '27%' }} />
+                  <col style={{ width: '29%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '9%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Room No / Name</th>
+                    <th>Description</th>
+                    <th>Assigned Doctors &amp; Schedule</th>
+                    <th>Staff</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((c, idx) => (
+                    <tr key={c.id}>
+                      <td className="muted">{idx + 1}</td>
+                      <td>
+                        <span className="room-chip role-pill-badge">{c.room_number}</span>
+                      </td>
+                      <td>{c.description || <span className="muted">—</span>}</td>
+                      <td>
+                        {c.doctors && c.doctors.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {c.doctors.map((d) => (
+                              <div key={d.id} style={{ fontSize: '12px' }}>
+                                <strong>{d.name}</strong>
+                                {d.schedules && d.schedules.length > 0 ? (
+                                  <span className="muted">
+                                    {' '}
+                                    ·{' '}
+                                    {d.schedules
+                                      .map(
+                                        (s) =>
+                                          `${s.weekday_short} (${s.start_time_12h}–${s.end_time_12h})`
+                                      )
+                                      .join(', ')}
+                                  </span>
+                                ) : d.assigned_days_text ? (
+                                  <span className="muted"> · {d.assigned_days_text}</span>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="muted">Unassigned</span>
+                        )}
+                      </td>
+                      <td>
+                        {c.staff_users && c.staff_users.length > 0 ? (
+                          <div style={{ fontSize: '12px' }}>
+                            {c.staff_users.map((su) => `${su.name} (${su.role_display})`).join(', ')}
+                          </div>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="button button-small button-outline"
+                          onClick={() => openEdit(c)}
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {modalOpen && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: 16,
-          }}
+          className="sm-modal-backdrop"
           onClick={(e) => {
             if (e.target === e.currentTarget) setModalOpen(false);
           }}
         >
-          <div className="panel" style={{ width: '100%', maxWidth: 480, padding: 24 }}>
-            <h2 style={{ marginTop: 0 }}>
-              {editing ? `Edit Room ${editing.room_number}` : 'Add Consultation Room'}
-            </h2>
-            <form onSubmit={handleSave} className="form-grid two-col">
-              <div className="form-group full">
-                <label htmlFor="rm-num">Room Number / Code</label>
-                <input
-                  id="rm-num"
-                  type="text"
-                  className="field-control"
-                  value={roomNumber}
-                  onChange={(e) => setRoomNumber(e.target.value)}
-                  placeholder="e.g. Room 405"
-                  required
-                />
+          <form className="sm-modal-panel" style={{ maxWidth: 480 }} onSubmit={handleSave}>
+            <div className="sm-modal-header">
+              <div>
+                <p className="eyebrow" style={{ marginBottom: 2 }}>
+                  ROOM DETAILS
+                </p>
+                <h2 style={{ margin: 0 }}>
+                  {editing ? `Edit Room: ${editing.room_number}` : 'Add Room'}
+                </h2>
               </div>
+              <button
+                type="button"
+                className="button button-small button-outline"
+                onClick={() => setModalOpen(false)}
+              >
+                ✕ Close
+              </button>
+            </div>
 
-              {!editing && (
-                <>
-                  <div className="form-group">
-                    <label htmlFor="rm-bld">Building</label>
-                    <input
-                      id="rm-bld"
-                      type="text"
-                      className="field-control"
-                      value={building}
-                      onChange={(e) => setBuilding(e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="rm-flr">Floor</label>
-                    <input
-                      id="rm-flr"
-                      type="text"
-                      className="field-control"
-                      value={floor}
-                      onChange={(e) => setFloor(e.target.value)}
-                    />
-                  </div>
-                </>
+            <div className="sm-modal-body">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="rm-num">Room No / Name *</label>
+                  <input
+                    id="rm-num"
+                    type="text"
+                    className="field-control"
+                    value={roomNumber}
+                    onChange={(e) => setRoomNumber(e.target.value)}
+                    placeholder="e.g. Room 405"
+                    required
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label htmlFor="rm-desc">Description (Optional)</label>
+                  <textarea
+                    id="rm-desc"
+                    rows={3}
+                    className="field-control"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="e.g. Building 1, 2nd Floor, General OPD Suite"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="sm-modal-footer"
+              style={{
+                justifyContent: editing ? 'space-between' : 'flex-end',
+              }}
+            >
+              {editing && (
+                <button
+                  type="button"
+                  className="button button-outline"
+                  style={{ color: 'var(--red)', borderColor: 'rgba(220,38,38,0.35)' }}
+                  disabled={deleting || saving}
+                  onClick={handleDeleteInModal}
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
               )}
-
-              <div className="form-group full">
-                <label htmlFor="rm-desc">Description / Equipment Notes</label>
-                <textarea
-                  id="rm-desc"
-                  rows={2}
-                  className="field-control"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. General OPD Suite, ECG Equipped"
-                />
-              </div>
-
-              <div className="form-group full" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   type="button"
                   className="button button-outline"
@@ -293,12 +345,16 @@ export default function RoomsPage() {
                 >
                   Cancel
                 </button>
-                <button type="submit" className="button button-primary" disabled={saving}>
-                  {saving ? 'Saving...' : 'Save Room'}
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={saving || deleting}
+                >
+                  {saving ? 'Saving...' : 'Save'}
                 </button>
               </div>
-            </form>
-          </div>
+            </div>
+          </form>
         </div>
       )}
     </AppLayout>
