@@ -39,8 +39,8 @@ export default function LoginChoicePage() {
               <span className="portal-tag">CLINICAL &amp; ADMINISTRATIVE</span>
               <h2>Doctor &amp; Staff Portal</h2>
               <p>
-                Authorized clinical workspace for medical specialists, chamber receptionists, and
-                hospital administrators.
+                Authorized clinical workspace for medical specialists, receptionists, and
+                hospital administration.
               </p>
               <span className="portal-link">
                 Sign in to Staff Workspace <Icon id="ic-arrow" />

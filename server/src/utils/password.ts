@@ -13,11 +13,11 @@ const COMMON_PASSWORDS = new Set([
 ]);
 
 export function validatePasswordStrength(password: string): string | null {
-  if (!password || password.length < 8) {
-    return 'This password is too short. It must contain at least 8 characters.';
+  if (!password || password.length < 6) {
+    return 'Password must contain at least 6 characters.';
   }
   if (/^\d+$/.test(password)) {
-    return 'This password is entirely numeric.';
+    return 'This password cannot be entirely numeric.';
   }
   if (COMMON_PASSWORDS.has(password.toLowerCase())) {
     return 'This password is too common.';

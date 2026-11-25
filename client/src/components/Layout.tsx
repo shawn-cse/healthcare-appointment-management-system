@@ -547,7 +547,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               <div className="footer-contact-item">
                 <Icon id="ic-map-pin" />
                 <div>
-                  <b>Main Hospital &amp; Chambers</b>
+                  <b>Main Hospital &amp; Rooms</b>
                   <p>Mirpur, Dhaka</p>
                 </div>
               </div>

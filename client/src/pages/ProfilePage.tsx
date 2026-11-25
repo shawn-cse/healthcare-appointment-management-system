@@ -140,25 +140,30 @@ export default function ProfilePage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="pr-email">Email</label>
+            <label htmlFor="pr-email">
+              Email {user.role !== 'patient' ? '' : '(Optional)'}
+            </label>
             <input
               id="pr-email"
               type="email"
               className="field-control"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required={user.role !== 'patient'}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="pr-phone">Phone Number</label>
+            <label htmlFor="pr-phone">
+              Phone Number {user.role !== 'patient' ? '(Optional)' : ''}
+            </label>
             <input
               id="pr-phone"
               type="tel"
               className="field-control"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              required
+              required={user.role === 'patient'}
             />
           </div>
 
@@ -174,7 +179,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="pr-nid">NID / Passport</label>
+            <label htmlFor="pr-nid">NID</label>
             <input
               id="pr-nid"
               type="text"
@@ -209,7 +214,7 @@ export default function ProfilePage() {
           {user.role === 'doctor' && (
             <>
               <div className="form-group">
-                <label htmlFor="pr-desig">Clinical Designation</label>
+                <label htmlFor="pr-desig">Designation</label>
                 <input
                   id="pr-desig"
                   type="text"
@@ -219,7 +224,7 @@ export default function ProfilePage() {
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="pr-room">Chamber / Room Number</label>
+                <label htmlFor="pr-room">Room Number</label>
                 <input
                   id="pr-room"
                   type="text"
@@ -229,10 +234,10 @@ export default function ProfilePage() {
                 />
               </div>
               <div className="form-group full">
-                <label htmlFor="pr-qual">Qualifications</label>
-                <input
+                <label htmlFor="pr-qual">Education &amp; Qualifications</label>
+                <textarea
                   id="pr-qual"
-                  type="text"
+                  rows={3}
                   className="field-control"
                   value={qualifications}
                   onChange={(e) => setQualifications(e.target.value)}

@@ -288,7 +288,7 @@ export default function DoctorsPage() {
                         </div>
                         <div className="doctor-primary-meta">
                           <div className="doctor-badge-row">
-                            <span className="dept-tag">{d.department.name}</span>
+                            <span className="dept-tag">{d.department?.name || 'General Consultation'}</span>
                             <span className="bmdc-tag">{d.bmdc_display}</span>
                           </div>
                           <h2 className="doctor-name-heading">

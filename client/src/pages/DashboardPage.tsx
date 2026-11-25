@@ -97,7 +97,7 @@ export default function DashboardPage() {
               <div className="panel-header">
                 <div>
                   <h2>Upcoming Appointments</h2>
-                  <p>Your next confirmed specialist visits and chamber locations</p>
+                  <p>Your next confirmed specialist visits and room locations</p>
                 </div>
                 <Link className="text-link" to="/appointments">
                   View all appointments <Icon id="ic-arrow" />
@@ -119,10 +119,10 @@ export default function DashboardPage() {
                         <div className="appointment-main">
                           <strong>Dr. {a.doctor.name}</strong>
                           <span>
-                            {a.doctor.department.name} · {a.slot.start_time_12h}
+                            {a.doctor.department?.name || 'General Consultation'} · {a.slot.start_time_12h}
                           </span>
                           <small>
-                            Ref: {a.reference} · Chamber: {a.doctor.active_room || 'OPD Chamber'}
+                            Ref: {a.reference} · Room: {a.doctor.active_room || 'OPD Room'}
                           </small>
                         </div>
                         <StatusPill status={a.status} label={a.status_display} />

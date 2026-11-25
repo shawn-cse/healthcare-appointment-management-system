@@ -478,7 +478,7 @@ export default function AppointmentsPage() {
                   <th>Ref &amp; Serial</th>
                   <th>Schedule Date &amp; Slot</th>
                   {!isPatient && <th>Patient Details</th>}
-                  <th>Specialist &amp; Chamber</th>
+                  <th>Specialist &amp; Room</th>
                   <th>Visit &amp; Fee</th>
                   <th>Status</th>
                   <th>Payment</th>
@@ -530,7 +530,8 @@ export default function AppointmentsPage() {
                     <td>
                       <strong>{ap.doctor.name}</strong>
                       <div className="muted" style={{ fontSize: '0.82rem' }}>
-                        {ap.doctor.department.name} · {ap.doctor.active_room}
+                        {ap.doctor.department?.name || 'General Consultation'}
+                        {ap.doctor.active_room ? ` · ${ap.doctor.active_room}` : ''}
                       </div>
                     </td>
                     <td>

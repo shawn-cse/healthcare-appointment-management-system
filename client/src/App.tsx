@@ -28,7 +28,6 @@ import RoomsPage from './pages/RoomsPage.tsx';
 import { SlotFormPage, WeeklyFormPage } from './pages/ScheduleFormsPage.tsx';
 import SchedulePage from './pages/SchedulePage.tsx';
 import StaffBookPage from './pages/StaffBookPage.tsx';
-import StaffEditPage from './pages/StaffEditPage.tsx';
 import StaffListPage from './pages/StaffListPage.tsx';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -160,7 +159,7 @@ export default function App() {
         path="/staff/new"
         element={
           <RequireRole roles={['admin']}>
-            <StaffEditPage />
+            <StaffListPage initialCreate />
           </RequireRole>
         }
       />
@@ -168,7 +167,7 @@ export default function App() {
         path="/staff/:id"
         element={
           <RequireRole roles={['admin']}>
-            <StaffEditPage />
+            <StaffListPage />
           </RequireRole>
         }
       />

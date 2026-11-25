@@ -154,7 +154,8 @@ export default function SchedulePage() {
             >
               {doctors.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name} — {d.department.name} ({d.active_room})
+                  {d.name} — {d.department?.name || 'General'}
+                  {d.active_room ? ` (${d.active_room})` : ''}
                 </option>
               ))}
             </select>

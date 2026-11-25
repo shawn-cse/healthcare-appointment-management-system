@@ -11,6 +11,7 @@ router.get('/meta', requireRoles('admin'), asyncHandler(c.getStaffMeta));
 router.post('/', requireRoles('admin'), asyncHandler(c.createStaff));
 router.get('/:id', requireRoles('admin'), asyncHandler(c.getStaffMember));
 router.put('/:id', requireRoles('admin'), asyncHandler(c.updateStaff));
+router.post('/:id/toggle-active', requireRoles('admin'), asyncHandler(c.toggleStaffActive));
 router.get('/doctor/:id/rules', requireRoles('doctor', 'admin'), asyncHandler(c.getDoctorRules));
 router.put('/doctor/:id/rules', requireRoles('doctor', 'admin'), asyncHandler(c.updateDoctorRules));
 

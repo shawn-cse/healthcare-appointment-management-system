@@ -11578,6 +11578,196 @@ b, strong {
   }
 }
 
+/* ==========================================================================
+   Unified Staff & Doctor Management Workspace
+   ========================================================================== */
+.sm-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  margin-left: 8px;
+}
+
+.sm-live-pill.is-ok {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.sm-live-pill.is-err {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.sm-radio-group {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sm-radio-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.sm-radio-btn:hover {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.sm-radio-btn.is-active {
+  border-color: #0d5c46;
+  background: #e6f7ef;
+  color: #0d5c46;
+  box-shadow: 0 0 0 1px #0d5c46;
+}
+
+.sm-radio-btn.is-danger-active {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #991b1b;
+  box-shadow: 0 0 0 1px #dc2626;
+}
+
+.sm-status-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.sm-status-toggle:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08);
+}
+
+.sm-status-toggle.active {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.sm-status-toggle.inactive {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.sm-status-toggle:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.sm-day-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sm-day-chip {
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.sm-day-chip.is-selected {
+  background: #0d5c46;
+  border-color: #0d5c46;
+  color: #ffffff;
+}
+
+.sm-room-box {
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.sm-room-doc-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+
+.sm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.56);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: pageSmoothEntrance 0.2s ease both;
+}
+
+.sm-modal-panel {
+  width: 100%;
+  max-width: 960px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #d1e3d9;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+  overflow: hidden;
+}
+
+.sm-modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fbf9;
+}
+
+.sm-modal-body {
+  padding: 22px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.sm-modal-footer {
+  padding: 14px 24px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #f8fafc;
+}
+
 /* Top Progress Bar (Brand Emerald Gradient with Glow) */
 .page-progress-bar {
   position: fixed;

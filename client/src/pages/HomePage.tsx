@@ -166,7 +166,7 @@ export default function HomePage() {
             <p className="eyebrow">YOUR NEXT CONSULTATION</p>
             <h2>One less thing to worry about.</h2>
             <p>
-              Explore doctor availability, chamber locations, and reserve a consultation in
+              Explore doctor availability, room locations, and reserve a consultation in
               minutes.
             </p>
           </div>

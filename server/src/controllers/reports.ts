@@ -332,7 +332,7 @@ export async function exportExcel(req: Request, res: Response): Promise<void> {
         serialized.slot.date,
         timeToHm(ap.slot.startTime),
         serialized.doctor.name,
-        serialized.doctor.department.name,
+        serialized.doctor.department?.name || 'General Consultation',
         serialized.patient_name,
         serialized.guest_phone,
         serialized.visit_type_display,

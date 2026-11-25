@@ -8,6 +8,10 @@ import { ACTIVE_APPOINTMENT_STATUSES, materializeWeekly } from '../services/appo
 import { logAudit } from '../services/audit.js';
 import { gatewayHttpsReady } from '../services/gateway.js';
 import {
+  assertNoRoomSlotConflict,
+  assertNoRoomWeeklyConflict,
+} from '../services/roomConflict.js';
+import {
   serializeChamber,
   serializeDepartment,
   serializeDoctor,
@@ -59,13 +63,20 @@ export async function publicHome(_req: Request, res: Response): Promise<void> {
 
   const [doctors, doctorCount] = await Promise.all([
     prisma.doctorProfile.findMany({
-      where: { isAvailable: true, user: { isActive: true }, department: { isActive: true } },
+      where: {
+        isAvailable: true,
+        user: { isActive: true },
+        OR: [{ departmentId: null }, { department: { isActive: true } }],
+      },
       include: doctorInclude,
       take: 6,
       orderBy: { id: 'asc' },
     }),
     prisma.doctorProfile.count({
-      where: { user: { isActive: true }, department: { isActive: true } },
+      where: {
+        user: { isActive: true },
+        OR: [{ departmentId: null }, { department: { isActive: true } }],
+      },
     }),
   ]);
 
@@ -105,7 +116,7 @@ export async function doctorDirectory(req: Request, res: Response): Promise<void
   const where: Prisma.DoctorProfileWhereInput = {
     isAvailable: true,
     user: { isActive: true },
-    department: { isActive: true },
+    OR: [{ departmentId: null }, { department: { isActive: true } }],
     ...(deptIds.length ? { departmentId: { in: deptIds } } : {}),
     ...(genders.length === 1 ? { gender: genders[0] } : {}),
     ...(q
@@ -138,7 +149,11 @@ export async function doctorDirectory(req: Request, res: Response): Promise<void
       orderBy: { name: 'asc' },
     }),
     prisma.doctorProfile.count({
-      where: { isAvailable: true, user: { isActive: true }, department: { isActive: true } },
+      where: {
+        isAvailable: true,
+        user: { isActive: true },
+        OR: [{ departmentId: null }, { department: { isActive: true } }],
+      },
     }),
   ]);
 
@@ -231,7 +246,7 @@ export async function doctorDetail(req: Request, res: Response): Promise<void> {
   if (!doc) throw new HttpError(404, 'Specialist doctor not found.');
 
   const isStaff = Boolean(req.user && ['doctor', 'receptionist', 'admin'].includes(req.user.role));
-  if (!isStaff && !doc.department.isActive) {
+  if (!isStaff && doc.department && !doc.department.isActive) {
     throw new HttpError(404, 'Specialist doctor is currently unavailable.');
   }
 
@@ -527,8 +542,9 @@ export async function listChambers(req: Request, res: Response): Promise<void> {
     include: {
       department: true,
       doctors: {
-        include: { user: true, weekly: true },
+        include: { user: true, department: true, weekly: true },
       },
+      staffUsers: true,
     },
     orderBy: [{ roomNumber: 'asc' }, { building: 'asc' }],
   });
@@ -613,6 +629,10 @@ export async function deleteChamber(req: Request, res: Response): Promise<void> 
     await tx.doctorProfile.updateMany({
       where: { chamberId: id },
       data: { chamberId: null, roomNumber: '' },
+    });
+    await tx.user.updateMany({
+      where: { chamberId: id },
+      data: { chamberId: null },
     });
     await tx.chamber.delete({ where: { id } });
     await logAudit(req.user, 'room.deleted', Number(id), chamber.roomNumber, tx);
@@ -706,6 +726,13 @@ export async function saveWeekly(req: Request, res: Response): Promise<void> {
 
   const weeklyId = req.params.id && /^\d+$/.test(req.params.id) ? BigInt(req.params.id) : null;
   const result = await prisma.$transaction(async (tx) => {
+    if (active) {
+      await assertNoRoomWeeklyConflict(tx, {
+        chamberId: doctor.chamberId,
+        excludeDoctorId: doctor.id,
+        rules: [{ weekday, startTime, endTime }],
+      });
+    }
     let saved;
     if (weeklyId) {
       const existing = await tx.weeklyAvailability.findFirst({
@@ -867,6 +894,17 @@ export async function saveSlot(req: Request, res: Response): Promise<void> {
   });
   if (conflict) {
     throw new HttpError(400, 'This doctor already has a slot at that time.');
+  }
+
+  if (isOpen) {
+    await assertNoRoomSlotConflict(prisma, {
+      chamberId: doctor.chamberId,
+      excludeDoctorId: doctor.id,
+      excludeSlotId: existing?.id,
+      date: dateObj,
+      startTime,
+      endTime,
+    });
   }
 
   const saved = existing

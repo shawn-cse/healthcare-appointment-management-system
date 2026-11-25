@@ -97,7 +97,11 @@ export function WeeklyFormPage() {
         <div>
           <p className="eyebrow">WEEKLY CLINIC RULE</p>
           <h1>{id ? 'Edit Recurring Availability' : 'Add Recurring Availability'}</h1>
-          <p>{doctor ? `${doctor.name} · ${doctor.department.name}` : 'Doctor schedule setup'}</p>
+          <p>
+            {doctor
+              ? `${doctor.name} · ${doctor.department?.name || 'General Consultation'}`
+              : 'Doctor schedule setup'}
+          </p>
         </div>
         <div className="heading-actions">
           <Link className="button button-outline" to={`/schedules?doctor=${doctorPk}`}>
@@ -300,7 +304,7 @@ export function SlotFormPage() {
             >
               {doctors.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name} — {d.department.name}
+                  {d.name} — {d.department?.name || 'General Consultation'}
                 </option>
               ))}
             </select>

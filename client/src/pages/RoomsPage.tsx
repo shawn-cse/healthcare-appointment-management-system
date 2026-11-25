@@ -104,7 +104,7 @@ export default function RoomsPage() {
         <div>
           <p className="eyebrow">HOSPITAL INFRASTRUCTURE</p>
           <h1>Consultation Rooms</h1>
-          <p>Manage OPD consultation chambers, building wings, and doctor room occupancy.</p>
+          <p>Manage OPD consultation rooms, building wings, and doctor &amp; staff room occupancy.</p>
         </div>
         <div className="heading-actions">
           <button type="button" className="button button-primary" onClick={openNew}>
@@ -161,18 +161,32 @@ export default function RoomsPage() {
                     Assigned Specialists ({c.doctors_count ?? (c.doctors?.length || 0)})
                   </strong>
                   {c.doctors && c.doctors.length > 0 ? (
-                    <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: '0.88rem' }}>
+                    <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: '0.86rem' }}>
                       {c.doctors.map((d) => (
-                        <li key={d.id}>
+                        <li key={d.id} style={{ marginBottom: 4 }}>
                           <strong>{d.name}</strong>
-                          {d.assigned_days_text ? ` — ${d.assigned_days_text}` : ''}
+                          {d.schedules && d.schedules.length > 0 ? (
+                            <div className="muted" style={{ fontSize: '0.8rem' }}>
+                              {d.schedules
+                                .map((s) => `${s.weekday_short} (${s.start_time_12h}–${s.end_time_12h})`)
+                                .join(' · ')}
+                            </div>
+                          ) : d.assigned_days_text ? (
+                            <span className="muted"> — {d.assigned_days_text}</span>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
                   ) : (
                     <p className="muted" style={{ margin: '6px 0 0', fontSize: '0.86rem' }}>
-                      Currently unassigned
+                      No doctors assigned
                     </p>
+                  )}
+                  {c.staff_users && c.staff_users.length > 0 && (
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--line)', fontSize: '0.82rem' }}>
+                      <strong className="muted">Staff Assigned: </strong>
+                      {c.staff_users.map((su) => `${su.name} (${su.role_display})`).join(', ')}
+                    </div>
                   )}
                 </div>
               </div>

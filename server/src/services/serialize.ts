@@ -109,7 +109,7 @@ export function userDisplayName(u: Pick<User, 'firstName' | 'lastName' | 'userna
   return full || u.username;
 }
 
-export function serializeUser(u: User) {
+export function serializeUser(u: User & { chamber?: Chamber | null }) {
   return {
     id: Number(u.id),
     username: u.username,
@@ -124,6 +124,8 @@ export function serializeUser(u: User) {
     nid: u.nid,
     address: u.address,
     avatar: mediaUrl(u.avatar),
+    chamber_id: u.chamberId ? Number(u.chamberId) : null,
+    room_number: u.chamber?.roomNumber || '',
     is_active: u.isActive,
     is_staff: u.isStaff,
     is_superuser: u.isSuperuser,
@@ -145,7 +147,11 @@ export function serializeDepartment(d: Department & { docCount?: number }) {
 }
 
 export function serializeChamber(
-  c: Chamber & { department?: Department | null; doctors?: Array<DoctorProfile & { user: User; weekly?: WeeklyAvailability[] }> }
+  c: Chamber & {
+    department?: Department | null;
+    doctors?: Array<DoctorProfile & { user: User; department?: Department | null; weekly?: WeeklyAvailability[] }>;
+    staffUsers?: User[];
+  }
 ) {
   return {
     id: Number(c.id),
@@ -168,8 +174,39 @@ export function serializeChamber(
             .filter((d) => d.user?.isActive)
             .map((d) => ({
               id: Number(d.id),
+              user_id: Number(d.userId),
               name: userDisplayName(d.user),
+              department_name: d.department?.name || 'General Consultation',
               assigned_days_text: computeAssignedDaysText(d.weekly || [], d.chamberDays),
+              schedules: (d.weekly || [])
+                .filter((w) => w.active)
+                .sort(
+                  (a, b) =>
+                    a.weekday - b.weekday ||
+                    timeToHm(a.startTime).localeCompare(timeToHm(b.startTime))
+                )
+                .map((w) => ({
+                  id: Number(w.id),
+                  weekday: w.weekday,
+                  weekday_name: WEEKDAY_NAMES[w.weekday] || String(w.weekday),
+                  weekday_short: WEEKDAY_SHORT[w.weekday] || String(w.weekday),
+                  start_time: timeToHm(w.startTime),
+                  end_time: timeToHm(w.endTime),
+                  start_time_12h: timeTo12h(w.startTime),
+                  end_time_12h: timeTo12h(w.endTime),
+                })),
+            })),
+        }
+      : {}),
+    ...(c.staffUsers
+      ? {
+          staff_users: c.staffUsers
+            .filter((u) => u.isActive && u.role !== 'doctor')
+            .map((u) => ({
+              id: Number(u.id),
+              name: userDisplayName(u),
+              role: u.role,
+              role_display: ROLE_DISPLAY[u.role] || u.role,
             })),
         }
       : {}),
@@ -199,7 +236,7 @@ function computeAssignedDaysText(weekly: WeeklyAvailability[], chamberDays: stri
 
 export type DoctorWithRelations = DoctorProfile & {
   user: User;
-  department: Department;
+  department?: Department | null;
   chamber?: Chamber | null;
   weekly?: WeeklyAvailability[];
   receptionists?: Array<{ user: User }>;
@@ -241,8 +278,8 @@ export function serializeDoctor(d: DoctorWithRelations) {
     title_prefix: d.titlePrefix,
     avatar: mediaUrl(d.user.avatar),
     default_avatar: d.gender === 'female' ? 'ic-doc-female' : 'ic-doc-male',
-    department_id: Number(d.departmentId),
-    department: serializeDepartment(d.department),
+    department_id: d.departmentId ? Number(d.departmentId) : null,
+    department: d.department ? serializeDepartment(d.department) : null,
     chamber_id: d.chamberId ? Number(d.chamberId) : null,
     chamber: d.chamber ? serializeChamber(d.chamber) : null,
     chamber_days: d.chamberDays,

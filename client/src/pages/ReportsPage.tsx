@@ -162,7 +162,7 @@ export default function ReportsPage() {
                 <option value="">All Hospital Specialists</option>
                 {data.doctors.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.name} ({d.department.name})
+                    {d.name} ({d.department?.name || 'General'})
                   </option>
                 ))}
               </select>

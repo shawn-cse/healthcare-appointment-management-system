@@ -20,13 +20,15 @@ model User {
   isActive    Boolean   @default(true) @map("is_active")
   dateJoined  DateTime  @default(now()) @map("date_joined") @db.Timestamptz(6)
   role        String    @default("patient") @db.VarChar(16)
-  phone       String?   @unique @db.VarChar(16)
+  phone       String?   @db.VarChar(16)
   dob         DateTime? @db.Date
   nid         String    @default("") @db.VarChar(30)
   address     String    @default("") @db.Text
   avatar      String    @default("") @db.VarChar(100)
+  chamberId   BigInt?   @map("chamber_id")
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  chamber                 Chamber?             @relation("UserRoom", fields: [chamberId], references: [id], onDelete: SetNull)
   doctorProfile           DoctorProfile?
   assignedDoctors         DoctorReceptionist[]
   patientAppointments     Appointment[]        @relation("PatientAppointments")
@@ -87,6 +89,7 @@ model Chamber {
 
   department Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   doctors    DoctorProfile[]
+  staffUsers User[]          @relation("UserRoom")
 
   @@index([departmentId])
   @@map("hospital_chamber")
@@ -95,7 +98,7 @@ model Chamber {
 model DoctorProfile {
   id                    BigInt   @id @default(autoincrement())
   userId                BigInt   @unique @map("user_id")
-  departmentId          BigInt   @map("department_id")
+  departmentId          BigInt?  @map("department_id")
   chamberId             BigInt?  @map("chamber_id")
   chamberDays           String   @default("0,2") @map("chamber_days") @db.VarChar(50)
   gender                String   @default("male") @db.VarChar(10)
@@ -125,7 +128,7 @@ model DoctorProfile {
   isAvailable           Boolean  @default(true) @map("is_available")
 
   user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  department    Department           @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  department    Department?          @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   chamber       Chamber?             @relation(fields: [chamberId], references: [id], onDelete: SetNull)
   receptionists DoctorReceptionist[]
   weekly        WeeklyAvailability[]

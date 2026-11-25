@@ -139,7 +139,7 @@ export default function BookPage() {
         <div className="panel padded-panel">
           <div className="panel-title-section">
             <h2>Consultation Specialist</h2>
-            <p>Consultant &amp; Chamber Details</p>
+            <p>Consultant &amp; Room Details</p>
           </div>
 
           <div className="booking-identity">
@@ -163,7 +163,7 @@ export default function BookPage() {
               </span>
               <div className="qual-text">{doctor.qualifications || 'Consultant Specialist'}</div>
               <small className="text-muted">
-                {doctor.designation} · {doctor.department.name}
+                {doctor.designation} · {doctor.department?.name || 'General Consultation'}
               </small>
             </div>
           </div>
@@ -192,7 +192,7 @@ export default function BookPage() {
           </div>
 
           <div className="details-row">
-            <span>Chamber / Center</span>
+            <span>Facility / Center</span>
             <b>{doctor.chamber?.name || 'Green Hospital Outpatient & Consultation Center'}</b>
           </div>
           <div className="details-row">

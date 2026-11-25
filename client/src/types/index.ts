@@ -14,6 +14,8 @@ export interface User {
   nid: string;
   address: string;
   avatar: string | null;
+  chamber_id?: number | null;
+  room_number?: string;
   is_active: boolean;
   is_staff: boolean;
   is_superuser: boolean;
@@ -55,8 +57,26 @@ export interface Chamber {
   doctors_count?: number;
   doctors?: Array<{
     id: number;
+    user_id?: number;
     name: string;
+    department_name?: string;
     assigned_days_text: string;
+    schedules?: Array<{
+      id: number;
+      weekday: number;
+      weekday_name: string;
+      weekday_short: string;
+      start_time: string;
+      end_time: string;
+      start_time_12h: string;
+      end_time_12h: string;
+    }>;
+  }>;
+  staff_users?: Array<{
+    id: number;
+    name: string;
+    role: string;
+    role_display: string;
   }>;
 }
 
@@ -89,8 +109,8 @@ export interface Doctor {
   title_prefix: string;
   avatar: string | null;
   default_avatar: 'ic-doc-male' | 'ic-doc-female';
-  department_id: number;
-  department: Department;
+  department_id: number | null;
+  department: Department | null;
   chamber_id: number | null;
   chamber: Chamber | null;
   chamber_days: string;

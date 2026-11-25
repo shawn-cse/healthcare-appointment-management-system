@@ -63,7 +63,7 @@ export default function DoctorDetailPage() {
           <Link className="back-link" to="/doctors">
             ‹ Back to Specialist Doctors
           </Link>
-          <span className="breadcrumb-dept">{doctor.department.name}</span>
+          <span className="breadcrumb-dept">{doctor.department?.name || 'General Consultation'}</span>
         </div>
 
         <div className="doctor-profile-card panel">
@@ -84,7 +84,7 @@ export default function DoctorDetailPage() {
 
             <div className="doctor-profile-meta">
               <div className="doctor-badge-row">
-                <span className="dept-pill-tag">{doctor.department.name}</span>
+                <span className="dept-pill-tag">{doctor.department?.name || 'General Consultation'}</span>
                 <span className="bmdc-pill-tag">{doctor.bmdc_display}</span>
               </div>
 

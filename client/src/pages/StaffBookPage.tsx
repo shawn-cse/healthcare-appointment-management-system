@@ -195,7 +195,8 @@ export default function StaffBookPage() {
                 <option value="">Choose a doctor...</option>
                 {doctors.map((doc) => (
                   <option key={doc.id} value={doc.id}>
-                    {doc.name} — {doc.department.name} ({doc.active_room})
+                    {doc.name} — {doc.department?.name || 'General'}
+                    {doc.active_room ? ` (${doc.active_room})` : ''}
                   </option>
                 ))}
               </select>
@@ -368,7 +369,7 @@ export default function StaffBookPage() {
           <div className="panel-header">
             <div>
               <h2>Booking Summary</h2>
-              <p>Live chamber, fee &amp; schedule verification</p>
+              <p>Live room, fee &amp; schedule verification</p>
             </div>
           </div>
           <div style={{ padding: 20 }}>
@@ -380,11 +381,11 @@ export default function StaffBookPage() {
                 </div>
                 <div className="summary-row">
                   <span>Department</span>
-                  <strong>{selectedDoc.department.name}</strong>
+                  <strong>{selectedDoc.department?.name || 'General Consultation'}</strong>
                 </div>
                 <div className="summary-row">
                   <span>Room</span>
-                  <strong>{selectedDoc.active_room}</strong>
+                  <strong>{selectedDoc.active_room || 'Unassigned'}</strong>
                 </div>
                 <div className="summary-row">
                   <span>Date</span>
@@ -404,7 +405,7 @@ export default function StaffBookPage() {
                 </div>
               </div>
             ) : (
-              <p className="muted">Select a specialist doctor to review fee &amp; chamber info.</p>
+              <p className="muted">Select a specialist doctor to review fee &amp; room info.</p>
             )}
 
             <button

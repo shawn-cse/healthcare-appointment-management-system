@@ -221,11 +221,11 @@ export default function AppointmentDetailPage() {
             </div>
             <div className="summary-row">
               <span>Department</span>
-              <strong>{ap.doctor.department.name}</strong>
+              <strong>{ap.doctor.department?.name || 'General Consultation'}</strong>
             </div>
             <div className="summary-row">
-              <span>Chamber / Room</span>
-              <strong>{ap.doctor.active_room}</strong>
+              <span>Consultation Room</span>
+              <strong>{ap.doctor.active_room || 'Unassigned'}</strong>
             </div>
             <div className="summary-row">
               <span>Patient Name</span>

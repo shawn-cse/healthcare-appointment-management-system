@@ -9,6 +9,8 @@ const router = Router();
 router.post('/register', asyncHandler(auth.register));
 router.post('/login', asyncHandler(auth.login));
 router.get('/check-username', asyncHandler(auth.checkUsername));
+router.get('/check-email', asyncHandler(auth.checkEmail));
+router.get('/check-phone', asyncHandler(auth.checkPhone));
 router.get('/me', authenticate, asyncHandler(auth.me));
 router.put(
   '/profile',

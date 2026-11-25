@@ -615,7 +615,7 @@ export function GreenTimePicker({
                 </span>
                 <span className="gtime-period-tag">{period}</span>
               </div>
-              <span className="gtime-session-lbl">Consultation &amp; Chamber Session Time</span>
+              <span className="gtime-session-lbl">Consultation &amp; Room Session Time</span>
             </div>
 
             <div className="gtime-presets">

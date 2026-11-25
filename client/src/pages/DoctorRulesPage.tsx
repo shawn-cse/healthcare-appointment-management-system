@@ -74,7 +74,7 @@ export default function DoctorRulesPage() {
         setCancelMode(d.cancel_fee_mode);
         setCancelVal(d.cancel_fee_value);
 
-        setDepartmentId(String(d.department_id));
+        setDepartmentId(d.department_id ? String(d.department_id) : '');
         setChamberId(d.chamber_id ? String(d.chamber_id) : '');
         setReceptionistId(d.assigned_receptionist_id ? String(d.assigned_receptionist_id) : '');
         setGender(d.gender);
@@ -111,7 +111,7 @@ export default function DoctorRulesPage() {
         cancel_fee_value: cancelVal,
       };
       if (meta?.is_admin) {
-        payload.department_id = departmentId;
+        payload.department_id = departmentId || null;
         payload.chamber_id = chamberId || null;
         payload.receptionist_id = receptionistId || null;
         payload.gender = gender;
@@ -353,13 +353,14 @@ export default function DoctorRulesPage() {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="dr-dept">Department</label>
+                  <label htmlFor="dr-dept">Department (Optional)</label>
                   <select
                     id="dr-dept"
                     className="field-control"
                     value={departmentId}
                     onChange={(e) => setDepartmentId(e.target.value)}
                   >
+                    <option value="">No Department / Unassigned</option>
                     {meta.departments.map((dep) => (
                       <option key={dep.id} value={dep.id}>
                         {dep.name}
@@ -369,14 +370,14 @@ export default function DoctorRulesPage() {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="dr-chamb">Assigned Chamber</label>
+                  <label htmlFor="dr-chamb">Assigned Room</label>
                   <select
                     id="dr-chamb"
                     className="field-control"
                     value={chamberId}
                     onChange={(e) => setChamberId(e.target.value)}
                   >
-                    <option value="">Unassigned</option>
+                    <option value="">No Room / Unassigned</option>
                     {meta.chambers.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.room_number} ({c.building})

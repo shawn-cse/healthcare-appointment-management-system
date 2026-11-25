@@ -86,7 +86,7 @@ export async function register(req: Request, res: Response): Promise<void> {
   }
 
   const phoneConflict = await prisma.user.findFirst({
-    where: { phone: parsed.phone },
+    where: { role: 'patient', phone: parsed.phone },
     select: { id: true },
   });
   if (phoneConflict) throw new HttpError(400, 'An account with this phone number already exists.');
@@ -146,7 +146,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     throw new HttpError(400, 'Incorrect login details. Please verify your credentials and try again.');
   }
 
-  const matches = await prisma.user.findMany({
+  const rawMatches = await prisma.user.findMany({
     where: {
       OR: [
         { username: { equals: identifier, mode: 'insensitive' } },
@@ -154,8 +154,15 @@ export async function login(req: Request, res: Response): Promise<void> {
         { email: { equals: identifier, mode: 'insensitive' } },
       ],
     },
-    take: 2,
+    include: { chamber: true },
+    take: 5,
   });
+
+  // If multiple accounts share a clinic phone, scope to selected login portal cleanly
+  const matches =
+    rawMatches.length > 1 && portal
+      ? rawMatches.filter((u) => (portal === 'patient' ? u.role === 'patient' : u.role !== 'patient'))
+      : rawMatches;
 
   if (matches.length !== 1) {
     throw new HttpError(401, 'Incorrect login details. Please verify your credentials and try again.');
@@ -195,7 +202,11 @@ export async function login(req: Request, res: Response): Promise<void> {
 }
 
 export async function me(req: Request, res: Response): Promise<void> {
-  const user = req.user!;
+  const userWithRoom = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    include: { chamber: true },
+  });
+  const user = userWithRoom || req.user!;
   const doctorProfile =
     user.role === 'doctor'
       ? await prisma.doctorProfile.findUnique({
@@ -214,7 +225,7 @@ export async function me(req: Request, res: Response): Promise<void> {
             designation: doctorProfile.designation,
             qualifications: doctorProfile.qualifications,
             room_number: doctorProfile.chamber?.roomNumber || doctorProfile.roomNumber || '',
-            department_name: doctorProfile.department.name,
+            department_name: doctorProfile.department?.name || 'General Consultation',
           }
         : null,
     },
@@ -263,6 +274,77 @@ export async function checkUsername(req: Request, res: Response): Promise<void> 
   });
 }
 
+export async function checkEmail(req: Request, res: Response): Promise<void> {
+  const email = String(req.query.email || '').trim().toLowerCase();
+  const excludeIdRaw = String(req.query.exclude_id || '').trim();
+  if (!email) {
+    res.json({ valid: false, status: 'empty', message: 'Email address is required.' });
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.json({ valid: false, status: 'invalid', message: 'Enter a valid email format.' });
+    return;
+  }
+  const excludeId = /^\d+$/.test(excludeIdRaw) ? BigInt(excludeIdRaw) : undefined;
+  const conflict = await prisma.user.findFirst({
+    where: {
+      ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      OR: [
+        { email: { equals: email, mode: 'insensitive' } },
+        { username: { equals: email, mode: 'insensitive' } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (conflict) {
+    res.json({
+      valid: false,
+      status: 'conflict',
+      message: 'This email address is already used by another account.',
+    });
+    return;
+  }
+  res.json({ valid: true, status: 'available', message: 'Email is OK' });
+}
+
+export async function checkPhone(req: Request, res: Response): Promise<void> {
+  const phone = String(req.query.phone || '').trim();
+  const role = String(req.query.role || 'patient').trim().toLowerCase();
+  const excludeIdRaw = String(req.query.exclude_id || '').trim();
+  if (!phone) {
+    res.json({
+      valid: role !== 'patient',
+      status: 'empty',
+      message: role === 'patient' ? 'Phone number is required for patients.' : 'Optional for staff',
+    });
+    return;
+  }
+  if (!PHONE_REGEX.test(phone)) {
+    res.json({ valid: false, status: 'invalid', message: 'Enter a valid 10–15 digit phone number.' });
+    return;
+  }
+  if (role === 'patient') {
+    const excludeId = /^\d+$/.test(excludeIdRaw) ? BigInt(excludeIdRaw) : undefined;
+    const conflict = await prisma.user.findFirst({
+      where: {
+        role: 'patient',
+        phone,
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (conflict) {
+      res.json({
+        valid: false,
+        status: 'conflict',
+        message: 'A patient account with this phone already exists.',
+      });
+      return;
+    }
+  }
+  res.json({ valid: true, status: 'available', message: 'Phone is OK' });
+}
+
 export async function updateProfile(req: Request, res: Response): Promise<void> {
   const user = req.user!;
   const body = req.body as Record<string, string | undefined>;
@@ -271,16 +353,24 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
   const lastName = (body.last_name ?? user.lastName).trim();
   const username = (body.username ?? user.username).trim();
   const email = (body.email ?? user.email).trim().toLowerCase();
-  const phone = (body.phone ?? user.phone ?? '').trim();
+  const phoneRaw = body.phone !== undefined ? body.phone.trim() : (user.phone ?? '').trim();
   const nid = (body.nid ?? user.nid).trim();
   const address = (body.address ?? user.address).trim();
   const dobRaw = body.dob !== undefined ? String(body.dob || '').trim() : undefined;
 
-  if (!firstName) throw new HttpError(400, 'First name is required.');
+  if (!firstName) throw new HttpError(400, 'Name is required.');
   if (!username) throw new HttpError(400, 'Username cannot be empty.');
-  if (!phone || !PHONE_REGEX.test(phone)) {
-    throw new HttpError(400, 'Enter a valid phone number (10–15 digits).');
+  if (user.role === 'patient') {
+    if (!phoneRaw || !PHONE_REGEX.test(phoneRaw)) {
+      throw new HttpError(400, 'Enter a valid phone number (10–15 digits).');
+    }
+  } else {
+    if (!email) throw new HttpError(400, 'Email address is required for staff accounts.');
+    if (phoneRaw && !PHONE_REGEX.test(phoneRaw)) {
+      throw new HttpError(400, 'Enter a valid phone number (10–15 digits).');
+    }
   }
+  const phone: string | null = phoneRaw || null;
 
   let dobDate = user.dob;
   if (dobRaw !== undefined) {
@@ -320,15 +410,30 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     if (emailConflict) throw new HttpError(400, 'An account with this email already exists.');
   }
 
-  const phoneConflict = await prisma.user.findFirst({
-    where: { NOT: { id: user.id }, phone },
-    select: { id: true },
-  });
-  if (phoneConflict) throw new HttpError(400, 'An account with this phone already exists.');
+  if (user.role === 'patient' && phone) {
+    const phoneConflict = await prisma.user.findFirst({
+      where: { NOT: { id: user.id }, role: 'patient', phone },
+      select: { id: true },
+    });
+    if (phoneConflict) throw new HttpError(400, 'A patient account with this phone already exists.');
+  }
 
   const avatarRel = req.file ? toRelativeMediaPath('profiles', req.file.filename) : undefined;
 
   const updated = await prisma.$transaction(async (tx) => {
+    let syncedChamberId: bigint | null | undefined = undefined;
+    if (body.room_number !== undefined) {
+      const rVal = body.room_number.trim();
+      if (!rVal) {
+        syncedChamberId = null;
+      } else {
+        const ch = await tx.chamber.findFirst({
+          where: { roomNumber: { equals: rVal, mode: 'insensitive' } },
+        });
+        syncedChamberId = ch ? ch.id : null;
+      }
+    }
+
     const u = await tx.user.update({
       where: { id: user.id },
       data: {
@@ -340,8 +445,10 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
         dob: dobDate,
         nid,
         address,
+        ...(syncedChamberId !== undefined ? { chamberId: syncedChamberId } : {}),
         ...(avatarRel ? { avatar: avatarRel } : {}),
       },
+      include: { chamber: true },
     });
 
     if (u.role === 'doctor') {
@@ -395,7 +502,7 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
             designation: doctorProfile.designation,
             qualifications: doctorProfile.qualifications,
             room_number: doctorProfile.chamber?.roomNumber || doctorProfile.roomNumber || '',
-            department_name: doctorProfile.department.name,
+            department_name: doctorProfile.department?.name || 'General Consultation',
           }
         : null,
     },
