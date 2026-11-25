@@ -265,17 +265,10 @@ export default function DepartmentsPage() {
                   {editing ? `Edit ${editing.name}` : 'Add Department'}
                 </h2>
               </div>
-              <button
-                type="button"
-                className="button button-small button-outline"
-                onClick={() => setModalOpen(false)}
-              >
-                ✕ Close
-              </button>
             </div>
 
             <div className="sm-modal-body">
-              <div className="form-grid">
+              <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
                 <div className="form-group">
                   <label htmlFor="dp-name">Department Name *</label>
                   <input

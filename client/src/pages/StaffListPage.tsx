@@ -690,13 +690,6 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                   {editUserId ? `Manage: ${name || username}` : 'Create Doctor / Staff Account'}
                 </h2>
               </div>
-              <button
-                type="button"
-                className="button button-small button-outline"
-                onClick={closeEditor}
-              >
-                ✕ Close
-              </button>
             </div>
 
             <div className="sm-modal-body">

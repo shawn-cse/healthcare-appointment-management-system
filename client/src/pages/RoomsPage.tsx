@@ -282,17 +282,10 @@ export default function RoomsPage() {
                   {editing ? `Edit Room: ${editing.room_number}` : 'Add Room'}
                 </h2>
               </div>
-              <button
-                type="button"
-                className="button button-small button-outline"
-                onClick={() => setModalOpen(false)}
-              >
-                ✕ Close
-              </button>
             </div>
 
             <div className="sm-modal-body">
-              <div className="form-grid">
+              <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
                 <div className="form-group">
                   <label htmlFor="rm-num">Room No *</label>
                   <input
