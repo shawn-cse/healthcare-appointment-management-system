@@ -221,7 +221,7 @@ export default function DoctorsPage() {
                           />
                         </svg>
                       </span>
-                      <span className="check-label-text">Male Specialists</span>
+                      <span className="check-label-text">Male</span>
                     </label>
                     <label className="filter-check-row">
                       <input
@@ -242,7 +242,7 @@ export default function DoctorsPage() {
                           />
                         </svg>
                       </span>
-                      <span className="check-label-text">Female Specialists</span>
+                      <span className="check-label-text">Female</span>
                     </label>
                   </div>
                 </div>

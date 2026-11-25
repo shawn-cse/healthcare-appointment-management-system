@@ -3119,11 +3119,11 @@ input[type="checkbox"] {
 }
 
 .register-intro {
-  padding-top: 60px;
+  padding-top: 12px;
 }
 
 .register-intro h1 {
-  font-size: 42px;
+  font-size: 32px;
   color: #0b2b23;
 }
 
@@ -3265,7 +3265,7 @@ input[type="checkbox"] {
 }
 
 .public-header {
-  height: 80px;
+  height: 64px;
   background: #ffffff;
   box-shadow: 0 4px 20px rgba(11, 58, 50, 0.06);
   position: sticky;
@@ -6269,72 +6269,73 @@ input[type="checkbox"] {
    Two-Column Doctor Directory Layout
    ========================================================================== */
 .doctor-directory-container {
-  padding-top: 24px;
-  padding-bottom: 48px;
+  padding-top: 14px;
+  padding-bottom: 36px;
 }
 
 .directory-header-bar {
-  margin-bottom: 24px;
+  margin-bottom: 14px;
 }
 
 .directory-eyebrow {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   color: #1f7754;
   text-transform: uppercase;
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .directory-title {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   color: #07382b;
   letter-spacing: -0.01em;
-  margin: 0 0 6px 0;
+  margin: 0 0 4px 0;
 }
 
 .directory-subtitle {
   color: #475569;
-  font-size: 14.5px;
-  line-height: 1.55;
+  font-size: 13.5px;
+  line-height: 1.45;
   margin: 0;
   max-width: 720px;
 }
 
 .directory-layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 28px;
+  grid-template-columns: 276px 1fr;
+  gap: 24px;
   align-items: start;
 }
 
-/* Sidebar Filters - Sticky to prevent moving and leaving an empty gap on scroll */
+/* Sidebar Filters - Sticky with independent internal scroll so users never scroll the full page to pick filters */
 .directory-sidebar {
   position: -webkit-sticky;
   position: sticky;
-  top: 90px;
+  top: 76px;
   align-self: start;
   z-index: 8;
 }
 
 .public-layout .directory-sidebar {
-  top: 96px;
+  top: 76px;
 }
 
 .app-layout .directory-sidebar {
-  top: 90px;
+  top: 84px;
 }
 
 .directory-sidebar .filter-panel {
   background: #ffffff;
   border: 1px solid #dceede;
   border-radius: 14px;
-  padding: 20px;
+  padding: 14px 16px;
   box-shadow: 0 3px 14px rgba(10, 48, 38, 0.04);
-  max-height: calc(100vh - 110px);
+  max-height: calc(100vh - 90px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
 }
 
@@ -6369,9 +6370,9 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 14px;
+  padding-bottom: 10px;
   border-bottom: 1px solid #eef5f0;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .filter-title {
@@ -6405,7 +6406,7 @@ input[type="checkbox"] {
 }
 
 .filter-group {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .filter-group:last-child {
@@ -6413,12 +6414,12 @@ input[type="checkbox"] {
 }
 
 .filter-group-title {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   color: #07382b;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
 }
 
 .filter-options-list {
@@ -6498,18 +6499,24 @@ input[type="checkbox"] {
 
 .dept-checkbox-list,
 .gender-checkbox-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   background: #ffffff;
   border: 1.5px solid #cbd5e1;
   border-radius: 8px;
-  padding: 6px;
+  padding: 5px;
 }
 
 .dept-checkbox-list {
-  max-height: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 132px;
   overflow-y: auto;
+}
+
+.gender-checkbox-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
 }
 
 .dept-checkbox-list::-webkit-scrollbar {
@@ -11517,21 +11524,18 @@ b, strong {
   }
 }
 
-/* Smooth Page Transitions & Interactive Controls across Entire Site */
+/* Smooth Page Transitions & Sticky-Safe Interactive Controls */
 @keyframes pageSmoothEntrance {
   0% {
     opacity: 0;
-    transform: translateY(8px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
 .gh-page-transition {
-  animation: pageSmoothEntrance 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
-  will-change: opacity, transform;
+  animation: pageSmoothEntrance 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .button,
