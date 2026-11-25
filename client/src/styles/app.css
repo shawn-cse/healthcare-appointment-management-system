@@ -5231,20 +5231,22 @@ input[type="checkbox"] {
 .green-cal-input {
   width: 100%;
   cursor: pointer;
-  padding-right: 74px !important;
+  padding-left: 12px !important;
+  padding-right: 62px !important;
+  font-variant-numeric: tabular-nums;
   user-select: none;
 }
 
 .cal-input-btn {
   position: absolute;
-  right: 8px;
+  right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #edf7f2;
   color: #166151;
   border: 1px solid #cce5d6;
@@ -5260,17 +5262,17 @@ input[type="checkbox"] {
 }
 
 .cal-icon {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 .cal-input-clear {
   position: absolute;
-  right: 44px;
+  right: 38px;
   top: 50%;
   transform: translateY(-50%);
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #e6ede8;
   color: #4b6b60;

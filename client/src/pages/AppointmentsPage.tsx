@@ -376,14 +376,14 @@ export default function AppointmentsPage() {
 
                 {(datePreset === 'custom' || dateFrom || dateTo) && (
                   <>
-                    <div style={{ width: 150 }}>
+                    <div style={{ width: 185 }}>
                       <GreenDatePicker
                         value={dateFrom}
                         onChange={(v) => setParam({ date_from: v || null, date_preset: 'custom' })}
                         placeholder="From Date"
                       />
                     </div>
-                    <div style={{ width: 150 }}>
+                    <div style={{ width: 185 }}>
                       <GreenDatePicker
                         value={dateTo}
                         onChange={(v) => setParam({ date_to: v || null, date_preset: 'custom' })}

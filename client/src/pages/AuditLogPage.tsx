@@ -39,8 +39,6 @@ const ACTORS = [
 const TIME_FILTERS = [
   ['all', 'All Time'],
   ['today', 'Today'],
-  ['2d', 'Last 2 Days'],
-  ['7d', 'Last 7 Days'],
   ['custom', 'Custom Date'],
 ] as const;
 
@@ -225,8 +223,8 @@ export default function AuditLogPage() {
                 </select>
 
                 {date === 'custom' && (
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <div style={{ width: 145 }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ width: 185 }}>
                       <GreenDatePicker
                         value={fromDate}
                         onChange={(v) => setParam({ date: 'custom', from: v || null })}
@@ -237,7 +235,7 @@ export default function AuditLogPage() {
                     <span className="muted" style={{ fontSize: 12 }}>
                       to
                     </span>
-                    <div style={{ width: 145 }}>
+                    <div style={{ width: 185 }}>
                       <GreenDatePicker
                         value={toDate}
                         onChange={(v) => setParam({ date: 'custom', to: v || null })}
