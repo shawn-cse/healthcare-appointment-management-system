@@ -384,7 +384,7 @@ export default function StaffBookPage() {
                   <strong>{selectedDoc.department?.name || 'General Consultation'}</strong>
                 </div>
                 <div className="summary-row">
-                  <span>Room</span>
+                  <span>Room No</span>
                   <strong>{selectedDoc.active_room || 'Unassigned'}</strong>
                 </div>
                 <div className="summary-row">

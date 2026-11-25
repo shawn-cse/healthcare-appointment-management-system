@@ -557,7 +557,7 @@ export async function listChambers(req: Request, res: Response): Promise<void> {
 
 export async function createChamber(req: Request, res: Response): Promise<void> {
   const roomNumber = String(req.body?.room_number || '').trim();
-  if (!roomNumber) throw new HttpError(400, 'Room No / Name is required.');
+  if (!roomNumber) throw new HttpError(400, 'Room No is required.');
 
   const building = String(req.body?.building || '').trim();
   const description = String(req.body?.description || '').trim().slice(0, 255);
@@ -592,7 +592,7 @@ export async function updateChamber(req: Request, res: Response): Promise<void> 
   if (!existing) throw new HttpError(404, 'Room not found.');
 
   const roomNumber = String(req.body?.room_number ?? existing.roomNumber).trim();
-  if (!roomNumber) throw new HttpError(400, 'Room No / Name is required.');
+  if (!roomNumber) throw new HttpError(400, 'Room No is required.');
 
   const description = String(req.body?.description ?? existing.description).trim().slice(0, 255);
   const updated = await prisma.chamber.update({

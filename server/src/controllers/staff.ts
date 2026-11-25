@@ -258,7 +258,7 @@ async function resolveChamberId(body: Record<string, unknown>, fallback?: bigint
   const raw = body.chamber_id ?? body.chamber ?? body.room_id;
   if (raw && /^\d+$/.test(String(raw))) {
     const ch = await prisma.chamber.findUnique({ where: { id: BigInt(String(raw)) } });
-    if (!ch) throw new HttpError(400, 'Selected consultation room was not found.');
+    if (!ch) throw new HttpError(400, 'Selected room was not found.');
     return { provided: true, chamber: ch };
   }
   return { provided: true, chamber: null };

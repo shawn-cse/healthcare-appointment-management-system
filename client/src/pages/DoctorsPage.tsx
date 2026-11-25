@@ -328,7 +328,7 @@ export default function DoctorsPage() {
                                 <Icon id="ic-building" />
                               </span>
                               <span className="chamber-info-text">
-                                <span className="chamber-lbl">Room:</span>
+                                <span className="chamber-lbl">Room No:</span>
                                 <b className="chamber-val">{d.active_room}</b>
                               </span>
                             </div>

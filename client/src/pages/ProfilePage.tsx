@@ -224,7 +224,7 @@ export default function ProfilePage() {
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="pr-room">Room Number</label>
+                <label htmlFor="pr-room">Room No</label>
                 <input
                   id="pr-room"
                   type="text"

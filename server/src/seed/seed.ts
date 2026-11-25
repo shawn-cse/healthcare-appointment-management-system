@@ -131,20 +131,20 @@ const SCHEDULE_PATTERNS = [
 ];
 
 const CHAMBER_SPECS: Array<[string, string, string]> = [
-  ['Building 1', 'Room 101', 'Ground Floor, General OPD'],
-  ['Building 1', 'Room 102', 'Ground Floor, Diagnostic OPD'],
-  ['Building 1', 'Room 201', '2nd Floor, Cardiology & Chest'],
-  ['Building 1', 'Room 302', '3rd Floor, Specialist Clinic'],
-  ['Building 1', 'Room 405', '4th Floor, Surgery Suite'],
-  ['Building 1', 'Room 707', '7th Floor, Oncology & Women Care'],
-  ['Building 2', 'Room 105', '1st Floor, Internal Medicine'],
-  ['Building 2', 'Room 202', '2nd Floor, Pediatrics & Child Care'],
-  ['Building 2', 'Room 303', '3rd Floor, Neurology & Brain Care'],
-  ['Building 2', 'Room 401', '4th Floor, Diabetes & Endocrine'],
-  ['Building 3', 'Room 202', '2nd Floor, Special Consultation'],
-  ['Building 3', 'Room 305', '3rd Floor, ENT & Head-Neck'],
-  ['Building 3', 'Room 402', '4th Floor, Dermatology Care'],
-  ['Building 3', 'Room 501', '5th Floor, Executive Lounge'],
+  ['', 'Room 101', 'Ground Floor, Outpatient Wing'],
+  ['', 'Room 102', 'Ground Floor, Diagnostic OPD'],
+  ['', 'Room 201', '2nd Floor, Cardiology & Chest'],
+  ['', 'Room 302', '3rd Floor, Specialist Clinic'],
+  ['', 'Room 405', '4th Floor, Surgery Suite'],
+  ['', 'Room 707', '7th Floor, Oncology & Women Care'],
+  ['', 'Room 105', '1st Floor, Internal Medicine'],
+  ['', 'Room 202', '2nd Floor, Pediatrics & Child Care'],
+  ['', 'Room 303', '3rd Floor, Neurology & Brain Care'],
+  ['', 'Room 401', '4th Floor, Diabetes & Endocrine'],
+  ['', 'Room 202', '2nd Floor, Special Consultation'],
+  ['', 'Room 305', '3rd Floor, ENT & Head-Neck'],
+  ['', 'Room 402', '4th Floor, Dermatology Care'],
+  ['', 'Room 501', '5th Floor, Executive Lounge'],
 ];
 
 const RECEPTIONISTS: Array<[string, string]> = [
@@ -274,14 +274,19 @@ export async function seedDatabase(): Promise<void> {
   const chambers = [];
   for (const [bld, rm, desc] of CHAMBER_SPECS) {
     let ch = await prisma.chamber.findFirst({
-      where: { roomNumber: rm, building: bld },
+      where: { roomNumber: rm, description: desc },
     });
+    if (!ch) {
+      ch = await prisma.chamber.findFirst({
+        where: { roomNumber: rm },
+      });
+    }
     if (!ch) {
       ch = await prisma.chamber.create({
         data: {
           building: bld,
           roomNumber: rm,
-          name: `Green Hospital ${bld} - ${rm}`,
+          name: rm,
           floor: desc.split(',')[0],
           description: desc,
           address: 'Mirpur, Dhaka',

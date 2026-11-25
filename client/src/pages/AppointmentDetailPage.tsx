@@ -224,7 +224,7 @@ export default function AppointmentDetailPage() {
               <strong>{ap.doctor.department?.name || 'General Consultation'}</strong>
             </div>
             <div className="summary-row">
-              <span>Consultation Room</span>
+              <span>Room No</span>
               <strong>{ap.doctor.active_room || 'Unassigned'}</strong>
             </div>
             <div className="summary-row">

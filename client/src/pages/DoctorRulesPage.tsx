@@ -370,7 +370,7 @@ export default function DoctorRulesPage() {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="dr-chamb">Assigned Room</label>
+                  <label htmlFor="dr-chamb">Room No</label>
                   <select
                     id="dr-chamb"
                     className="field-control"
@@ -380,7 +380,8 @@ export default function DoctorRulesPage() {
                     <option value="">No Room / Unassigned</option>
                     {meta.chambers.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.room_number} ({c.building})
+                        {c.room_number}
+                        {c.description ? ` — ${c.description}` : ''}
                       </option>
                     ))}
                   </select>

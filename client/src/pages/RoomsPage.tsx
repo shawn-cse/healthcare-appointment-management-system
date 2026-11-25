@@ -117,8 +117,8 @@ export default function RoomsPage() {
         <div className="page-heading">
           <div>
             <p className="eyebrow">HOSPITAL ROOMS</p>
-            <h1>Rooms</h1>
-            <p>Manage rooms, short descriptions, and doctor &amp; staff room occupancy.</p>
+            <h1>Room Management</h1>
+            <p>Manage hospital rooms, short descriptions, and assigned doctors &amp; staff.</p>
           </div>
           <div className="heading-actions">
             <button type="button" className="button button-primary" onClick={openNew}>
@@ -196,7 +196,7 @@ export default function RoomsPage() {
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Room No / Name</th>
+                    <th>Room No</th>
                     <th>Description</th>
                     <th>Assigned Doctors &amp; Schedule</th>
                     <th>Staff</th>
@@ -294,7 +294,7 @@ export default function RoomsPage() {
             <div className="sm-modal-body">
               <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="rm-num">Room No / Name *</label>
+                  <label htmlFor="rm-num">Room No *</label>
                   <input
                     id="rm-num"
                     type="text"
@@ -314,7 +314,7 @@ export default function RoomsPage() {
                     className="field-control"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="e.g. Building 1, 2nd Floor, General OPD Suite"
+                    placeholder="e.g. Ground Floor, Outpatient Wing"
                   />
                 </div>
               </div>

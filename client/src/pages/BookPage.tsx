@@ -192,11 +192,11 @@ export default function BookPage() {
           </div>
 
           <div className="details-row">
-            <span>Facility / Center</span>
-            <b>{doctor.chamber?.name || 'Green Hospital Outpatient & Consultation Center'}</b>
+            <span>Location</span>
+            <b>{doctor.chamber?.description || 'Green Hospital Outpatient Center'}</b>
           </div>
           <div className="details-row">
-            <span>Room Number</span>
+            <span>Room No</span>
             <b className="highlight-room-badge">{doctor.active_room || 'OPD'}</b>
           </div>
           <div className="details-row">

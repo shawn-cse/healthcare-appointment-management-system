@@ -414,8 +414,8 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
             <p className="eyebrow">CLINICAL ROSTER &amp; ACCOUNTS</p>
             <h1>Staff &amp; Doctor Management</h1>
             <p>
-              Onboard doctors, receptionists, and administrators, assign consultation rooms without
-              schedule conflicts, and control portal access from one unified console.
+              Onboard doctors, receptionists, and administrators, assign rooms without schedule
+              conflicts, and control portal access from one unified console.
             </p>
           </div>
           {isAdmin && (
@@ -892,7 +892,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
               <div className="sm-room-box" style={{ marginBottom: role === 'doctor' ? 18 : 0 }}>
                 <div className="form-grid two-col">
                   <div className="form-group full" style={{ marginBottom: 8 }}>
-                    <label htmlFor="sm-room">Room (Optional — Any Staff Role)</label>
+                    <label htmlFor="sm-room">Room No (Optional — Any Staff Role)</label>
                     <select
                       id="sm-room"
                       className="field-control"
@@ -925,9 +925,11 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                       <strong style={{ fontSize: '0.88rem', color: '#0d5c46' }}>
                         Room Occupancy &amp; Schedule ({selectedRoom.room_number})
                       </strong>
-                      <span className="muted" style={{ fontSize: '0.8rem' }}>
-                        {selectedRoom.building} · {selectedRoom.floor}
-                      </span>
+                      {selectedRoom.description && (
+                        <span className="muted" style={{ fontSize: '0.8rem' }}>
+                          {selectedRoom.description}
+                        </span>
+                      )}
                     </div>
 
                     {otherDoctorsInRoom.length > 0 ? (

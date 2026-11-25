@@ -116,7 +116,7 @@ export default function DoctorDetailPage() {
             {doctor.active_room && (
               <div className="meta-bar-item">
                 <span className="meta-bar-label">
-                  <Icon id="ic-building" className="icon icon-xs" /> Room
+                  <Icon id="ic-building" className="icon icon-xs" /> Room No
                 </span>
                 <b className="meta-bar-value">{doctor.active_room}</b>
               </div>
