@@ -1,0 +1,337 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          BigInt    @id @default(autoincrement())
+  password    String    @db.VarChar(128)
+  lastLogin   DateTime? @map("last_login") @db.Timestamptz(6)
+  isSuperuser Boolean   @default(false) @map("is_superuser")
+  username    String    @unique @db.VarChar(150)
+  firstName   String    @default("") @map("first_name") @db.VarChar(150)
+  lastName    String    @default("") @map("last_name") @db.VarChar(150)
+  email       String    @default("") @db.VarChar(254)
+  isStaff     Boolean   @default(false) @map("is_staff")
+  isActive    Boolean   @default(true) @map("is_active")
+  dateJoined  DateTime  @default(now()) @map("date_joined") @db.Timestamptz(6)
+  role        String    @default("patient") @db.VarChar(16)
+  phone       String?   @unique @db.VarChar(16)
+  dob         DateTime? @db.Date
+  nid         String    @default("") @db.VarChar(30)
+  address     String    @default("") @db.Text
+  avatar      String    @default("") @db.VarChar(100)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  doctorProfile           DoctorProfile?
+  assignedDoctors         DoctorReceptionist[]
+  patientAppointments     Appointment[]        @relation("PatientAppointments")
+  cancelledAppointments   Appointment[]        @relation("CancelledAppointments")
+  createdAppointments     Appointment[]        @relation("CreatedAppointments")
+  handledPayments         PaymentTransaction[] @relation("HandledPayments")
+  requestedRefunds        RefundRequest[]      @relation("RequestedRefunds")
+  reviewedRefunds         RefundRequest[]      @relation("ReviewedRefunds")
+  complaints              Complaint[]          @relation("PatientComplaints")
+  handledComplaints       Complaint[]          @relation("UpdatedComplaints")
+  complaintMessages       ComplaintMessage[]
+  auditEvents             AuditEvent[]
+
+  @@index([role])
+  @@map("hospital_user")
+}
+
+model Department {
+  id          BigInt   @id @default(autoincrement())
+  name        String   @unique @db.VarChar(100)
+  slug        String   @unique @db.VarChar(50)
+  description String   @default("") @db.VarChar(255)
+  icon        String   @default("heart-pulse") @db.VarChar(32)
+  isActive    Boolean  @default(true) @map("is_active")
+
+  doctors  DoctorProfile[]
+  chambers Chamber[]
+
+  @@map("hospital_department")
+}
+
+model HospitalPolicy {
+  id                    Int      @id @default(1) @db.SmallInt
+  defaultNoticeHours    Int      @default(24) @map("default_notice_hours")
+  defaultAdvanceDays    Int      @default(60) @map("default_advance_days")
+  defaultPaymentHours   Int      @default(4) @map("default_payment_hours")
+  defaultCancelMode     String   @default("percent") @map("default_cancel_mode") @db.VarChar(10)
+  defaultCancelValue    Decimal  @default(10.00) @map("default_cancel_value") @db.Decimal(9, 2)
+  defaultHospitalMode   String   @default("percent") @map("default_hospital_mode") @db.VarChar(10)
+  defaultHospitalValue  Decimal  @default(10.00) @map("default_hospital_value") @db.Decimal(9, 2)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("hospital_hospitalpolicy")
+}
+
+model Chamber {
+  id            BigInt      @id @default(autoincrement())
+  building      String      @default("Building 1") @db.VarChar(80)
+  name          String      @db.VarChar(150)
+  roomNumber    String      @default("Chamber 302") @map("room_number") @db.VarChar(50)
+  floor         String      @default("3rd Floor") @db.VarChar(50)
+  description   String      @default("Building 1, chamber 302") @db.VarChar(255)
+  address       String      @default("Mirpur, Dhaka") @db.VarChar(255)
+  contactNumber String      @default("+88096100016211") @map("contact_number") @db.VarChar(120)
+  departmentId  BigInt?     @map("department_id")
+  isActive      Boolean     @default(true) @map("is_active")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  department Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  doctors    DoctorProfile[]
+
+  @@index([departmentId])
+  @@map("hospital_chamber")
+}
+
+model DoctorProfile {
+  id                    BigInt   @id @default(autoincrement())
+  userId                BigInt   @unique @map("user_id")
+  departmentId          BigInt   @map("department_id")
+  chamberId             BigInt?  @map("chamber_id")
+  chamberDays           String   @default("0,2") @map("chamber_days") @db.VarChar(50)
+  gender                String   @default("male") @db.VarChar(10)
+  qualifications        String   @default("") @db.Text
+  designation           String   @default("Consultant") @db.VarChar(150)
+  registrationNumber    String   @default("") @map("registration_number") @db.VarChar(100)
+  experienceYears       Int      @default(0) @map("experience_years") @db.SmallInt
+  biography             String   @default("") @db.Text
+  initialFee            Decimal  @default(1000.00) @map("initial_fee") @db.Decimal(9, 2)
+  followupFee           Decimal  @default(800.00) @map("followup_fee") @db.Decimal(9, 2)
+  followupWithinDays    Int      @default(30) @map("followup_within_days")
+  reportFee             Decimal  @default(500.00) @map("report_fee") @db.Decimal(9, 2)
+  maxPatientsPerSession Int      @default(30) @map("max_patients_per_session") @db.SmallInt
+  hospitalShareMode     String   @default("percent") @map("hospital_share_mode") @db.VarChar(10)
+  hospitalShareValue    Decimal  @default(10.00) @map("hospital_share_value") @db.Decimal(9, 2)
+  bookingNoticeHours    Int      @default(24) @map("booking_notice_hours")
+  bookingAdvanceDays    Int      @default(60) @map("booking_advance_days")
+  paymentPolicy         String   @default("on_day") @map("payment_policy") @db.VarChar(10)
+  paymentDeadlineHours  Int      @default(4) @map("payment_deadline_hours")
+  cancelFeeMode         String   @default("percent") @map("cancel_fee_mode") @db.VarChar(10)
+  cancelFeeValue        Decimal  @default(10.00) @map("cancel_fee_value") @db.Decimal(9, 2)
+  titlePrefix           String   @default("Dr.") @map("title_prefix") @db.VarChar(40)
+  institute             String   @default("") @db.VarChar(200)
+  roomNumber            String   @default("Chamber 302") @map("room_number") @db.VarChar(50)
+  chamberAddress        String   @default("Mirpur, Dhaka") @map("chamber_address") @db.VarChar(255)
+  contactNumber         String   @default("+88096100016211") @map("contact_number") @db.VarChar(100)
+  isAvailable           Boolean  @default(true) @map("is_available")
+
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department    Department           @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  chamber       Chamber?             @relation(fields: [chamberId], references: [id], onDelete: SetNull)
+  receptionists DoctorReceptionist[]
+  weekly        WeeklyAvailability[]
+  slots         AppointmentSlot[]
+
+  @@index([departmentId])
+  @@index([chamberId])
+  @@map("hospital_doctorprofile")
+}
+
+model DoctorReceptionist {
+  id              BigInt @id @default(autoincrement())
+  doctorProfileId BigInt @map("doctorprofile_id")
+  userId          BigInt @map("user_id")
+
+  doctorProfile DoctorProfile @relation(fields: [doctorProfileId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorProfileId, userId])
+  @@index([doctorProfileId])
+  @@index([userId])
+  @@map("hospital_doctorprofile_receptionists")
+}
+
+model WeeklyAvailability {
+  id              BigInt   @id @default(autoincrement())
+  doctorId        BigInt   @map("doctor_id")
+  weekday         Int      @db.SmallInt
+  startTime       DateTime @map("start_time") @db.Time(6)
+  endTime         DateTime @map("end_time") @db.Time(6)
+  durationMinutes Int      @default(30) @map("duration_minutes") @db.SmallInt
+  capacity        Int      @default(1) @db.SmallInt
+  active          Boolean  @default(true)
+
+  doctor DoctorProfile     @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  slots  AppointmentSlot[]
+
+  @@index([doctorId])
+  @@map("hospital_weeklyavailability")
+}
+
+model AppointmentSlot {
+  id         BigInt   @id @default(autoincrement())
+  doctorId   BigInt   @map("doctor_id")
+  templateId BigInt?  @map("template_id")
+  date       DateTime @db.Date
+  startTime  DateTime @map("start_time") @db.Time(6)
+  endTime    DateTime @map("end_time") @db.Time(6)
+  capacity   Int      @default(1) @db.SmallInt
+  isOpen     Boolean  @default(true) @map("is_open")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  doctor       DoctorProfile       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  template     WeeklyAvailability? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  appointments Appointment[]
+
+  @@unique([doctorId, date, startTime], map: "unique_doctor_slot")
+  @@index([doctorId])
+  @@index([date])
+  @@index([templateId])
+  @@map("hospital_appointmentslot")
+}
+
+model Appointment {
+  id                  BigInt    @id @default(autoincrement())
+  reference           String    @unique @db.VarChar(20)
+  serialNumber        Int       @default(1) @map("serial_number")
+  slotId              BigInt    @map("slot_id")
+  patientId           BigInt?   @map("patient_id")
+  guestName           String    @map("guest_name") @db.VarChar(150)
+  guestPhone          String    @map("guest_phone") @db.VarChar(16)
+  guestDob            DateTime? @map("guest_dob") @db.Date
+  visitType           String    @default("first") @map("visit_type") @db.VarChar(10)
+  status              String    @default("confirmed") @db.VarChar(14)
+  paymentStatus       String    @default("unpaid") @map("payment_status") @db.VarChar(20)
+  paymentMethod       String    @default("cash") @map("payment_method") @db.VarChar(10)
+  source              String    @default("web") @db.VarChar(10)
+  fee                 Decimal   @db.Decimal(9, 2)
+  cancelModeSnapshot  String    @default("percent") @map("cancel_mode_snapshot") @db.VarChar(10)
+  cancelValueSnapshot Decimal   @default(0.00) @map("cancel_value_snapshot") @db.Decimal(9, 2)
+  hospitalCut         Decimal   @default(0.00) @map("hospital_cut") @db.Decimal(9, 2)
+  doctorCut           Decimal   @default(0.00) @map("doctor_cut") @db.Decimal(9, 2)
+  paymentDueAt        DateTime? @map("payment_due_at") @db.Timestamptz(6)
+  notes               String    @default("") @db.Text
+  cancellationReason  String    @default("") @map("cancellation_reason") @db.Text
+  cancelledById       BigInt?   @map("cancelled_by_id")
+  createdById         BigInt?   @map("created_by_id")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  slot        AppointmentSlot      @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  patient     User?                @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Restrict)
+  cancelledBy User?                @relation("CancelledAppointments", fields: [cancelledById], references: [id], onDelete: SetNull)
+  createdBy   User?                @relation("CreatedAppointments", fields: [createdById], references: [id], onDelete: SetNull)
+  payments    PaymentTransaction[]
+  refund      RefundRequest?
+  complaints  Complaint[]
+
+  @@index([slotId])
+  @@index([patientId])
+  @@index([guestPhone])
+  @@index([status])
+  @@index([paymentStatus])
+  @@map("hospital_appointment")
+}
+
+model PaymentTransaction {
+  id                BigInt    @id @default(autoincrement())
+  appointmentId     BigInt    @map("appointment_id")
+  kind              String    @default("charge") @db.VarChar(8)
+  method            String    @db.VarChar(12)
+  status            String    @default("initiated") @db.VarChar(14)
+  amount            Decimal   @db.Decimal(9, 2)
+  externalId        String?   @unique @map("external_id") @db.VarChar(40)
+  validationId      String    @default("") @map("validation_id") @db.VarChar(90)
+  bankTransactionId String    @default("") @map("bank_transaction_id") @db.VarChar(90)
+  refundReference   String    @default("") @map("refund_reference") @db.VarChar(90)
+  handledById       BigInt?   @map("handled_by_id")
+  note              String    @default("") @db.VarChar(255)
+  processedAt       DateTime? @map("processed_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  handledBy   User?       @relation("HandledPayments", fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([appointmentId])
+  @@index([handledById])
+  @@map("hospital_paymenttransaction")
+}
+
+model RefundRequest {
+  id            BigInt    @id @default(autoincrement())
+  appointmentId BigInt    @unique @map("appointment_id")
+  amount        Decimal   @db.Decimal(9, 2)
+  mode          String    @db.VarChar(10)
+  status        String    @default("pending") @db.VarChar(12)
+  requestedById BigInt?   @map("requested_by_id")
+  reviewedById  BigInt?   @map("reviewed_by_id")
+  reason        String    @default("") @db.Text
+  internalNote  String    @default("") @map("internal_note") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  reviewedAt    DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  requestedBy User?       @relation("RequestedRefunds", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedBy  User?       @relation("ReviewedRefunds", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([requestedById])
+  @@index([reviewedById])
+  @@map("hospital_refundrequest")
+}
+
+model Complaint {
+  id              BigInt   @id @default(autoincrement())
+  ticketCode      String   @default("") @map("ticket_code") @db.VarChar(12)
+  patientId       BigInt   @map("patient_id")
+  appointmentId   BigInt?  @map("appointment_id")
+  subject         String   @db.VarChar(150)
+  category        String   @default("support") @db.VarChar(20)
+  message         String   @db.Text
+  attachment      String?  @db.VarChar(100)
+  status          String   @default("submitted") @db.VarChar(20)
+  response        String   @default("") @db.Text
+  adminAttachment String?  @map("admin_attachment") @db.VarChar(100)
+  updatedById     BigInt?  @map("updated_by_id")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  patient     User               @relation("PatientComplaints", fields: [patientId], references: [id], onDelete: Restrict)
+  appointment Appointment?       @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  updatedBy   User?              @relation("UpdatedComplaints", fields: [updatedById], references: [id], onDelete: SetNull)
+  messages    ComplaintMessage[]
+
+  @@index([ticketCode])
+  @@index([patientId])
+  @@index([appointmentId])
+  @@index([updatedById])
+  @@map("hospital_complaint")
+}
+
+model ComplaintMessage {
+  id          BigInt   @id @default(autoincrement())
+  complaintId BigInt   @map("complaint_id")
+  authorId    BigInt   @map("author_id")
+  message     String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([complaintId])
+  @@index([authorId])
+  @@map("hospital_complaintmessage")
+}
+
+model AuditEvent {
+  id        BigInt   @id @default(autoincrement())
+  actorId   BigInt?  @map("actor_id")
+  action    String   @db.VarChar(100)
+  target    String   @db.VarChar(160)
+  detail    String   @default("") @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@map("hospital_auditevent")
+}

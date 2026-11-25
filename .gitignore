@@ -1,8 +1,22 @@
+# Dependencies & Build Outputs
+node_modules/
+server/node_modules/
+client/node_modules/
+server/dist/
+client/dist/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Environment & Secrets
 .env
-__pycache__/
-*.py[cod]
-*.sqlite3
-/media/*
-!/media/.gitkeep
-/staticfiles/
-.pytest_cache/
+.env.local
+.env.*.local
+
+# Runtime Media & Logs
+media/
+*.log
+
+# OS Files
+.DS_Store
+Thumbs.db

@@ -3,47 +3,91 @@ services:
     image: postgres:16-alpine
     container_name: Green_Hospital_DB
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${DATABASE_NAME:-green_hospital}
       POSTGRES_USER: ${DATABASE_USER:-green_user}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-change_this_database_password}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
     volumes:
       - green_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-green_user} -d ${DATABASE_NAME:-green_hospital}"]
       interval: 5s
       timeout: 5s
-      retries: 15
-  web:
-    build: .
-    image: green_hospital_web:latest
-    container_name: Green_Hospital
+      retries: 10
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: Green_Hospital_API
     restart: unless-stopped
-    env_file: .env
-    ports:
-      - "8000:8000"
-    volumes:
-      - green_media:/app/media
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      MEDIA_ROOT: /app/media
+    volumes:
+      - ./media:/app/media
+    expose:
+      - "5000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
-      interval: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
       timeout: 5s
-      start_period: 40s
+      retries: 10
+      start_period: 20s
+
+  web:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: Green_Hospital
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8000:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
       retries: 5
+
   scheduler:
-    build: .
-    image: green_hospital_scheduler:latest
+    build:
+      context: ./server
+      dockerfile: Dockerfile
     container_name: Green_Hospital_Scheduler
     restart: unless-stopped
-    env_file: .env
-    command: ["python", "manage.py", "run_maintenance"]
     depends_on:
-      web:
+      db:
         condition: service_healthy
+      api:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      MEDIA_ROOT: /app/media
+    volumes:
+      - ./media:/app/media
+    command: ["node", "dist/worker.js"]
+    healthcheck:
+      test: ["CMD-SHELL", "pidof node >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
 volumes:
   green_postgres:
-  green_media:

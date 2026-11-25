@@ -1,0 +1,46 @@
+{
+  "name": "green-hospital-server",
+  "version": "2.0.0",
+  "description": "Green Hospital - TypeScript Express + Prisma + PostgreSQL Backend",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "prisma generate && tsc",
+    "start": "node dist/server.js",
+    "worker": "node dist/worker.js",
+    "dev": "tsx watch src/server.ts",
+    "seed": "tsx src/seed/seed.ts",
+    "typecheck": "prisma generate && tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.7.5",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/morgan": "^1.9.9",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.13.10",
+    "@types/supertest": "^6.0.2",
+    "prisma": "^6.5.0",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

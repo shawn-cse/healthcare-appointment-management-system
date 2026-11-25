@@ -1,0 +1,188 @@
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import api, { getApiErrorMessage } from '../api/api.ts';
+import { AppLayout } from '../components/Layout.tsx';
+import { useAuth } from '../context/AuthContext.tsx';
+import { useToast } from '../context/ToastContext.tsx';
+import type { Appointment } from '../types/index.ts';
+
+export default function ComplaintNewPage() {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [ticketType, setTicketType] = useState<'support' | 'complaint'>('support');
+  const [category, setCategory] = useState('support');
+  const [appointmentId, setAppointmentId] = useState(searchParams.get('appointment') || '');
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const isPatient = user?.role === 'patient';
+
+  useEffect(() => {
+    if (!isPatient) return;
+    api
+      .get<{ patient_appointments: Appointment[] }>('/complaints')
+      .then((res) => setAppointments(res.data.patient_appointments || []))
+      .catch(() => {});
+  }, [isPatient]);
+
+  const handleTypeChange = (type: 'support' | 'complaint') => {
+    setTicketType(type);
+    setCategory(type === 'support' ? 'support' : 'hospital');
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('subject', subject.trim());
+      formData.append('category', category);
+      formData.append('message', message.trim());
+      if (isPatient && appointmentId) {
+        formData.append('appointment_id', appointmentId);
+      }
+      if (attachment) {
+        formData.append('attachment', attachment);
+      }
+
+      const res = await api.post<{ message: string }>('/complaints', formData);
+      showToast(res.data.message || 'Ticket submitted.', 'success');
+      navigate('/complaints');
+    } catch (err) {
+      showToast(getApiErrorMessage(err, 'Failed to submit ticket.'), 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AppLayout>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">HOSPITAL SUPPORT &amp; ESCALATIONS</p>
+          <h1>Submit Support Request or Complaint</h1>
+          <p>
+            Select general support or file a formal clinical/billing complaint for review by
+            administration.
+          </p>
+        </div>
+        <div className="heading-actions">
+          <Link className="button button-outline" to="/complaints">
+            ← Back to Tickets
+          </Link>
+        </div>
+      </div>
+
+      <div className="panel" style={{ maxWidth: 740, padding: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+          <button
+            type="button"
+            className={`button ${ticketType === 'support' ? 'button-primary' : 'button-outline'}`}
+            onClick={() => handleTypeChange('support')}
+          >
+            Support &amp; General Inquiry
+          </button>
+          <button
+            type="button"
+            className={`button ${ticketType === 'complaint' ? 'button-primary' : 'button-outline'}`}
+            onClick={() => handleTypeChange('complaint')}
+          >
+            Formal Complaint
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="form-grid">
+          {ticketType === 'complaint' && (
+            <div className="form-group">
+              <label htmlFor="cn-cat">Complaint Category</label>
+              <select
+                id="cn-cat"
+                className="field-control"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="doctor">Doctor consultation / attitude</option>
+                <option value="hospital">Hospital cleanliness / facility</option>
+                <option value="staff">Reception or support staff</option>
+                <option value="billing">Billing or refund issue</option>
+                <option value="other">Other matter</option>
+              </select>
+            </div>
+          )}
+
+          {isPatient && (
+            <div className="form-group">
+              <label htmlFor="cn-appt">Related Appointment (Optional)</label>
+              <select
+                id="cn-appt"
+                className="field-control"
+                value={appointmentId}
+                onChange={(e) => setAppointmentId(e.target.value)}
+              >
+                <option value="">General Inquiry / Not Linked to a Booking</option>
+                {appointments.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.reference} — {a.doctor.name} ({a.slot.date})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label htmlFor="cn-subj">Subject (Max 150 chars)</label>
+            <input
+              id="cn-subj"
+              type="text"
+              maxLength={150}
+              className="field-control"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Brief summary of your request or concern"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="cn-msg">Detailed Description</label>
+            <textarea
+              id="cn-msg"
+              rows={5}
+              className="field-control"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Describe what happened, relevant dates, or how administration can help..."
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="cn-file">Supporting Document / Screenshot (Optional)</label>
+            <input
+              id="cn-file"
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp"
+              className="field-control"
+              onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Link className="button button-outline" to="/complaints">
+              Cancel
+            </Link>
+            <button type="submit" className="button button-primary" disabled={submitting}>
+              {submitting ? 'Submitting...' : 'Submit Ticket'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </AppLayout>
+  );
+}
