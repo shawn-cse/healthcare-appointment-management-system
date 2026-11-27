@@ -44,6 +44,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMobileNavOpen(false);
     setDropdownOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
     setProgressActive(true);
     setProgressWidth(68);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -56,7 +59,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [location.pathname, location.search]);
+  }, [location.pathname]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -80,61 +83,40 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!user) return <PublicLayout>{children}</PublicLayout>;
 
-  const navItems: NavItem[] = [];
-  if (user.role === 'patient') {
-    navItems.push(
-      { to: '/dashboard', label: 'Dashboard', icon: 'ic-grid' },
+  const dashboard = { to: '/dashboard', label: 'Dashboard', icon: 'ic-grid' };
+  const appointments = { to: '/appointments', label: 'Appointment Management', icon: 'ic-calendar' };
+  const payments = { to: '/payments', label: 'Payment Management', icon: 'ic-wallet' };
+  const refunds = { to: '/finance/refunds', label: 'Refund Management', icon: 'ic-wallet' };
+  const complaints = { to: '/service/complaints', label: 'Complaint Management', icon: 'ic-alert' };
+  const directory = { to: '/staff', label: 'Staff and Doctor List', icon: 'ic-users' };
+  const support = { to: '/complaints', label: 'Support', icon: 'ic-help' };
+  const personalComplaints = { ...support, label: 'My Complaints' };
+  const groups: { label?: string; items: NavItem[] }[] = [];
+  if (!user.is_active) {
+    groups.push({ items: [user.role === 'patient' ? personalComplaints : support] });
+  } else if (user.role === 'patient') {
+    groups.push({ items: [dashboard,
       { to: '/doctors', label: 'Find Doctors', icon: 'ic-stethoscope' },
-      { to: '/appointments', label: 'My Appointments', icon: 'ic-calendar' },
-      { to: '/complaints', label: 'Complaint & Support Desk', icon: 'ic-help' }
-    );
+      { ...appointments, label: 'My Appointments' }, { ...payments, label: 'My Payments' }, personalComplaints,
+    ] });
+  } else if (user.role === 'doctor') {
+    groups.push({ items: [dashboard, appointments,
+      { to: '/schedules', label: 'Schedule Management', icon: 'ic-clock' },
+      ...(user.doctor_profile_id ? [{ to: `/doctors/${user.doctor_profile_id}/rules`, label: 'Fees & Appointment Rules', icon: 'ic-settings' }] : []),
+      complaints, directory, support,
+    ] });
+  } else if (user.role === 'receptionist') {
+    groups.push({ items: [dashboard, { to: '/reception/book', label: 'Create Appointment', icon: 'ic-plus' }, appointments, payments, refunds, directory, support] });
   } else {
-    navItems.push(
-      { to: '/dashboard', label: 'Dashboard', icon: 'ic-grid' },
-      { to: '/staff', label: 'Staff and Dr Management', icon: 'ic-users' },
-      { to: '/appointments', label: 'Appointments', icon: 'ic-calendar' }
-    );
-    if (user.role !== 'doctor') {
-      navItems.push({ to: '/reception/book', label: 'Register Booking', icon: 'ic-plus' });
-    }
-    navItems.push({ to: '/schedules', label: 'Schedules & Slots', icon: 'ic-clock' });
-    if (user.role === 'doctor' && user.doctor_profile_id) {
-      navItems.push({
-        to: `/doctors/${user.doctor_profile_id}/rules`,
-        label: 'Fees & Booking Rules',
-        icon: 'ic-settings',
-      });
-    }
-    if (user.role === 'admin' || user.role === 'receptionist') {
-      navItems.push({ to: '/finance/refunds', label: 'Refund Management', icon: 'ic-wallet' });
-    }
-    if (user.role === 'admin') {
-      navItems.push({
-        to: '/service/complaints',
-        label: 'Complaint & Support Management',
-        icon: 'ic-help',
-      });
-    } else if (user.role === 'doctor') {
-      navItems.push(
-        { to: '/service/complaints', label: 'Complaint Management', icon: 'ic-alert' },
-        { to: '/complaints', label: 'Support & Requests', icon: 'ic-help' }
-      );
-    } else if (user.role === 'receptionist') {
-      navItems.push(
-        { to: '/complaints', label: 'Support & Requests', icon: 'ic-help' },
-        { to: '/service/complaints', label: 'Complaint Management', icon: 'ic-alert' }
-      );
-    }
-    if (user.role === 'admin' || user.role === 'doctor') {
-      navItems.push({ to: '/reports', label: 'Reports & Analytics', icon: 'ic-chart' });
-    }
-    if (user.role === 'admin') {
-      navItems.push(
-        { to: '/rooms', label: 'Room Management', icon: 'ic-building' },
-        { to: '/departments', label: 'Manage Departments', icon: 'ic-building' },
-        { to: '/activity-log', label: 'Activity Log', icon: 'ic-clipboard' }
-      );
-    }
+    groups.push({ items: [dashboard, { ...directory, label: 'Doctors & Staff Management' },
+      appointments, { to: '/reception/book', label: 'Register Booking', icon: 'ic-plus' },
+      { to: '/rooms', label: 'Room Management', icon: 'ic-building' },
+      { to: '/departments', label: 'Department Management', icon: 'ic-building' },
+      payments, refunds, { ...complaints, label: 'Complaints & Support' },
+      { to: '/system/settings', label: 'System Settings', icon: 'ic-settings' },
+      { to: '/reports', label: 'Reports & Analytics', icon: 'ic-chart' },
+      { to: '/activity-log', label: 'Activity Log', icon: 'ic-clipboard' },
+    ] });
   }
 
   const toggleNav = () => {
@@ -197,19 +179,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         <div className="sidebar-scroll">
-          <div className="nav-eyebrow">
-            {user.role === 'patient' ? 'PATIENT SERVICES' : 'WORKSPACE'}
-          </div>
           <nav className="nav-list" aria-label="Main navigation">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) => (isActive ? 'active' : '')}
-              >
-                <Icon id={item.icon} /> {item.label}
-              </NavLink>
-            ))}
+            {groups.map((group, index) => <div className="nav-group" key={group.label || index}>
+              {group.label && <div className="nav-eyebrow">{group.label}</div>}
+              {group.items.map((item) => <NavLink key={item.to} to={item.to} end className={({ isActive }) => isActive ? 'active' : ''}>
+                <Icon id={item.icon} /> <span>{item.label}</span>
+              </NavLink>)}
+            </div>)}
           </nav>
         </div>
       </aside>
@@ -324,16 +300,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
                 <div className="dropdown-divider" />
-                <div className="dropdown-links-list">
+                {user.is_active && <div className="dropdown-links-list">
                   <Link to="/profile" className="dropdown-link-item" role="menuitem">
                     <Icon id="ic-user" />
-                    <span>Update Profile</span>
+                    <span>My Profile</span>
                   </Link>
                   <Link to="/profile/password" className="dropdown-link-item" role="menuitem">
                     <Icon id="ic-settings" />
-                    <span>Change Password</span>
+                    <span>Profile Settings</span>
                   </Link>
-                </div>
+                </div>}
                 <div className="dropdown-divider" />
                 <div className="dropdown-logout-form">
                   <button
@@ -355,7 +331,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className={`page-progress-bar ${progressActive ? 'is-active' : ''}`} aria-hidden="true">
             <div className="page-progress-inner" style={{ width: `${progressWidth}%` }} />
           </div>
-          <div key={location.pathname + location.search} className="gh-page-transition">
+          <div key={location.pathname} className="gh-page-transition">
             {children}
           </div>
           <footer className="app-footer">
@@ -374,11 +350,39 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const location = useLocation();
   const [navExpanded, setNavExpanded] = useState(false);
+  const [infoMenuOpen, setInfoMenuOpen] = useState(false);
+  const infoMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setNavExpanded(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [location.pathname, location.search]);
+    setInfoMenuOpen(false);
+  }, [location.pathname, location.search, location.hash]);
+
+  useEffect(() => {
+    if (!location.hash) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (infoMenuRef.current && !infoMenuRef.current.contains(e.target as Node)) {
+        setInfoMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setInfoMenuOpen(false);
+        setNavExpanded(false);
+      }
+    };
+    document.addEventListener('click', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('click', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
 
   useEffect(() => {
     document.body.classList.remove('app-layout', 'sidebar-collapsed', 'nav-open');
@@ -438,26 +442,115 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             className={`public-links ${navExpanded ? 'nav-expanded' : ''}`}
             id="public-navigation"
           >
-            <Link to="/" onClick={() => setNavExpanded(false)}>
+            <NavLink to="/" end className={({ isActive }) => (isActive && !location.hash ? 'is-nav-active' : '')} onClick={() => setNavExpanded(false)}>
               Home
-            </Link>
-            <Link to="/doctors" onClick={() => setNavExpanded(false)}>
+            </NavLink>
+            <NavLink to="/doctors" className={({ isActive }) => (isActive ? 'is-nav-active' : '')} onClick={() => setNavExpanded(false)}>
               Find Doctors
-            </Link>
-            <a href="/#care" onClick={() => setNavExpanded(false)}>
+            </NavLink>
+            <Link to="/#care" onClick={() => setNavExpanded(false)}>
               Departments
-            </a>
+            </Link>
+
+            <div
+              className={`public-nav-dropdown ${infoMenuOpen ? 'is-open' : ''}`}
+              ref={infoMenuRef}
+            >
+              <button
+                type="button"
+                className={`public-nav-trigger ${location.pathname === '/hospital-info' ? 'is-nav-active' : ''}`}
+                aria-expanded={infoMenuOpen}
+                aria-haspopup="true"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setInfoMenuOpen((prev) => !prev);
+                }}
+              >
+                <span>Hospital Info</span>
+                <svg className="icon public-nav-chevron" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="m6 9 6 6 6-6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+
+              <div className="public-nav-menu" role="menu">
+                <Link
+                  to="/hospital-info#about-us"
+                  className="public-nav-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setInfoMenuOpen(false);
+                    setNavExpanded(false);
+                  }}
+                >
+                  <Icon id="ic-building" />
+                  <div>
+                    <strong>About Us</strong>
+                    <small>Clinical overview, departments &amp; care</small>
+                  </div>
+                </Link>
+                <Link
+                  to="/hospital-info#hospital-policy"
+                  className="public-nav-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setInfoMenuOpen(false);
+                    setNavExpanded(false);
+                  }}
+                >
+                  <Icon id="ic-clipboard" />
+                  <div>
+                    <strong>Hospital Policy</strong>
+                    <small>Booking rules, fees, payments &amp; refunds</small>
+                  </div>
+                </Link>
+                <Link
+                  to="/hospital-info#contact-us"
+                  className="public-nav-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setInfoMenuOpen(false);
+                    setNavExpanded(false);
+                  }}
+                >
+                  <Icon id="ic-phone" />
+                  <div>
+                    <strong>Contact Us</strong>
+                    <small>24/7 hotline, location &amp; support</small>
+                  </div>
+                </Link>
+                <div className="public-nav-menu-footer">
+                  <Link
+                    to="/hospital-info"
+                    onClick={() => {
+                      setInfoMenuOpen(false);
+                      setNavExpanded(false);
+                    }}
+                  >
+                    View All Hospital Information <Icon id="ic-arrow" />
+                  </Link>
+                </div>
+              </div>
+            </div>
           </nav>
 
           <div className="public-header-actions">
             <Link className="button button-primary button-sm" to="/login">
-              Sign In <Icon id="ic-arrow" />
+              Login / Register <Icon id="ic-arrow" />
             </Link>
             <button
               type="button"
               className="icon-button mobile-toggle public-mobile-toggle"
               onClick={() => setNavExpanded((prev) => !prev)}
               aria-label="Toggle navigation"
+              aria-controls="public-navigation"
+              aria-expanded={navExpanded}
             >
               <Icon id="ic-menu" />
             </button>
@@ -466,7 +559,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="public-main-content">
-        <div key={location.pathname + location.search} className="gh-page-transition">
+        <div key={location.pathname} className="gh-page-transition">
           {children}
         </div>
       </main>
@@ -504,7 +597,16 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                   <Link to="/doctors">Find a Specialist Doctor</Link>
                 </li>
                 <li>
-                  <a href="/#care">Medical Departments</a>
+                  <Link to="/#care">Medical Departments</Link>
+                </li>
+                <li>
+                  <Link to="/hospital-info#about-us">About Us</Link>
+                </li>
+                <li>
+                  <Link to="/hospital-info#hospital-policy">Hospital Policy</Link>
+                </li>
+                <li>
+                  <Link to="/hospital-info#contact-us">Contact Us</Link>
                 </li>
                 <li>
                   <Link to="/login/patient">Patient Portal Sign In</Link>

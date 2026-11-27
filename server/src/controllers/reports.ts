@@ -9,9 +9,10 @@ import {
   serializeAppointment,
   serializeAuditEvent,
   serializeDoctor,
+  serializePaymentTransaction,
   userDisplayName,
 } from '../services/serialize.js';
-import { addDaysDate, dateToIso, localTodayDate, parseIsoDate, timeToHm } from '../utils/dateTime.js';
+import { addDaysDate, dateToIso, localStartUtc, localTodayDate, parseIsoDate, parseTimeStr, timeToHm } from '../utils/dateTime.js';
 
 const appointmentInclude = {
   patient: true,
@@ -34,9 +35,64 @@ const appointmentInclude = {
   },
 };
 
+function transactionHospitalShare(amount: number, fee: number, cut: number, charge: boolean) {
+  return fee > 0 ? (charge ? Math.round(amount * cut / fee) : Math.round((fee - amount) * cut / fee) - cut) : 0;
+}
+
+async function adminDashboard(today: Date) {
+  const midnight = parseTimeStr('00:00')!;
+  const bounds = [0, -6, -29].map((offset) => localStartUtc(addDaysDate(today, offset), midnight));
+  const [queue, total, paid, unpaid, transactions] = await Promise.all([
+    prisma.appointment.findMany({
+      where: { slot: { date: today }, status: { notIn: ['cancelled', 'expired'] } },
+      include: appointmentInclude,
+      orderBy: [{ slot: { startTime: 'asc' } }, { serialNumber: 'asc' }, { id: 'asc' }],
+    }),
+    prisma.appointment.count(),
+    prisma.appointment.count({ where: { paymentStatus: { in: ['paid', 'partially_refunded'] } } }),
+    prisma.appointment.count({ where: { paymentStatus: 'unpaid', status: { in: ['pending', 'confirmed'] } } }),
+    prisma.paymentTransaction.findMany({
+      where: {
+        processedAt: { gte: bounds[2], lt: localStartUtc(addDaysDate(today, 1), midnight) },
+        OR: [{ kind: 'charge', status: 'verified' }, { kind: 'refund', status: 'refunded' }],
+      },
+      select: { amount: true, kind: true, processedAt: true, appointment: { select: { fee: true, hospitalCut: true } } },
+    }),
+  ]);
+  const todayPatients = new Set(queue.map((row) => row.patientId ? `patient:${row.patientId}` : row.guestPhone ? `phone:${row.guestPhone}` : `booking:${row.id}`));
+  const revenue = bounds.map((start) => transactions.reduce((sum, row) => {
+    if (!row.processedAt || row.processedAt < start) return sum;
+    return sum + transactionHospitalShare(Math.round(Number(row.amount) * 100), Math.round(Number(row.appointment.fee) * 100), Math.round(Number(row.appointment.hospitalCut) * 100), row.kind === 'charge');
+  }, 0) / 100);
+  return {
+    role: 'admin', today: dateToIso(today), notifications: [],
+    counts: { today: todayPatients.size, total, paid, unpaid, revenue_today: revenue[0], revenue_7_days: revenue[1], revenue_30_days: revenue[2] },
+    today_appointments: queue.map(serializeAppointment),
+  };
+}
+
 export async function dashboard(req: Request, res: Response): Promise<void> {
   const user = req.user!;
   const today = localTodayDate();
+  if (user.role === 'admin') {
+    res.json(await adminDashboard(today));
+    return;
+  }
+  const docIds = await managedDoctorIds(user);
+  const scope = appointmentScopeWhere(user, docIds);
+  const complaintScope: Prisma.ComplaintWhereInput = user.role === 'patient' ? { patientId: user.id } : {
+    OR: [{ patientId: user.id }, { recipientId: user.id }, ...(user.role === 'doctor' ? [{ appointment: scope }] : [])],
+  };
+  const [recentBookings, recentTickets, recentRefunds] = await Promise.all([
+    prisma.appointment.findMany({ where: scope, orderBy: { updatedAt: 'desc' }, take: 15, select: { id: true, reference: true, status: true, updatedAt: true, paymentStatus: true } }),
+    prisma.complaint.findMany({ where: complaintScope, orderBy: { updatedAt: 'desc' }, take: 15, select: { id: true, subject: true, status: true, updatedAt: true } }),
+    prisma.refundRequest.findMany({ where: { appointment: scope, ...(user.role === 'receptionist' ? { status: { in: ['approved', 'processing', 'completed'] } } : {}) }, orderBy: { createdAt: 'desc' }, take: 15, select: { id: true, status: true, createdAt: true, completedAt: true, reviewedAt: true, appointment: { select: { id: true, reference: true } } } }),
+  ]);
+  const notifications = [
+    ...recentBookings.map((item) => ({ id: `appointment-${item.id}`, link: `/appointments/${item.id}`, label: `Appointment ${item.reference} · ${item.status.replaceAll('_', ' ')}`, date: item.updatedAt })),
+    ...recentTickets.map((item) => ({ id: `complaint-${item.id}`, link: `/complaints/${item.id}`, label: `${item.subject} · ${item.status}`, date: item.updatedAt })),
+    ...recentRefunds.map((item) => ({ id: `refund-${item.id}`, link: `/appointments/${item.appointment.id}`, label: `Refund for ${item.appointment.reference} · ${item.status}`, date: item.completedAt ?? item.reviewedAt ?? item.createdAt })),
+  ].sort((a, b) => +b.date - +a.date);
 
   if (user.role === 'patient') {
     const [upcoming, history, upcomingCount, completedCount, complaintsCount] = await Promise.all([
@@ -77,12 +133,12 @@ export async function dashboard(req: Request, res: Response): Promise<void> {
       },
       upcoming: upcoming.map(serializeAppointment),
       history: history.map(serializeAppointment),
+      notifications,
+      unpaid_appointments: (await prisma.appointment.findMany({ where: { patientId: user.id, paymentStatus: 'unpaid', status: { in: ['pending', 'confirmed'] } }, include: appointmentInclude, orderBy: { createdAt: 'desc' }, take: 10 })).map(serializeAppointment),
     });
     return;
   }
 
-  const docIds = await managedDoctorIds(user);
-  const scope = appointmentScopeWhere(user, docIds);
   const thirtyDaysAgo = addDaysDate(today, -30);
 
   const [
@@ -114,15 +170,15 @@ export async function dashboard(req: Request, res: Response): Promise<void> {
     }),
     prisma.refundRequest.count({
       where: {
-        status: 'pending',
+        status: user.role === 'receptionist' ? 'approved' : 'pending',
         ...(docIds !== null ? { appointment: { slot: { doctorId: { in: docIds } } } } : {}),
       },
     }),
-    prisma.appointment.aggregate({
+    prisma.paymentTransaction.aggregate({
       where: {
-        AND: [scope, { paymentStatus: 'paid', slot: { date: { gte: thirtyDaysAgo } } }],
+        appointment: scope, kind: 'charge', status: 'verified', processedAt: { gte: localStartUtc(thirtyDaysAgo, parseTimeStr('00:00')!) },
       },
-      _sum: { fee: true },
+      _sum: { amount: true },
     }),
     prisma.appointment.findMany({
       where: {
@@ -164,25 +220,27 @@ export async function dashboard(req: Request, res: Response): Promise<void> {
     pending: pendingCount,
     unpaid: unpaidCount,
     refunds: refundsCount,
-    collections: Number(paidAgg._sum.fee || 0),
+    collections: Number(paidAgg._sum.amount || 0),
     spaces,
   };
+  const [completed, cancelled, pendingComplaints, supportCount, earningRows, assignedDoctors] = await Promise.all([
+    prisma.appointment.count({ where: { AND: [scope, { status: 'completed' }] } }),
+    prisma.appointment.count({ where: { AND: [scope, { status: 'cancelled' }] } }),
+    prisma.complaint.count({ where: { AND: [complaintScope, { status: { in: ['submitted', 'reviewing', 'approved'] }, patient: { role: 'patient' } }] } }),
+    prisma.complaint.count({ where: { AND: [complaintScope, { status: { in: ['submitted', 'reviewing'] }, patient: { role: { not: 'patient' } } }] } }),
+    prisma.appointment.findMany({ where: scope, select: { id: true, fee: true, hospitalCut: true } }),
+    prisma.doctorProfile.findMany({ where: { id: { in: docIds ?? [] } }, include: { user: true, department: true, chamber: true, receptionists: { include: { user: true } }, weekly: true } }),
+  ]);
+  const shares = await collectedRevenueShares(earningRows);
+  Object.assign(counts, { completed, cancelled, complaints: pendingComplaints, support: supportCount, hospital_revenue: shares.hospital, doctor_earnings: shares.doctor });
 
-  if (user.role === 'admin') {
-    const [doctors, patients, receptionists] = await Promise.all([
-      prisma.doctorProfile.count({ where: { user: { isActive: true } } }),
-      prisma.user.count({ where: { role: 'patient', isActive: true } }),
-      prisma.user.count({ where: { role: 'receptionist', isActive: true } }),
-    ]);
-    counts.doctors = doctors;
-    counts.patients = patients;
-    counts.receptionists = receptionists;
-  }
 
   res.json({
     role: user.role,
     today: dateToIso(today),
     counts,
+    notifications,
+    assigned_doctors: assignedDoctors.map(serializeDoctor),
     today_appointments: todayAppointments.map(serializeAppointment),
     recent_appointments: recentAppointments.map(serializeAppointment),
   });
@@ -209,34 +267,27 @@ async function getReportData(req: Request) {
     end = tmp;
   }
 
-  const where: Prisma.AppointmentWhereInput = {
+  const department = String(req.query.department || '');
+  const visit = String(req.query.visit_type || '');
+  const method = String(req.query.payment_method || '');
+  const status = String(req.query.status || '');
+  const scope: Prisma.AppointmentWhereInput = {
     slot: {
-      date: { gte: start, lte: end },
       ...(targetDocIds !== null ? { doctorId: { in: targetDocIds } } : {}),
+      ...(/^\d+$/.test(department) ? { doctor: { departmentId: BigInt(department) } } : {}),
     },
+    ...(['first', 'followup', 'report'].includes(visit) ? { visitType: visit } : {}),
+    ...(['pending', 'confirmed', 'completed', 'cancelled', 'no_show', 'expired'].includes(status) ? { status } : {}),
   };
-
-  const apps = await prisma.appointment.findMany({
-    where,
-    include: appointmentInclude,
-    orderBy: { createdAt: 'desc' },
-  });
-
-  const appIds = apps.map((a) => a.id);
-  const [verifiedAgg, refundedAgg, shares, doctors] = await Promise.all([
-    appIds.length
-      ? prisma.paymentTransaction.aggregate({
-          where: { appointmentId: { in: appIds }, kind: 'charge', status: 'verified' },
-          _sum: { amount: true },
-        })
-      : Promise.resolve({ _sum: { amount: 0 } }),
-    appIds.length
-      ? prisma.paymentTransaction.aggregate({
-          where: { appointmentId: { in: appIds }, kind: 'refund', status: 'refunded' },
-          _sum: { amount: true },
-        })
-      : Promise.resolve({ _sum: { amount: 0 } }),
-    collectedRevenueShares(apps),
+  const midnight = parseTimeStr('00:00')!;
+  const [apps, transactions, doctors] = await Promise.all([
+    prisma.appointment.findMany({ where: { AND: [scope, { slot: { date: { gte: start, lte: end } }, ...(['cash', 'online'].includes(method) ? { paymentMethod: method } : {}) }] }, include: appointmentInclude, orderBy: [{ slot: { date: 'desc' } }, { id: 'desc' }] }),
+    prisma.paymentTransaction.findMany({ where: {
+      appointment: scope,
+      processedAt: { gte: localStartUtc(start, midnight), lt: localStartUtc(addDaysDate(end, 1), midnight) },
+      OR: [{ kind: 'charge', status: 'verified' }, { kind: 'refund', status: 'refunded' }],
+      ...(['cash', 'online', 'bank'].includes(method) ? { method } : {}),
+    }, include: { appointment: { include: { slot: { include: { doctor: { include: { user: true, department: true } } } } } } }, orderBy: [{ processedAt: 'desc' }, { id: 'desc' }] }),
     prisma.doctorProfile.findMany({
       where: allDocIds === null ? {} : { id: { in: allDocIds } },
       include: { user: true, department: true, chamber: true },
@@ -244,8 +295,26 @@ async function getReportData(req: Request) {
     }),
   ]);
 
-  const collected = Number(verifiedAgg._sum.amount || 0);
-  const refunded = Number(refundedAgg._sum.amount || 0);
+  let collected = 0, refunded = 0, hospital = 0;
+  const financialRows = transactions.map((transaction) => {
+    const amount = Math.round(Number(transaction.amount) * 100);
+    const fee = Math.round(Number(transaction.appointment.fee) * 100);
+    const cut = Math.round(Number(transaction.appointment.hospitalCut) * 100);
+    const charge = transaction.kind === 'charge';
+    if (charge) collected += amount;
+    else refunded += amount;
+    const share = transactionHospitalShare(amount, fee, cut, charge);
+    hospital += share;
+    return {
+      ...serializePaymentTransaction(transaction),
+      reference: transaction.appointment.reference,
+      doctor_id: Number(transaction.appointment.slot.doctorId),
+      doctor: userDisplayName(transaction.appointment.slot.doctor.user),
+      department: transaction.appointment.slot.doctor.department?.name || '',
+      hospital: share / 100,
+      doctor_earnings: ((charge ? amount : -amount) - share) / 100,
+    };
+  });
 
   return {
     start,
@@ -253,17 +322,18 @@ async function getReportData(req: Request) {
     selectedDoctor: selectedDocRaw,
     doctors,
     apps,
+    financialRows,
     report: {
       total: apps.length,
       completed: apps.filter((a) => a.status === 'completed').length,
       confirmed: apps.filter((a) => a.status === 'confirmed').length,
       cancelled: apps.filter((a) => a.status === 'cancelled').length,
       unpaid: apps.filter((a) => a.paymentStatus === 'unpaid').length,
-      collected,
-      refunded,
-      net: round2(collected - refunded),
-      hospital_cut: shares.hospital,
-      doctor_cut: shares.doctor,
+      collected: collected / 100,
+      refunded: refunded / 100,
+      net: (collected - refunded) / 100,
+      hospital_cut: hospital / 100,
+      doctor_cut: (collected - refunded - hospital) / 100,
     },
   };
 }
@@ -272,7 +342,8 @@ export async function reports(req: Request, res: Response): Promise<void> {
   const data = await getReportData(req);
   res.json({
     report: data.report,
-    appointments: data.apps.slice(0, 50).map(serializeAppointment),
+    appointments: data.apps.map(serializeAppointment),
+    transactions: data.financialRows,
     doctors: data.doctors.map(serializeDoctor),
     from_date: dateToIso(data.start),
     to_date: dateToIso(data.end),
@@ -305,6 +376,12 @@ export async function exportExcel(req: Request, res: Response): Promise<void> {
   ws.addRow(['Net collected (BDT)', data.report.net]);
   ws.addRow(['Hospital net share (BDT)', data.report.hospital_cut]);
   ws.addRow(['Doctor net share (BDT)', data.report.doctor_cut]);
+
+  const transactions = workbook.addWorksheet('Financial Transactions');
+  transactions.addRow(['Payment ID', 'Appointment', 'Doctor', 'Department', 'Type', 'Method', 'Transaction date', 'Amount BDT', 'Hospital BDT', 'Doctor BDT']);
+  for (const entry of data.financialRows) transactions.addRow([entry.id, entry.reference, entry.doctor, entry.department, entry.kind_display, entry.method_display, entry.processed_at, entry.amount, entry.hospital, entry.doctor_earnings].map(safeExcel));
+  transactions.getRow(1).font = { bold: true };
+  transactions.views = [{ state: 'frozen', ySplit: 1 }];
 
   const apptSheet = workbook.addWorksheet('Appointments');
   apptSheet.addRow([
@@ -543,7 +620,13 @@ function buildAuditFilter(req: Request): Prisma.AuditEventWhereInput {
 export async function auditLog(req: Request, res: Response): Promise<void> {
   const where = buildAuditFilter(req);
   const page = Math.max(1, Number(req.query.page || 1) || 1);
-  const limit = 30;
+  const limit = Math.min(100, Math.max(1, Math.trunc(Number(req.query.limit) || 30)));
+  const [field, rawDirection] = String(req.query.sort || 'date.desc').split('.');
+  const direction = rawDirection === 'asc' ? 'asc' as const : 'desc' as const;
+  const order: Record<string, Prisma.AuditEventOrderByWithRelationInput> = {
+    date: { createdAt: direction }, actor: { actor: { firstName: direction } },
+    action: { action: direction }, target: { target: direction }, detail: { detail: direction },
+  };
   const today = localTodayDate();
 
   const [totalFiltered, items, totalAll, bookingCount, financeCount, todayCount] = await Promise.all([
@@ -551,7 +634,7 @@ export async function auditLog(req: Request, res: Response): Promise<void> {
     prisma.auditEvent.findMany({
       where,
       include: { actor: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [Object.hasOwn(order, field) ? order[field] : order.date, { id: 'desc' }],
       skip: (page - 1) * limit,
       take: limit,
     }),

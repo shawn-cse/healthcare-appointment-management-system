@@ -1,27 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
+import { ManagementTable } from '../components/ManagementTable.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen } from '../components/UI.tsx';
-import { useConfirm } from '../context/ConfirmContext.tsx';
 import { useToast } from '../context/ToastContext.tsx';
 import type { Department } from '../types/index.ts';
 
 export default function DepartmentsPage() {
   const { showToast } = useToast();
-  const { confirm } = useConfirm();
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Department | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const loadDepts = useCallback(() => {
     setLoading(true);
@@ -35,20 +31,6 @@ export default function DepartmentsPage() {
   useEffect(() => {
     loadDepts();
   }, [loadDepts]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return departments.filter((d) => {
-      if (statusFilter === 'active' && !d.is_active) return false;
-      if (statusFilter === 'inactive' && d.is_active) return false;
-      if (!q) return true;
-      return (
-        d.name.toLowerCase().includes(q) ||
-        d.description.toLowerCase().includes(q) ||
-        d.slug.toLowerCase().includes(q)
-      );
-    });
-  }, [departments, search, statusFilter]);
 
   const openCreate = () => {
     setEditing(null);
@@ -85,28 +67,6 @@ export default function DepartmentsPage() {
     }
   };
 
-  const handleToggle = async (d: Department) => {
-    const ok = await confirm({
-      title: d.is_active ? 'Deactivate Department' : 'Activate Department',
-      message: d.is_active
-        ? `Deactivate "${d.name}"? Doctors in deactivated departments are hidden from public patient booking.`
-        : `Re-activate "${d.name}" so specialists are visible to patients?`,
-      confirmText: d.is_active ? 'Deactivate' : 'Activate',
-      type: d.is_active ? 'warning' : 'info',
-    });
-    if (!ok) return;
-    setTogglingId(d.id);
-    try {
-      const res = await api.post<{ message: string }>(`/catalog/departments/${d.id}/toggle`);
-      showToast(res.data.message, 'success');
-      loadDepts();
-    } catch (err) {
-      showToast(getApiErrorMessage(err, 'Could not change department state.'), 'error');
-    } finally {
-      setTogglingId(null);
-    }
-  };
-
   return (
     <AppLayout>
       <div className="staff-directory-page">
@@ -126,122 +86,13 @@ export default function DepartmentsPage() {
           </div>
         </div>
 
-        <div className="excel-sheet-panel">
-          <div className="excel-sheet-header-bar">
-            <div className="activity-filter-toolbar">
-              <div className="staff-live-search-wrap" style={{ flex: '1 1 260px', maxWidth: 420 }}>
-                <Icon id="ic-search" className="icon search-ic" />
-                <input
-                  type="text"
-                  className="field-control"
-                  placeholder="Type to search department name or description..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  autoComplete="off"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    className="staff-live-search-clear"
-                    title="Clear search"
-                    onClick={() => setSearch('')}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
-              <select
-                className="field-control activity-select"
-                aria-label="Filter by department status"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-              >
-                <option value="all">All Statuses</option>
-                <option value="active">Active Only</option>
-                <option value="inactive">Inactive Only</option>
-              </select>
-
-              <div className="sheet-indicator" style={{ marginLeft: 'auto' }}>
-                <span className="live-dot-pulse" />
-                <span>
-                  Showing <strong>{filtered.length}</strong> of <strong>{departments.length}</strong>{' '}
-                  departments
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {loading ? (
-            <LoadingScreen />
-          ) : filtered.length === 0 ? (
-            <div className="empty-state" style={{ padding: '36px 24px' }}>
-              <h3>No departments matched</h3>
-              <p className="muted">Try another search keyword or add a new department.</p>
-            </div>
-          ) : (
-            <div className="excel-table-wrap">
-              <table className="excel-grid-table">
-                <colgroup>
-                  <col style={{ width: '7%' }} />
-                  <col style={{ width: '24%' }} />
-                  <col style={{ width: '37%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '11%' }} />
-                  <col style={{ width: '11%' }} />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Department Name</th>
-                    <th>Description</th>
-                    <th>Doctors</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((d, idx) => (
-                    <tr key={d.id}>
-                      <td className="muted">{idx + 1}</td>
-                      <td>
-                        <div className="person-name">{d.name}</div>
-                        <div className="muted" style={{ fontSize: '0.76rem' }}>
-                          {d.slug}
-                        </div>
-                      </td>
-                      <td>{d.description || <span className="muted">—</span>}</td>
-                      <td>
-                        <span className="role-pill-badge">{d.doctor_count ?? 0} doctor(s)</span>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className={`sm-status-toggle ${d.is_active ? 'active' : 'inactive'}`}
-                          disabled={togglingId === d.id}
-                          title={d.is_active ? 'Click to deactivate' : 'Click to activate'}
-                          onClick={() => handleToggle(d)}
-                        >
-                          <span>{d.is_active ? '●' : '○'}</span>
-                          <span>{d.is_active ? 'Active' : 'Inactive'}</span>
-                        </button>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="button button-small button-outline"
-                          onClick={() => openEdit(d)}
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {loading ? <LoadingScreen /> : <ManagementTable rows={departments} rowKey={(d) => d.id} columns={[
+            { heading: 'Department name', value: (d) => `${d.name} ${d.description}`, cell: (d) => d.name },
+            { heading: 'Total doctors', value: (d) => d.doctor_count || 0 },
+            { heading: 'Actions', value: () => '', cell: (d) => <div className="consultation-times">
+              <button className="button button-small button-outline" type="button" onClick={() => openEdit(d)}>Edit</button>
+            </div> },
+          ]} />}
       </div>
 
       {modalOpen && (

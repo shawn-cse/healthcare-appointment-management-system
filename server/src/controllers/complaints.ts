@@ -1,15 +1,18 @@
 import type { Request, Response } from 'express';
 import type { Prisma } from '@prisma/client';
+import path from 'node:path';
 import { prisma } from '../config/db.js';
+import { env } from '../config/env.js';
 import { HttpError } from '../middleware/error.js';
 import { managedDoctorIds } from '../services/access.js';
-import { generateUniqueTicketCode } from '../services/appointments.js';
+import { generateUniqueTicketCode, round2 } from '../services/appointments.js';
 import { logAudit } from '../services/audit.js';
-import { serializeAppointment, serializeComplaint } from '../services/serialize.js';
+import { serializeAppointment, serializeComplaint, userDisplayName } from '../services/serialize.js';
 import { toRelativeMediaPath } from '../utils/upload.js';
 
 const complaintInclude = {
   patient: true,
+  recipient: true,
   updatedBy: true,
   appointment: {
     include: {
@@ -33,6 +36,7 @@ const complaintInclude = {
 };
 
 async function buildQueueScope(user: NonNullable<Request['user']>, userType: string) {
+  if (userType === 'support') return { patient: { role: { not: 'patient' } } };
   if (user.role === 'admin') {
     const roleMap: Record<string, string> = {
       doctor: 'doctor',
@@ -51,25 +55,37 @@ async function buildQueueScope(user: NonNullable<Request['user']>, userType: str
     const docIds = (await managedDoctorIds(user)) || [];
     return {
       appointmentId: { not: null },
+      recipientId: user.id,
       appointment: { slot: { doctorId: { in: docIds } } },
     };
   }
   return { patientId: user.id };
 }
 
+export async function listRecipients(req: Request, res: Response) {
+  const user = req.user!;
+  const assigned = user.role === 'receptionist' ? await managedDoctorIds(user) : null;
+  const rows = await prisma.user.findMany({ where: { id: { not: user.id }, isActive: true, OR: [
+    { role: 'admin' },
+    ...(user.isActive && (user.role === 'doctor' || user.role === 'admin') ? [{ role: { in: ['doctor', 'receptionist'] } }] : []),
+    ...(user.isActive && assigned?.length ? [{ doctorProfile: { id: { in: assigned } } }] : []),
+  ] }, select: { id: true, firstName: true, lastName: true, username: true, role: true }, orderBy: { firstName: 'asc' } });
+  res.json({ recipients: rows.map((row) => ({ id: Number(row.id), name: userDisplayName(row), role: row.role })) });
+}
+
 export async function listComplaints(req: Request, res: Response): Promise<void> {
   const user = req.user!;
   const mode = String(req.query.mode || '').trim(); // 'mine' | 'queue'
 
-  if (mode === 'queue' && ['admin', 'doctor', 'receptionist'].includes(user.role)) {
+  if (user.isActive && mode === 'queue' && ['admin', 'doctor', 'receptionist'].includes(user.role)) {
     const userTypeRaw = String(req.query.user_type || 'patient').toLowerCase();
-    const userType = ['patient', 'doctor', 'staff'].includes(userTypeRaw) ? userTypeRaw : 'patient';
+    const userType = ['patient', 'doctor', 'staff', ...(user.role === 'admin' ? ['support'] : [])].includes(userTypeRaw) ? userTypeRaw : 'patient';
 
     const scopeWhere = await buildQueueScope(user, userType);
     const filters: Prisma.ComplaintWhereInput[] = [scopeWhere];
 
     const statusFilter = String(req.query.status || '').trim();
-    if (['submitted', 'reviewing', 'resolved'].includes(statusFilter)) {
+    if (['submitted', 'reviewing', 'resolved', 'approved', 'rejected'].includes(statusFilter)) {
       filters.push({ status: statusFilter });
     }
 
@@ -93,7 +109,6 @@ export async function listComplaints(req: Request, res: Response): Promise<void>
       where: { AND: filters },
       include: complaintInclude,
       orderBy: { createdAt: sort === 'oldest' ? 'asc' : 'desc' },
-      take: 400,
     });
 
     const baseWhere: Prisma.ComplaintWhereInput =
@@ -137,19 +152,16 @@ export async function listComplaints(req: Request, res: Response): Promise<void>
 
   // Personal tickets list (Patient, Doctor, Receptionist)
   const items = await prisma.complaint.findMany({
-    where: { patientId: user.id },
+    where: { OR: [{ patientId: user.id }, ...(user.role !== 'patient' ? [{ recipientId: user.id, patient: { role: { not: 'patient' } } }] : [])] },
     include: complaintInclude,
     orderBy: { createdAt: 'desc' },
   });
 
   let patientAppointments: ReturnType<typeof serializeAppointment>[] = [];
-  if (user.role === 'patient') {
+  if (user.role === 'patient' && user.isActive) {
     const appts = await prisma.appointment.findMany({
       where: {
-        OR: [
-          { patientId: user.id },
-          ...(user.phone ? [{ guestPhone: user.phone }] : []),
-        ],
+        patientId: user.id,
       },
       include: {
         patient: true,
@@ -195,7 +207,9 @@ export async function createComplaint(req: Request, res: Response): Promise<void
   }
 
   const rawCategory = String(req.body?.category || 'support').trim();
-  const category = ['doctor', 'hospital', 'staff', 'billing', 'other'].includes(rawCategory)
+  const issueCategories = ['cancel_appointment', 'reschedule', 'adjust_visit', 'payment_issue', 'refund_request', 'other_issue'];
+  const internalCategories = ['assistance', 'internal_complaint', 'admin_request', 'technical', 'important_message'];
+  const category = ['doctor', 'hospital', 'staff', 'billing', 'other', ...issueCategories, ...(user.role !== 'patient' ? internalCategories : [])].includes(rawCategory)
     ? rawCategory
     : 'support';
 
@@ -205,12 +219,24 @@ export async function createComplaint(req: Request, res: Response): Promise<void
     const appt = await prisma.appointment.findFirst({
       where: {
         id: BigInt(String(rawAppt)),
-        OR: [{ patientId: user.id }, ...(user.phone ? [{ guestPhone: user.phone }] : [])],
+        patientId: user.id,
       },
       select: { id: true },
     });
     if (!appt) throw new HttpError(400, 'Selected appointment was not found for your account.');
     appointmentId = appt.id;
+  }
+  if (issueCategories.includes(category) && !appointmentId) throw new HttpError(400, 'Select an appointment for this issue.');
+  let recipientId: bigint | null = null;
+  if (user.role !== 'patient' && req.body?.recipient_id) {
+    const raw = String(req.body.recipient_id);
+    if (!/^\d+$/.test(raw)) throw new HttpError(400, 'Select an eligible recipient.');
+    const candidate = await prisma.user.findFirst({ where: { id: BigInt(raw), isActive: true, role: { in: ['doctor', 'receptionist', 'admin'] } }, include: { doctorProfile: true } });
+    const assigned = candidate?.doctorProfile && user.role === 'receptionist' && (await managedDoctorIds(user))?.includes(candidate.doctorProfile.id);
+    if (!candidate || candidate.id === user.id || !(candidate.role === 'admin' || (user.isActive && (user.role === 'doctor' || assigned)))) {
+      throw new HttpError(403, 'This recipient cannot receive your request.');
+    }
+    recipientId = candidate.id;
   }
 
   const ticketCode = await generateUniqueTicketCode();
@@ -218,22 +244,41 @@ export async function createComplaint(req: Request, res: Response): Promise<void
     ? toRelativeMediaPath('complaints/patient', req.file.filename)
     : null;
 
-  const created = await prisma.complaint.create({
-    data: {
+  const created = await prisma.$transaction(async (tx) => {
+    if (appointmentId) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`complaint:${user.id}:${appointmentId}:${category}`}, 0))`;
+      const open = await tx.complaint.findFirst({ where: { patientId: user.id, appointmentId, category, subject, message, status: { in: ['submitted', 'reviewing', 'approved'] } }, include: complaintInclude });
+      if (open) return open;
+    }
+    const ticket = await tx.complaint.create({ data: {
       ticketCode,
       patientId: user.id,
       appointmentId,
+      recipientId,
       subject,
       category,
       message,
       attachment,
       status: 'submitted',
       response: '',
-    },
-    include: complaintInclude,
+    }, include: complaintInclude });
+    if (category === 'refund_request' && appointmentId) {
+      await tx.$queryRaw`SELECT id FROM hospital_appointment WHERE id = ${appointmentId} FOR UPDATE`;
+      const appt = await tx.appointment.findUniqueOrThrow({ where: { id: appointmentId } });
+      const original = await tx.paymentTransaction.findFirst({ where: { appointmentId, kind: 'charge', status: 'verified' } });
+      if (original && ['paid', 'refund_pending'].includes(appt.paymentStatus)) {
+        const fee = Number(original.amount);
+        const penalty = appt.cancelModeSnapshot === 'fixed' ? Number(appt.cancelValueSnapshot) : round2(fee * Number(appt.cancelValueSnapshot) / 100);
+        const amount = appt.status === 'cancelled' ? Math.max(0, round2(fee - penalty)) : fee;
+        if (amount > 0) await tx.refundRequest.upsert({ where: { appointmentId }, update: {}, create: {
+          appointmentId, amount, requestedById: user.id, reason: `Patient request ${ticket.ticketCode}`,
+          mode: original.method === 'online' ? 'online' : 'cash', status: 'pending',
+        } });
+      }
+    }
+    await logAudit(user, 'complaint.submitted', Number(ticket.id), ticket.ticketCode, tx);
+    return ticket;
   });
-
-  await logAudit(user, 'complaint.submitted', Number(created.id), created.ticketCode);
   const serialized = serializeComplaint(created);
   res.status(201).json({
     complaint: serialized,
@@ -243,44 +288,59 @@ export async function createComplaint(req: Request, res: Response): Promise<void
   });
 }
 
-export async function getComplaint(req: Request, res: Response): Promise<void> {
-  const id = BigInt(req.params.id);
+async function visibleComplaint(user: NonNullable<Request['user']>, id: bigint) {
   const c = await prisma.complaint.findUnique({ where: { id }, include: complaintInclude });
   if (!c) throw new HttpError(404, 'Ticket not found.');
 
-  const user = req.user!;
+  const internalRecipient = c.recipientId === user.id && c.patient.role !== 'patient';
+  if (!user.isActive && c.patientId !== user.id && !internalRecipient) throw new HttpError(403, 'Not authorized.');
   if (user.role === 'patient' && c.patientId !== user.id) {
     throw new HttpError(403, 'Not authorized.');
   }
   if (user.role === 'doctor') {
     const isOwner = c.patientId === user.id;
     const isDocAppt = c.appointment?.slot.doctor.userId === user.id;
-    if (!isOwner && !isDocAppt) throw new HttpError(403, 'Not authorized.');
+    if (!isOwner && !internalRecipient && !isDocAppt) throw new HttpError(403, 'Not authorized.');
   }
   if (user.role === 'receptionist') {
     const docIds = (await managedDoctorIds(user)) || [];
     const isOwner = c.patientId === user.id;
     const isManagedAppt = c.appointment ? docIds.includes(c.appointment.slot.doctorId) : false;
-    if (!isOwner && !isManagedAppt) throw new HttpError(403, 'Not authorized.');
+    if (!isOwner && !internalRecipient && !(isManagedAppt && c.recipientId === user.id)) throw new HttpError(403, 'Not authorized.');
   }
 
-  res.json({ complaint: serializeComplaint(c) });
+  return c;
+}
+
+export async function getComplaint(req: Request, res: Response): Promise<void> {
+  res.json({ complaint: serializeComplaint(await visibleComplaint(req.user!, BigInt(req.params.id))) });
+}
+
+export async function downloadAttachment(req: Request, res: Response): Promise<void> {
+  const ticket = await visibleComplaint(req.user!, BigInt(req.params.id));
+  const file = req.params.kind === 'response' ? ticket.adminAttachment : ticket.attachment;
+  if (!file) throw new HttpError(404, 'Attachment not found.');
+  const directory = path.join(env.mediaRoot, 'complaints', req.params.kind === 'response' ? 'admin' : 'patient');
+  const filename = path.basename(file);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.download(path.join(directory, filename), filename);
 }
 
 export async function replyComplaint(req: Request, res: Response): Promise<void> {
   const id = BigInt(req.params.id);
-  const c = await prisma.complaint.findUnique({ where: { id } });
+  const c = await prisma.complaint.findUnique({ where: { id }, include: { patient: true } });
   if (!c) throw new HttpError(404, 'Ticket not found.');
-  if (c.patientId !== req.user!.id) throw new HttpError(403, 'Not authorized.');
+  const actor = req.user!;
+  if (c.patientId !== actor.id && !(c.recipientId === actor.id && c.patient.role !== 'patient') && !(actor.isActive && actor.role === 'admin')) throw new HttpError(403, 'Not authorized.');
 
   const text = String(req.body?.message || '').trim();
   if (!text) throw new HttpError(400, 'Please type a message before submitting.');
 
-  await prisma.complaintMessage.create({
-    data: { complaintId: c.id, authorId: req.user!.id, message: text },
+  await prisma.$transaction(async (tx) => {
+    await tx.complaintMessage.create({ data: { complaintId: c.id, authorId: actor.id, message: text } });
+    await tx.complaint.update({ where: { id: c.id }, data: { updatedAt: new Date() } });
+    await logAudit(actor, 'complaint.patient_reply', Number(c.id), `Reply on #${c.id}`, tx);
   });
-  await prisma.complaint.update({ where: { id: c.id }, data: { updatedAt: new Date() } });
-  await logAudit(req.user, 'complaint.patient_reply', Number(c.id), `Reply on #${c.id}`);
 
   const updated = await prisma.complaint.findUniqueOrThrow({
     where: { id: c.id },
@@ -296,14 +356,13 @@ export async function updateComplaint(req: Request, res: Response): Promise<void
   }
 
   const id = BigInt(req.params.id);
-  const scopeWhere =
+  const scopeWhere: Prisma.ComplaintWhereInput =
     user.role === 'doctor'
-      ? { id, appointmentId: { not: null }, appointment: { slot: { doctor: { userId: user.id } } } }
+      ? { id, OR: [{ appointment: { slot: { doctor: { userId: user.id } } } }, { recipientId: user.id, patient: { role: { not: 'patient' } } }] }
       : user.role === 'receptionist'
         ? {
             id,
-            appointmentId: { not: null },
-            appointment: { slot: { doctorId: { in: (await managedDoctorIds(user)) || [] } } },
+            recipientId: user.id,
           }
         : { id };
 
@@ -319,20 +378,39 @@ export async function updateComplaint(req: Request, res: Response): Promise<void
   const data: Prisma.ComplaintUpdateInput = {
     updatedBy: { connect: { id: user.id } },
   };
+  const financial = ['refund_request', 'payment_issue', 'billing', 'adjust_visit'].includes(existing.category);
+  if (user.role !== 'admin' && financial && newStatus === 'resolved') throw new HttpError(403, 'Financial requests require administrative review.');
+  if (['approved', 'rejected'].includes(newStatus) && user.role !== 'admin') throw new HttpError(403, 'An administrator must review this request.');
+  if (req.body?.recipient_id !== undefined) {
+    const raw = String(req.body.recipient_id);
+    if (raw && !/^\d+$/.test(raw)) throw new HttpError(400, 'Select an eligible recipient.');
+    if (raw) {
+      const recipient = await prisma.user.findFirst({ where: { id: BigInt(raw), isActive: true, role: { in: ['doctor', 'receptionist', 'admin'] } } });
+      if (!recipient || (financial && recipient.role !== 'admin')) throw new HttpError(400, 'Select an eligible recipient.');
+      if (user.role !== 'admin' && (user.role !== 'doctor' || recipient.role !== 'admin')) throw new HttpError(403, 'Only administrators may assign a request to clinical staff.');
+      if (existing.appointmentId && recipient.role !== 'admin') {
+        const appointment = await prisma.appointment.findUniqueOrThrow({ where: { id: existing.appointmentId }, include: { slot: true } });
+        if (!(await managedDoctorIds(recipient))?.includes(appointment.slot.doctorId)) throw new HttpError(400, 'The recipient must be assigned to this appointment.');
+      }
+      data.recipient = { connect: { id: recipient.id } };
+    } else {
+      if (user.role !== 'admin') throw new HttpError(403, 'Only administrators may clear an assignment.');
+      data.recipient = { disconnect: true };
+    }
+  }
   if (adminFile) data.adminAttachment = adminFile;
   if (responseNote) data.response = responseNote;
-  if (['submitted', 'reviewing', 'resolved'].includes(newStatus)) {
+  if (['submitted', 'reviewing', 'resolved', 'approved', 'rejected'].includes(newStatus)) {
     data.status = newStatus;
   }
 
-  const updated = await prisma.complaint.update({
-    where: { id },
-    data,
-    include: complaintInclude,
+  const updated = await prisma.$transaction(async (tx) => {
+    if (responseNote) await tx.complaintMessage.create({ data: { complaintId: id, authorId: user.id, message: responseNote } });
+    return tx.complaint.update({ where: { id }, data, include: complaintInclude });
   });
 
   const serialized = serializeComplaint(updated);
-  if (['submitted', 'reviewing', 'resolved'].includes(newStatus)) {
+  if (['submitted', 'reviewing', 'resolved', 'approved', 'rejected'].includes(newStatus)) {
     await logAudit(
       user,
       newStatus === 'resolved' ? 'complaint.resolved' : 'complaint.updated',
@@ -349,7 +427,7 @@ export async function updateComplaint(req: Request, res: Response): Promise<void
 
 export async function bulkComplaints(req: Request, res: Response): Promise<void> {
   const user = req.user!;
-  if (!['admin', 'receptionist', 'doctor'].includes(user.role)) {
+  if (user.role !== 'admin') {
     throw new HttpError(403, 'Not authorized.');
   }
 
@@ -368,22 +446,7 @@ export async function bulkComplaints(req: Request, res: Response): Promise<void>
     throw new HttpError(400, 'Invalid status selected for bulk update.');
   }
 
-  const scopeWhere: Prisma.ComplaintWhereInput =
-    user.role === 'doctor'
-      ? {
-          id: { in: ids },
-          appointmentId: { not: null },
-          appointment: { slot: { doctor: { userId: user.id } } },
-        }
-      : user.role === 'receptionist'
-        ? {
-            id: { in: ids },
-            appointmentId: { not: null },
-            appointment: { slot: { doctorId: { in: (await managedDoctorIds(user)) || [] } } },
-          }
-        : { id: { in: ids } };
-
-  const tickets = await prisma.complaint.findMany({ where: scopeWhere });
+  const tickets = await prisma.complaint.findMany({ where: { id: { in: ids } } });
   let count = 0;
   for (const t of tickets) {
     await prisma.complaint.update({

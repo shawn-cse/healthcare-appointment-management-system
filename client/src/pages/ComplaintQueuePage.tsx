@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { NavLink, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
-import { Icon } from '../components/Icons.tsx';
+import { ManagementTable } from '../components/ManagementTable.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen, StatusPill, formatDateTime } from '../components/UI.tsx';
+import { AttachmentLink } from '../components/AttachmentLink.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
 import { useToast } from '../context/ToastContext.tsx';
 import type { Complaint } from '../types/index.ts';
@@ -21,25 +22,29 @@ interface QueueResponse {
   };
 }
 
-export default function ComplaintQueuePage() {
+export default function ComplaintQueuePage({ support = false }: { support?: boolean }) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const userType = searchParams.get('user_type') || 'patient';
+  const userType = support ? 'support' : 'patient';
   const status = searchParams.get('status') || '';
-  const q = searchParams.get('q') || '';
-  const sort = searchParams.get('sort') || 'newest';
 
-  const [searchInput, setSearchInput] = useState(q);
   const [data, setData] = useState<QueueResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [bulkStatus, setBulkStatus] = useState('');
 
   // Read & Update modal state
   const [activeTicket, setActiveTicket] = useState<Complaint | null>(null);
-  const [editStatus, setEditStatus] = useState<'submitted' | 'reviewing' | 'resolved'>('reviewing');
+  const [editStatus, setEditStatus] = useState<Complaint['status']>('reviewing');
+  const [recipients, setRecipients] = useState<Array<{ id: number; name: string; role: string }>>([]);
+  const [recipient, setRecipient] = useState('');
+  useEffect(() => {
+    if (user?.role === 'admin' || user?.role === 'doctor') {
+      api.get<{ recipients: typeof recipients }>('/complaints/recipients')
+        .then(({ data }) => setRecipients(user.role === 'doctor' ? data.recipients.filter((person) => person.role === 'admin') : data.recipients))
+        .catch(() => {});
+    }
+  }, [user?.role]);
   const [editResponse, setEditResponse] = useState('');
   const [adminFile, setAdminFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -50,18 +55,15 @@ export default function ComplaintQueuePage() {
     params.set('mode', 'queue');
     params.set('user_type', userType);
     if (status) params.set('status', status);
-    if (q) params.set('q', q);
-    if (sort) params.set('sort', sort);
 
     api
       .get<QueueResponse>(`/complaints?${params.toString()}`)
       .then((res) => {
         setData(res.data);
-        setSelectedIds([]);
       })
       .catch((err) => showToast(getApiErrorMessage(err, 'Could not load complaint queue.'), 'error'))
       .finally(() => setLoading(false));
-  }, [userType, status, q, sort, showToast]);
+  }, [userType, status, showToast]);
 
   useEffect(() => {
     loadQueue();
@@ -79,7 +81,8 @@ export default function ComplaintQueuePage() {
   const openModal = (c: Complaint) => {
     setActiveTicket(c);
     setEditStatus(c.status);
-    setEditResponse(c.response || '');
+    setEditResponse('');
+    setRecipient(c.recipient_id ? String(c.recipient_id) : '');
     setAdminFile(null);
   };
 
@@ -91,6 +94,7 @@ export default function ComplaintQueuePage() {
       const formData = new FormData();
       formData.append('status', editStatus);
       formData.append('response', editResponse);
+      if ((user?.role === 'admin' || (user?.role === 'doctor' && recipient)) && recipient !== String(activeTicket.recipient_id || '')) formData.append('recipient_id', recipient);
       if (adminFile) {
         formData.append('admin_attachment', adminFile);
       }
@@ -105,22 +109,6 @@ export default function ComplaintQueuePage() {
     }
   };
 
-  const handleBulkSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bulkStatus || selectedIds.length === 0) return;
-    try {
-      const res = await api.post<{ message: string }>('/complaints/bulk', {
-        selected_complaints: selectedIds,
-        bulk_status: bulkStatus,
-      });
-      showToast(res.data.message, 'success');
-      setBulkStatus('');
-      loadQueue();
-    } catch (err) {
-      showToast(getApiErrorMessage(err, 'Bulk update failed.'), 'error');
-    }
-  };
-
   const counts = data?.counts || {
     all: 0,
     submitted: 0,
@@ -131,14 +119,13 @@ export default function ComplaintQueuePage() {
     staff: 0,
   };
   const complaints = data?.complaints || [];
-  const allChecked = complaints.length > 0 && selectedIds.length === complaints.length;
 
   return (
     <AppLayout>
       <div className="page-heading">
         <div>
           <p className="eyebrow">SERVICE QUALITY &amp; RESOLUTION QUEUE</p>
-          <h1>Complaint &amp; Support Management</h1>
+          <h1>{support ? 'Support Management' : 'Complaint Management'}</h1>
           <p>
             Review incoming complaints, inspect patient evidence, and issue audited hospital
             resolutions.
@@ -146,25 +133,10 @@ export default function ComplaintQueuePage() {
         </div>
       </div>
 
-      {user?.role === 'admin' && (
-        <div className="filter-tabs" style={{ marginBottom: 16 }}>
-          {[
-            ['patient', `Patient Queue (${counts.patient})`],
-            ['doctor', `Doctor Tickets (${counts.doctor})`],
-            ['staff', `Staff Tickets (${counts.staff})`],
-          ].map(([val, lbl]) => (
-            <button
-              key={val}
-              type="button"
-              className={`filter-tab ${userType === val ? 'active' : ''}`}
-              onClick={() => setParam({ user_type: val, status: null })}
-            >
-              {lbl}
-            </button>
-          ))}
-        </div>
-      )}
-
+      {user?.role === 'admin' && <nav className="filter-tabs" aria-label="Complaint source">
+        <NavLink to="/service/complaints" className={({ isActive }) => `filter-tab ${isActive ? 'active' : ''}`}>Patient complaints</NavLink>
+        <NavLink to="/service/support" className={({ isActive }) => `filter-tab ${isActive ? 'active' : ''}`}>Doctor and reception support</NavLink>
+      </nav>}
       <div className="metric-grid" style={{ marginBottom: 18 }}>
         <div className="metric-card">
           <div className="metric-top">
@@ -196,164 +168,19 @@ export default function ComplaintQueuePage() {
         </div>
       </div>
 
-      <div className="panel" style={{ padding: 16, marginBottom: 16 }}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setParam({ q: searchInput.trim() || null });
-          }}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}
-        >
-          <input
-            type="search"
-            className="field-control"
-            style={{ flex: '1 1 240px' }}
-            placeholder="Search ticket code, subject, submitter name, phone..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-          <select
-            className="field-control"
-            style={{ width: 'auto' }}
-            value={status}
-            onChange={(e) => setParam({ status: e.target.value || null })}
-          >
-            <option value="">All Statuses</option>
-            <option value="submitted">Generated</option>
-            <option value="reviewing">Under Review</option>
-            <option value="resolved">Issue Solved</option>
-          </select>
-          <select
-            className="field-control"
-            style={{ width: 'auto' }}
-            value={sort}
-            onChange={(e) => setParam({ sort: e.target.value })}
-          >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-          </select>
-          <button type="submit" className="button button-primary button-small">
-            <Icon id="ic-search" /> Apply
-          </button>
-        </form>
-      </div>
-
-      {selectedIds.length > 0 && (
-        <form
-          onSubmit={handleBulkSubmit}
-          className="notice notice-info"
-          style={{
-            marginBottom: 14,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 10,
-          }}
-        >
-          <strong>{selectedIds.length} ticket(s) selected</strong>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <select
-              className="field-control"
-              style={{ width: 'auto' }}
-              value={bulkStatus}
-              onChange={(e) => setBulkStatus(e.target.value)}
-              required
-            >
-              <option value="">Choose new status...</option>
-              <option value="submitted">Mark Generated</option>
-              <option value="reviewing">Mark Under Review</option>
-              <option value="resolved">Mark Issue Solved</option>
-            </select>
-            <button type="submit" className="button button-primary button-small">
-              Update Selected
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div className="panel">
-        {loading ? (
-          <LoadingScreen />
-        ) : complaints.length === 0 ? (
-          <div className="empty-state" style={{ padding: 48 }}>
-            <h3>No complaints in queue</h3>
-          </div>
-        ) : (
-          <div className="excel-table-wrap">
-            <table className="excel-sheet">
-              <thead>
-                <tr>
-                  <th style={{ width: 38 }}>
-                    <input
-                      type="checkbox"
-                      checked={allChecked}
-                      onChange={(e) =>
-                        setSelectedIds(e.target.checked ? complaints.map((c) => c.id) : [])
-                      }
-                    />
-                  </th>
-                  <th>Ticket</th>
-                  <th>Submitter</th>
-                  <th>Category &amp; Subject</th>
-                  <th>Status</th>
-                  <th>Updated</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {complaints.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(c.id)}
-                        onChange={(e) =>
-                          setSelectedIds((prev) =>
-                            e.target.checked ? [...prev, c.id] : prev.filter((x) => x !== c.id)
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <strong>{c.display_code}</strong>
-                      <div className="muted" style={{ fontSize: '0.78rem' }}>
-                        {c.is_support ? 'Support' : 'Complaint'}
-                      </div>
-                    </td>
-                    <td>
-                      <strong>{c.patient.name}</strong>
-                      <div className="muted" style={{ fontSize: '0.8rem' }}>
-                        {c.patient.phone || c.patient.username}
-                      </div>
-                    </td>
-                    <td>
-                      <strong>{c.subject}</strong>
-                      <div className="muted" style={{ fontSize: '0.8rem' }}>
-                        {c.category_display}
-                        {c.appointment ? ` · ${c.appointment.reference}` : ''}
-                      </div>
-                    </td>
-                    <td>
-                      <StatusPill status={c.status} label={c.step_label} />
-                    </td>
-                    <td>{formatDateTime(c.updated_at)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="button button-small button-primary"
-                        onClick={() => openModal(c)}
-                      >
-                        Inspect / Respond
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {loading ? <LoadingScreen /> : <ManagementTable rows={complaints} rowKey={(ticket) => ticket.id} dateColumn={5}
+        filters={<select className="field-control" aria-label="Request status" value={status} onChange={(e) => setParam({ status: e.target.value || null })}>
+          <option value="">All statuses</option><option value="submitted">Pending</option><option value="reviewing">In progress</option>
+          <option value="approved">Approved</option><option value="rejected">Rejected</option><option value="resolved">Resolved</option>
+        </select>} columns={[
+          { heading: 'Complaint ID', value: (ticket) => ticket.display_code, cell: (ticket) => <button type="button" className="text-link" onClick={() => openModal(ticket)}>{ticket.display_code}</button> },
+          { heading: 'Appointment ID', value: (ticket) => ticket.appointment?.reference || '' },
+          { heading: support ? 'Sender' : 'Patient', value: (ticket) => `${ticket.patient.name} ${ticket.patient.phone}`, cell: (ticket) => ticket.patient.name },
+          { heading: 'Category', value: (ticket) => `${ticket.category_display} ${ticket.subject}`, cell: (ticket) => <>{ticket.category_display}<br /><small>{ticket.subject}</small></> },
+          { heading: 'Status', value: (ticket) => ticket.status_display, cell: (ticket) => <StatusPill status={ticket.status} label={ticket.status_display} /> },
+          { heading: 'Date', value: (ticket) => ticket.created_at, cell: (ticket) => formatDateTime(ticket.created_at) },
+          { heading: 'Actions', value: () => '', cell: (ticket) => <button type="button" className="button button-small button-outline" onClick={() => openModal(ticket)}>Review</button> },
+        ]} />}
 
       {activeTicket && (
         <div
@@ -395,14 +222,7 @@ export default function ComplaintQueuePage() {
               <p style={{ margin: '8px 0 0', whiteSpace: 'pre-wrap' }}>{activeTicket.message}</p>
               {activeTicket.attachment && (
                 <div style={{ marginTop: 8 }}>
-                  <a
-                    href={activeTicket.attachment}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="button button-small button-outline"
-                  >
-                    📎 Evidence: {activeTicket.attachment_name || 'Download'}
-                  </a>
+                  <AttachmentLink path={activeTicket.attachment} filename={activeTicket.attachment_name || 'Download attachment'} />
                 </div>
               )}
             </div>
@@ -435,15 +255,21 @@ export default function ComplaintQueuePage() {
                   className="field-control"
                   value={editStatus}
                   onChange={(e) =>
-                    setEditStatus(e.target.value as 'submitted' | 'reviewing' | 'resolved')
+                    setEditStatus(e.target.value as Complaint['status'])
                   }
                 >
                   <option value="submitted">1. Generated</option>
                   <option value="reviewing">2. Under Review &amp; Inquiring</option>
-                  <option value="resolved">3. Issue Solved</option>
+                  <option value="resolved">Resolved</option>
+                  {user?.role === 'admin' && <><option value="approved">Approved</option><option value="rejected">Rejected</option></>}
                 </select>
               </div>
 
+              {(user?.role === 'admin' || user?.role === 'doctor') && <label className="form-group">{user.role === 'doctor' ? 'Forward to administration' : 'Assigned recipient'}
+                <select className="field-control" value={recipient} onChange={(e) => setRecipient(e.target.value)}>
+                  <option value="">{user.role === 'doctor' ? 'Select administrator' : 'Hospital administration'}</option>{recipients.map((person) => <option key={person.id} value={person.id}>{person.name} ({person.role})</option>)}
+                </select>
+              </label>}
               <div className="form-group">
                 <label htmlFor="cq-resp">Official Resolution Note</label>
                 <textarea

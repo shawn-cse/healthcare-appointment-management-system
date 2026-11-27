@@ -61,14 +61,5 @@ router.delete(
   requireRoles('doctor', 'admin'),
   asyncHandler(c.deleteWeekly)
 );
-router.post('/schedules/slot', authenticate, requireRoles('doctor', 'admin'), asyncHandler(c.saveSlot));
-router.put('/schedules/slot/:id', authenticate, requireRoles('doctor', 'admin'), asyncHandler(c.saveSlot));
-router.post(
-  '/schedules/slot/:id/toggle',
-  authenticate,
-  requireRoles('doctor', 'admin'),
-  asyncHandler(c.toggleSlot)
-);
-router.post('/schedules/copy', authenticate, requireRoles('doctor', 'admin'), asyncHandler(c.copySlots));
 
 export default router;

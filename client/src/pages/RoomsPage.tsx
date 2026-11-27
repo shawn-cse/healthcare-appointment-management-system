@@ -1,19 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
+import { ManagementTable } from '../components/ManagementTable.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen } from '../components/UI.tsx';
 import { useConfirm } from '../context/ConfirmContext.tsx';
 import { useToast } from '../context/ToastContext.tsx';
-import type { Chamber } from '../types/index.ts';
+import type { Chamber, Department } from '../types/index.ts';
 
 export default function RoomsPage() {
   const { showToast } = useToast();
   const { confirm } = useConfirm();
 
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [department, setDepartment] = useState('');
   const [chambers, setChambers] = useState<Chamber[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [occupancyFilter, setOccupancyFilter] = useState<'all' | 'occupied' | 'empty'>('all');
 
   // Add / Edit Modal state
@@ -35,27 +37,12 @@ export default function RoomsPage() {
 
   useEffect(() => {
     loadRooms();
-  }, [loadRooms]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return chambers.filter((c) => {
-      const hasPeople =
-        (c.doctors_count ?? (c.doctors?.length || 0)) > 0 || (c.staff_users?.length || 0) > 0;
-      if (occupancyFilter === 'occupied' && !hasPeople) return false;
-      if (occupancyFilter === 'empty' && hasPeople) return false;
-      if (!q) return true;
-      return (
-        c.room_number.toLowerCase().includes(q) ||
-        c.description.toLowerCase().includes(q) ||
-        (c.doctors || []).some((d) => d.name.toLowerCase().includes(q)) ||
-        (c.staff_users || []).some((s) => s.name.toLowerCase().includes(q))
-      );
-    });
-  }, [chambers, search, occupancyFilter]);
+    api.get<{ departments: Department[] }>('/catalog/departments').then(({ data }) => setDepartments(data.departments)).catch((err) => showToast(getApiErrorMessage(err, 'Could not load departments.'), 'error'));
+  }, [loadRooms, showToast]);
 
   const openNew = () => {
     setEditing(null);
+    setDepartment('');
     setRoomNumber('');
     setDescription('');
     setModalOpen(true);
@@ -63,6 +50,7 @@ export default function RoomsPage() {
 
   const openEdit = (c: Chamber) => {
     setEditing(c);
+    setDepartment(c.department_id ? String(c.department_id) : '');
     setRoomNumber(c.room_number);
     setDescription(c.description || '');
     setModalOpen(true);
@@ -75,6 +63,7 @@ export default function RoomsPage() {
       const payload = {
         room_number: roomNumber.trim(),
         description: description.trim(),
+        department_id: department || null,
       };
       const res = editing
         ? await api.put<{ message: string }>(`/catalog/chambers/${editing.id}`, payload)
@@ -91,21 +80,17 @@ export default function RoomsPage() {
 
   const handleDeleteInModal = async () => {
     if (!editing) return;
-    const ok = await confirm({
-      title: 'Delete Room',
-      message: `Delete "${editing.room_number}"? Assigned doctors and staff will have their room cleared.`,
-      confirmText: 'Delete Room',
-      type: 'danger',
-    });
+    const action = editing.is_active ? 'Deactivate' : 'Activate';
+    const ok = await confirm({ title: `${action} room`, message: `${action} ${editing.room_number}?`, confirmText: action, type: 'warning' });
     if (!ok) return;
     setDeleting(true);
     try {
-      const res = await api.delete<{ message: string }>(`/catalog/chambers/${editing.id}`);
+      const res = await api.put<{ message: string }>(`/catalog/chambers/${editing.id}`, { is_active: !editing.is_active });
       showToast(res.data.message, 'success');
       setModalOpen(false);
       loadRooms();
     } catch (err) {
-      showToast(getApiErrorMessage(err, 'Could not delete room.'), 'error');
+      showToast(getApiErrorMessage(err, 'Could not change room status.'), 'error');
     } finally {
       setDeleting(false);
     }
@@ -127,142 +112,22 @@ export default function RoomsPage() {
           </div>
         </div>
 
-        <div className="excel-sheet-panel">
-          <div className="excel-sheet-header-bar">
-            <div className="activity-filter-toolbar">
-              <div className="staff-live-search-wrap" style={{ flex: '1 1 260px', maxWidth: 420 }}>
-                <Icon id="ic-search" className="icon search-ic" />
-                <input
-                  type="text"
-                  className="field-control"
-                  placeholder="Type to search room no, description, or doctor name..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  autoComplete="off"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    className="staff-live-search-clear"
-                    title="Clear search"
-                    onClick={() => setSearch('')}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
-              <select
-                className="field-control activity-select"
-                aria-label="Filter rooms by occupancy"
-                value={occupancyFilter}
-                onChange={(e) =>
-                  setOccupancyFilter(e.target.value as 'all' | 'occupied' | 'empty')
-                }
-              >
-                <option value="all">All Rooms</option>
-                <option value="occupied">Assigned Only</option>
-                <option value="empty">Unassigned Only</option>
-              </select>
-
-              <div className="sheet-indicator" style={{ marginLeft: 'auto' }}>
-                <span className="live-dot-pulse" />
-                <span>
-                  Showing <strong>{filtered.length}</strong> of <strong>{chambers.length}</strong>{' '}
-                  rooms
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {loading ? (
-            <LoadingScreen />
-          ) : filtered.length === 0 ? (
-            <div className="empty-state" style={{ padding: '36px 24px' }}>
-              <h3>No rooms matched</h3>
-              <p className="muted">Try another keyword or add a new room.</p>
-            </div>
-          ) : (
-            <div className="excel-table-wrap">
-              <table className="excel-grid-table">
-                <colgroup>
-                  <col style={{ width: '6%' }} />
-                  <col style={{ width: '18%' }} />
-                  <col style={{ width: '27%' }} />
-                  <col style={{ width: '29%' }} />
-                  <col style={{ width: '11%' }} />
-                  <col style={{ width: '9%' }} />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Room No</th>
-                    <th>Description</th>
-                    <th>Assigned Doctors &amp; Schedule</th>
-                    <th>Staff</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((c, idx) => (
-                    <tr key={c.id}>
-                      <td className="muted">{idx + 1}</td>
-                      <td>
-                        <span className="room-chip role-pill-badge">{c.room_number}</span>
-                      </td>
-                      <td>{c.description || <span className="muted">—</span>}</td>
-                      <td>
-                        {c.doctors && c.doctors.length > 0 ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            {c.doctors.map((d) => (
-                              <div key={d.id} style={{ fontSize: '12px' }}>
-                                <strong>{d.name}</strong>
-                                {d.schedules && d.schedules.length > 0 ? (
-                                  <span className="muted">
-                                    {' '}
-                                    ·{' '}
-                                    {d.schedules
-                                      .map(
-                                        (s) =>
-                                          `${s.weekday_short} (${s.start_time_12h}–${s.end_time_12h})`
-                                      )
-                                      .join(', ')}
-                                  </span>
-                                ) : d.assigned_days_text ? (
-                                  <span className="muted"> · {d.assigned_days_text}</span>
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="muted">Unassigned</span>
-                        )}
-                      </td>
-                      <td>
-                        {c.staff_users && c.staff_users.length > 0 ? (
-                          <div style={{ fontSize: '12px' }}>
-                            {c.staff_users.map((su) => `${su.name} (${su.role_display})`).join(', ')}
-                          </div>
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="button button-small button-outline"
-                          onClick={() => openEdit(c)}
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {loading ? <LoadingScreen /> : <ManagementTable rows={chambers.filter((room) => {
+          const occupied = !!room.doctors?.length || !!room.staff_users?.length;
+          return occupancyFilter === 'all' || occupied === (occupancyFilter === 'occupied');
+        })} rowKey={(room) => room.id}
+          filters={<select className="field-control" aria-label="Room occupancy" value={occupancyFilter} onChange={(e) => setOccupancyFilter(e.target.value as typeof occupancyFilter)}>
+            <option value="all">All rooms</option><option value="occupied">Assigned rooms</option><option value="empty">Unassigned rooms</option>
+          </select>} columns={[
+            { heading: 'Room number', value: (room) => `${room.room_number} ${room.description}`, cell: (room) => <button className="text-link" type="button" onClick={() => openEdit(room)}>{room.room_number}</button> },
+            { heading: 'Department', value: (room) => room.department?.name || 'Unassigned' },
+            { heading: 'Assigned doctors', value: (room) => room.doctors?.map((doctor) => doctor.name).join(', ') || 'Unassigned',
+              cell: (room) => room.doctors?.length ? <details><summary>{room.doctors.map((doctor) => doctor.name).join(', ')}</summary>
+                {room.doctors.map((doctor) => <p key={doctor.id}><strong>{doctor.name}</strong> {(doctor.schedules ?? []).map((period) => `${period.weekday_short} ${period.start_time_12h}`).join(', ')}</p>)}
+              </details> : 'Unassigned' },
+            { heading: 'Status', value: (room) => room.is_active ? 'Active' : 'Inactive' },
+            { heading: 'Actions', value: () => '', cell: (room) => <button className="button button-small button-outline" type="button" onClick={() => openEdit(room)}>Edit room</button> },
+          ]} />}
       </div>
 
       {modalOpen && (
@@ -299,6 +164,11 @@ export default function RoomsPage() {
                   />
                 </div>
 
+                <label className="form-group">Department
+                  <select className="field-control" value={department} onChange={(e) => setDepartment(e.target.value)}>
+                    <option value="">Unassigned</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </label>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label htmlFor="rm-desc">Description (Optional)</label>
                   <textarea
@@ -327,7 +197,7 @@ export default function RoomsPage() {
                   disabled={deleting || saving}
                   onClick={handleDeleteInModal}
                 >
-                  {deleting ? 'Deleting...' : 'Delete'}
+                  {deleting ? 'Saving...' : editing.is_active ? 'Deactivate room' : 'Activate room'}
                 </button>
               )}
               <div style={{ display: 'flex', gap: 10 }}>

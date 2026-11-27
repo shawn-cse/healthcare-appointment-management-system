@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { prisma } from '../config/db.js';
 import { env } from '../config/env.js';
 import { HttpError } from '../middleware/error.js';
+import { acceptsPayment, settleMonthlyCommission } from './appointments.js';
 import { logAudit } from './audit.js';
 import { userDisplayName } from './serialize.js';
 
@@ -30,42 +31,34 @@ function gatewayKeys() {
 }
 
 export async function initializeGatewayPayment(appointmentId: bigint): Promise<string> {
-  const appt = await prisma.appointment.findUnique({
-    where: { id: appointmentId },
-    include: { patient: true },
-  });
-  if (!appt) throw new HttpError(404, 'Appointment not found.');
-
-  if (appt.paymentStatus !== 'unpaid' || !['pending', 'confirmed'].includes(appt.status)) {
-    throw new HttpError(400, 'This appointment is no longer awaiting payment.');
-  }
-  if (appt.status === 'pending' && appt.paymentDueAt && appt.paymentDueAt <= new Date()) {
-    throw new HttpError(400, 'The payment deadline has passed. Please arrange a new booking.');
-  }
-  if (!env.publicBaseUrl.startsWith('https://')) {
-    throw new HttpError(400, 'Online payments require a public HTTPS callback URL in PUBLIC_BASE_URL.');
-  }
-  const fee = Number(appt.fee);
-  if (fee < 10 || fee > 500000) {
-    throw new HttpError(400, 'Online checkout only supports fees between ৳10 and ৳500,000.');
-  }
-
+  const credentials = gatewayKeys();
+  if (!gatewayHttpsReady()) throw new HttpError(400, 'Online payments require a public HTTPS callback URL.');
   const txnId = 'GH' + crypto.randomUUID().replace(/-/g, '').slice(0, 25).toUpperCase();
-  const txn = await prisma.paymentTransaction.create({
-    data: {
-      appointmentId: appt.id,
-      kind: 'charge',
-      method: 'online',
-      status: 'initiated',
-      amount: appt.fee,
-      externalId: txnId,
-    },
+  const { appt, txn } = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM hospital_appointment WHERE id = ${appointmentId} FOR UPDATE`;
+    const appt = await tx.appointment.findUnique({ where: { id: appointmentId }, include: { patient: true } });
+    if (!appt) throw new HttpError(404, 'Appointment not found.');
+    if (appt.paymentMethod !== 'online' || !acceptsPayment(appt.acceptedPaymentMethods, 'online')) throw new HttpError(400, 'Select online payment before starting checkout.');
+    if (appt.paymentStatus !== 'unpaid' || !['pending', 'confirmed'].includes(appt.status) || (appt.paymentDueAt && appt.paymentDueAt <= new Date())) {
+      throw new HttpError(400, 'This appointment is no longer awaiting payment.');
+    }
+    const fee = Number(appt.fee);
+    if (fee < 10 || fee > 500000) throw new HttpError(400, 'Online checkout only supports fees between BDT 10 and BDT 500,000.');
+    const existing = await tx.paymentTransaction.findFirst({ where: { appointmentId, kind: 'charge', status: 'initiated' } });
+    if (existing) {
+      if (existing.checkoutUrl) return { appt, txn: existing };
+      throw new HttpError(409, 'An online checkout is already being prepared.');
+    }
+    const txn = await tx.paymentTransaction.create({ data: { appointmentId, kind: 'charge', method: 'online', status: 'initiated', amount: appt.fee, externalId: txnId } });
+    return { appt, txn };
   });
+  if (txn.checkoutUrl) return txn.checkoutUrl;
+  const fee = Number(appt.fee);
 
   const patientName = appt.patient ? userDisplayName(appt.patient) : appt.guestName;
   const patientEmail = appt.patient?.email || 'billing@greenhospital.local';
   const body = new URLSearchParams({
-    ...gatewayKeys(),
+    ...credentials,
     total_amount: fee.toFixed(2),
     currency: 'BDT',
     tran_id: txnId,
@@ -93,11 +86,12 @@ export async function initializeGatewayPayment(appointmentId: bigint): Promise<s
       signal: AbortSignal.timeout(20000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = (await res.json()) as { GatewayPageURL?: string; failedreason?: string };
+    const data = (await res.json()) as { GatewayPageURL?: string; sessionkey?: string; failedreason?: string };
     const url = data.GatewayPageURL;
     if (!url || !url.startsWith('https://')) {
       throw new Error(data.failedreason || 'Gateway did not return a checkout URL.');
     }
+    await prisma.paymentTransaction.update({ where: { id: txn.id }, data: { checkoutUrl: url, gatewaySessionKey: data.sessionkey || null } });
     return url;
   } catch (err) {
     await prisma.paymentTransaction.update({
@@ -109,6 +103,29 @@ export async function initializeGatewayPayment(appointmentId: bigint): Promise<s
     });
     throw new HttpError(400, 'Online checkout is temporarily unavailable. Please try again later.');
   }
+}
+
+export async function reconcileGatewayCheckout(transactionId: string): Promise<void> {
+  if (!gatewayEnabled() || !/^[a-zA-Z0-9]{1,40}$/.test(transactionId)) return;
+  const transaction = await prisma.paymentTransaction.findFirst({ where: {
+    externalId: transactionId, kind: 'charge', method: 'online', status: 'initiated', gatewaySessionKey: { not: null },
+  } });
+  if (!transaction?.gatewaySessionKey) return;
+  const search = new URLSearchParams({ ...gatewayKeys(), sessionkey: transaction.gatewaySessionKey, v: '1', format: 'json' });
+  const response = await fetch(`${gatewayBaseUrl()}/validator/api/merchantTransIDvalidationAPI.php?${search}`, { signal: AbortSignal.timeout(5000) });
+  if (!response.ok) throw new HttpError(503, 'Payment status is temporarily unavailable.');
+  const result = await response.json() as { APIConnect?: string; tran_id?: string; status?: string; val_id?: string };
+  if (result.APIConnect !== 'DONE' || result.tran_id !== transactionId) return;
+  const status = result.status?.toUpperCase() || '';
+  if (['VALID', 'VALIDATED'].includes(status) && result.val_id) {
+    await verifyGatewayCallback(result.val_id);
+    return;
+  }
+  if (!['FAILED', 'CANCELLED', 'EXPIRED'].includes(status)) return;
+  await prisma.$transaction(async (tx) => {
+    const changed = await tx.paymentTransaction.updateMany({ where: { id: transaction.id, status: 'initiated' }, data: { status: 'failed', processedAt: new Date(), note: `Gateway reported ${status.toLowerCase()}.` } });
+    if (changed.count) await logAudit(null, 'payment.gateway_checkout_closed', transaction.externalId!, status, tx);
+  });
 }
 
 export async function validateById(validationId: string) {
@@ -156,7 +173,7 @@ export async function verifyGatewayCallback(validationId: string) {
     await tx.$queryRaw`
       SELECT id FROM hospital_appointment WHERE id = ${txn.appointmentId} FOR UPDATE
     `;
-    const appt = await tx.appointment.findUniqueOrThrow({ where: { id: txn.appointmentId } });
+    const appt = await tx.appointment.findUniqueOrThrow({ where: { id: txn.appointmentId }, include: { slot: { select: { doctorId: true } } } });
 
     if (Number(response.amount || 0) !== Number(txn.amount) || Number(txn.amount) !== Number(appt.fee)) {
       throw new HttpError(400, 'Payment amount differs from the appointment fee.');
@@ -168,13 +185,15 @@ export async function verifyGatewayCallback(validationId: string) {
       throw new HttpError(400, 'This appointment already has a recorded payment.');
     }
 
+    const paidAt = new Date();
+    const shares = await settleMonthlyCommission(tx, appt, appt.slot.doctorId, paidAt);
     await tx.paymentTransaction.update({
       where: { id: txn.id },
       data: {
         status: 'verified',
         validationId,
         bankTransactionId: response.bank_tran_id || '',
-        processedAt: new Date(),
+        processedAt: paidAt,
       },
     });
 
@@ -206,6 +225,7 @@ export async function verifyGatewayCallback(validationId: string) {
     const updated = await tx.appointment.update({
       where: { id: appt.id },
       data: {
+        ...shares,
         paymentMethod: 'online',
         paymentStatus: nextPaymentStatus,
         status: nextStatus,

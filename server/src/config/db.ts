@@ -25,32 +25,36 @@ const NON_DESTRUCTIVE_SYNC_SQL = [
 ];
 
 export async function ensureDatabaseSchema(): Promise<void> {
-  const existing = await prisma.$queryRaw<Array<{ tbl: string | null }>>`
-    SELECT to_regclass('public.hospital_user')::text AS tbl
-  `;
-
-  if (!existing[0]?.tbl) {
-    const sqlPath = path.resolve(process.cwd(), 'prisma', 'init.sql');
-    const sql = await fs.readFile(sqlPath, 'utf-8');
-    const cleanedSql = sql.replace(/^\s*--.*$/gm, '');
-    const statements = cleanedSql
-      .split(/;\s*(?:\r?\n|$)/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-
-    await prisma.$transaction(async (tx) => {
-      for (const stmt of statements) {
-        await tx.$executeRawUnsafe(stmt);
-      }
-    });
-  }
-
-  // Always apply idempotent non-destructive schema alignments (room on any staff, optional doctor dept, patient-scoped unique phone)
+  const prismaDir = path.resolve(process.cwd(), 'prisma');
+  const migrationDir = path.join(prismaDir, 'upgrades');
+  const migrations = (await fs.readdir(migrationDir)).filter((file) => /^\d+_.*\.sql$/.test(file)).sort();
+  const statements = (sql: string) => sql.replace(/^\s*--.*$/gm, '')
+    .split(/;\s*(?:\r?\n|$)/).map((statement) => statement.trim()).filter(Boolean);
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(413209701)`;
+    const [existing] = await tx.$queryRaw<Array<{ tbl: string | null }>>`
+      SELECT to_regclass('public.hospital_user')::text AS tbl
+    `;
+    if (!existing?.tbl) {
+      for (const statement of statements(await fs.readFile(path.join(prismaDir, 'init.sql'), 'utf-8'))) {
+        await tx.$executeRawUnsafe(statement);
+      }
+    }
     for (const ddl of NON_DESTRUCTIVE_SYNC_SQL) {
       await tx.$executeRawUnsafe(ddl);
     }
-  });
+    await tx.$executeRaw`CREATE TABLE IF NOT EXISTS hospital_schema_upgrade (
+      filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now()
+    )`;
+    const applied = await tx.$queryRaw<Array<{ filename: string }>>`SELECT filename FROM hospital_schema_upgrade`;
+    for (const filename of migrations) {
+      if (applied.some((row) => row.filename === filename)) continue;
+      for (const statement of statements(await fs.readFile(path.join(migrationDir, filename), 'utf-8'))) {
+        await tx.$executeRawUnsafe(statement);
+      }
+      await tx.$executeRaw`INSERT INTO hospital_schema_upgrade (filename) VALUES (${filename})`;
+    }
+  }, { timeout: 120_000, maxWait: 15_000 });
 }
 
 export async function checkDatabaseHealth(): Promise<boolean> {

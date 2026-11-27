@@ -542,15 +542,6 @@ export function GreenTimePicker({
   };
 
   const current24 = to24h(hour12, minute, period);
-  const presets = [
-    ['09:00', '09:00 AM'],
-    ['10:30', '10:30 AM'],
-    ['11:00', '11:00 AM'],
-    ['14:00', '02:00 PM'],
-    ['16:00', '04:00 PM'],
-    ['18:00', '06:00 PM'],
-  ];
-
   return (
     <div className="green-time-wrapper" ref={wrapperRef}>
       <input
@@ -558,7 +549,7 @@ export function GreenTimePicker({
         type="text"
         readOnly
         required={required}
-        value={value}
+        value={value ? `${pad2(parseTimeState(value).hour12)}:${pad2(parseTimeState(value).minute)} ${parseTimeState(value).period}` : ''}
         onClick={handleOpen}
         placeholder={placeholder}
         className={`${className} green-timepicker green-time-input`}
@@ -606,38 +597,6 @@ export function GreenTimePicker({
             style={{ top: `${pos.top}px`, left: `${pos.left}px` }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="gtime-header">
-              <div className="gtime-digital">
-                <span className="gtime-digits">
-                  <span className="gtime-digit-box">{pad2(hour12)}</span>
-                  <span>:</span>
-                  <span className="gtime-digit-box">{pad2(minute)}</span>
-                </span>
-                <span className="gtime-period-tag">{period}</span>
-              </div>
-              <span className="gtime-session-lbl">Consultation &amp; Room Session Time</span>
-            </div>
-
-            <div className="gtime-presets">
-              <span className="gtime-preset-lbl">Standard Session Slots:</span>
-              <div className="gtime-preset-chips">
-                {presets.map(([val24, lbl]) => (
-                  <button
-                    key={val24}
-                    type="button"
-                    className={`gtime-preset-btn ${current24 === val24 ? 'is-selected' : ''}`}
-                    onClick={() => {
-                      const st = parseTimeState(val24);
-                      apply(st.hour12, st.minute, st.period);
-                      setOpen(false);
-                    }}
-                  >
-                    {lbl}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="gtime-columns-wrap">
               <div className="gtime-col">
                 <div className="gtime-col-lbl">Hour</div>
@@ -657,7 +616,7 @@ export function GreenTimePicker({
               <div className="gtime-col">
                 <div className="gtime-col-lbl">Minute</div>
                 <div className="gtime-chips-scroll">
-                  {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+                  {Array.from({ length: 60 }, (_, m) => m).map((m) => (
                     <button
                       key={m}
                       type="button"
@@ -687,24 +646,6 @@ export function GreenTimePicker({
             </div>
 
             <div className="gtime-footer">
-              <button
-                type="button"
-                className="gtime-btn-text"
-                onClick={() => {
-                  const d = new Date();
-                  let ch = d.getHours();
-                  let cm = Math.round(d.getMinutes() / 5) * 5;
-                  if (cm >= 60) {
-                    cm = 0;
-                    ch += 1;
-                  }
-                  const cp: 'AM' | 'PM' = ch >= 12 ? 'PM' : 'AM';
-                  const ch12 = ch % 12 === 0 ? 12 : ch % 12;
-                  apply(ch12, cm, cp);
-                }}
-              >
-                Current Clock
-              </button>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <button
                   type="button"

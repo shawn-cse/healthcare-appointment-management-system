@@ -3,8 +3,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import request from 'supertest';
 import ExcelJS from 'exceljs';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ensureDatabaseSchema, prisma } from '../src/config/db.js';
+import { env } from '../src/config/env.js';
 import app from '../src/app.js';
 import {
   cancelAppointment,
@@ -369,7 +370,9 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
       where: { appointmentId: booked.id },
     });
     expect(Number(refReq.amount)).toBe(1000);
-    await approveRefund(refReq.id, receptionUser);
+    expect(refReq.requestedById).toBeNull();
+    await expect(approveRefund(refReq.id, receptionUser)).rejects.toThrow(/administrator/i);
+    await approveRefund(refReq.id, adminUser);
     await finalizeCashRefund(refReq.id, receptionUser);
     const afterFull = await prisma.appointment.findUniqueOrThrow({ where: { id: booked.id } });
     expect(afterFull.paymentStatus).toBe('refunded');
@@ -396,13 +399,15 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
       where: { id: docProfile.id },
       data: { cancelFeeValue: 90 },
     });
-    await cancelAppointment(booked2.id, patientUser, { reason: 'Changed plans' });
+    const patientCancel = await request(app).post(`/api/appointments/${booked2.id}/cancel`).set('Authorization', `Bearer ${patientToken}`);
+    expect(patientCancel.status).toBe(403);
+    await cancelAppointment(booked2.id, adminUser, { reason: 'Patient requested cancellation' });
 
     const refReq2 = await prisma.refundRequest.findUniqueOrThrow({
       where: { appointmentId: booked2.id },
     });
     expect(Number(refReq2.amount)).toBe(850);
-    await approveRefund(refReq2.id, receptionUser);
+    await approveRefund(refReq2.id, adminUser);
     await finalizeCashRefund(refReq2.id, receptionUser);
 
     const shares = await collectedRevenueShares([booked2]);
@@ -432,19 +437,30 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
     }
   });
 
-  it('auto-assigns patientN username when blank and provides live username conflict check', async () => {
-    const reg = await request(app).post('/api/auth/register').send({
-      first_name: 'Test',
-      last_name: 'User',
+  it('auto-generates a unique patient username when omitted and provides live username conflict checking', async () => {
+    const payload = {
+      full_name: 'Test User',
+      gender: 'female',
       username: '',
       phone: '01633333333',
       dob: '1992-05-10',
       email: 'testuser@example.com',
       password1: 'SecureTest123!',
       password2: 'SecureTest123!',
+    };
+    const autoReg = await request(app).post('/api/auth/register').send({
+      ...payload,
+      phone: '01633333334',
+      email: '',
     });
+    expect(autoReg.status).toBe(201);
+    expect(autoReg.body.user.username).toMatch(/^testuser_[0-9a-f]{6}$/);
+
+    const reg = await request(app).post('/api/auth/register').send({ ...payload, username: 'test-unique' });
     expect(reg.status).toBe(201);
-    expect(reg.body.user.username).toMatch(/^patient\d+$/);
+    const equivalentPhone = await request(app).post('/api/auth/register').send({ ...payload, username: 'second', email: '', phone: '+880 1633-333333' });
+    expect(equivalentPhone.status).toBe(400);
+    expect(reg.body.user.username).toBe('test-unique');
 
     const emptyCheck = await request(app).get('/api/auth/check-username?username=');
     expect(emptyCheck.body.status).toBe('empty');
@@ -461,6 +477,24 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
 
     const okCheck = await request(app).get('/api/auth/check-username?username=dr_unique_999');
     expect(okCheck.body.status).toBe('available');
+  });
+
+  it('blocks deactivated staff and revokes blocked or reset sessions', async () => {
+    const account = Number(doctorUser.id);
+    const admin = `Bearer ${adminToken}`;
+    await request(app).post(`/api/staff/${account}/toggle-active`).set('Authorization', admin).expect(200);
+    await request(app).get('/api/appointments').set('Authorization', `Bearer ${doctorToken}`).expect(401);
+    await request(app).get('/api/complaints').set('Authorization', `Bearer ${doctorToken}`).expect(401);
+    await request(app).post('/api/auth/login').send({ identifier: doctorUser.username, password: 'secureDoctor123!', portal: 'staff' }).expect(401);
+    await request(app).put(`/api/staff/${account}/login-permission`).set('Authorization', admin).send({ login_allowed: true }).expect(400);
+    const inactive = await request(app).get('/api/catalog/doctors').expect(200);
+    expect(inactive.body.doctors.some((doctor: { user_id: number }) => doctor.user_id === account)).toBe(false);
+    await request(app).post(`/api/staff/${account}/toggle-active`).set('Authorization', admin).expect(200);
+    await request(app).get('/api/auth/me').set('Authorization', `Bearer ${doctorToken}`).expect(401);
+    const reenabled = await request(app).post('/api/auth/login').send({ identifier: doctorUser.username, password: 'secureDoctor123!', portal: 'staff' }).expect(200);
+    await request(app).put(`/api/staff/${account}`).set('Authorization', admin).send({ new_password: 'UpdatedDoctor789!' }).expect(200);
+    await request(app).get('/api/auth/me').set('Authorization', `Bearer ${reenabled.body.token}`).expect(401);
+    await request(app).post('/api/auth/login').send({ identifier: doctorUser.username, password: 'UpdatedDoctor789!', portal: 'staff' }).expect(200);
   });
 
   it('prevents patients and unassigned doctors from viewing another appointment', async () => {
@@ -515,23 +549,27 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
     const r1 = await request(app)
       .post(`/api/appointments/${booked.id}/quick-update`)
       .set('Authorization', `Bearer ${doctorToken}`)
-      .send({ visit_type: 'followup', status: 'completed' });
+      .send({ fee: 800 });
     expect(r1.status).toBe(200);
     expect(Number(r1.body.fee)).toBe(800);
-    expect(r1.body.status).toBe('completed');
+    expect(r1.body.status).toBe(booked.status);
 
     const r2 = await request(app)
       .post(`/api/appointments/${booked.id}/quick-update`)
       .set('Authorization', `Bearer ${receptionToken}`)
       .send({ visit_type: 'report', collect_cash: '1' });
-    expect(r2.status).toBe(200);
-    expect(Number(r2.body.fee)).toBe(500);
-    expect(r2.body.payment_status).toBe('paid');
+    expect(r2.status).toBe(403);
+    const doctorCollect = await request(app).post(`/api/appointments/${booked.id}/collect`).set('Authorization', `Bearer ${doctorToken}`);
+    expect(doctorCollect.status).toBe(403);
+    const collected = await request(app).post(`/api/appointments/${booked.id}/collect`).set('Authorization', `Bearer ${receptionToken}`);
+    expect(collected.status).toBe(200);
+    const paidEdit = await request(app).post(`/api/appointments/${booked.id}/quick-update`).set('Authorization', `Bearer ${doctorToken}`).send({ visit_type: 'report' });
+    expect(paidEdit.status).toBe(409);
 
     const otherAppt = await createAppointment({
       actor: adminUser,
       slotId: slotTwoId,
-      patientId: otherPatientUser.id,
+      patientId: null,
       name: 'Other Patient',
       phone: otherPatientUser.phone!,
       visitType: 'first',
@@ -627,7 +665,9 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
     expect(ticket.status).toBe('submitted');
     expect(ticket.status_step).toBe(1);
     expect(ticket.display_code).toMatch(/^[A-Z0-9]{6}$/);
-    expect(ticket.attachment).toContain('/media/complaints/patient/');
+    expect(ticket.attachment).toBe(`/complaints/${ticket.id}/attachments/original`);
+    expect((await request(app).get(`/api${ticket.attachment}`).set('Authorization', `Bearer ${otherPatientToken}`)).status).toBe(403);
+    expect((await request(app).get(`/api${ticket.attachment}`).set('Authorization', `Bearer ${patientToken}`)).status).toBe(200);
 
     const updateRes = await request(app)
       .put(`/api/complaints/${ticket.id}`)
@@ -664,6 +704,8 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
         first_name: 'New',
         last_name: 'Doctor',
         username: 'new_doctor',
+        dob: '1984-10-19',
+        registration_number: 'A-182371',
         email: 'new.doctor@example.org',
         phone: '01855555555',
         is_active: true,
@@ -688,4 +730,177 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
     expect(docAfter.chamberId).toBeNull();
     expect(docAfter.roomNumber).toBe('');
   });
+
+  it('preserves guest age, links verified historical bookings, and scopes support conversations', async () => {
+    const phone = '01315550000';
+    const dob = new Date('2000-01-01T00:00:00.000Z');
+    const age = new Date().getUTCFullYear() - dob.getUTCFullYear();
+    const desk = await request(app).post('/api/appointments').set('Authorization', `Bearer ${receptionToken}`).send({
+      slot_id: Number(slotOneId), name: 'Guest Example', phone, age, gender: 'female', visit_type: 'first', payment_method: 'cash',
+    }).expect(201);
+    const guestId = BigInt(desk.body.appointment.id);
+    const saved = await prisma.appointment.findUniqueOrThrow({ where: { id: guestId } });
+    expect(saved).toMatchObject({ patientId: null, guestAge: age, guestDob: null });
+    const registration = await request(app).post('/api/auth/register').send({
+      full_name: 'Guest Example', username: 'guest-verify', phone, dob: '2000-01-01', gender: 'female', password1: 'StrongGuest123!', password2: 'StrongGuest123!',
+    }).expect(201);
+    const account = BigInt(registration.body.user.id);
+    const authorization = `Bearer ${registration.body.token}`;
+    await request(app).get(`/api/appointments/${guestId}`).set('Authorization', authorization).expect(404);
+    const code = '123456';
+    await prisma.phoneChallenge.create({ data: { userId: account, phone, codeHash: crypto.createHmac('sha256', env.jwtSecret).update(`${account}:${phone}:${code}`).digest('hex'), sentAt: new Date(), expiresAt: new Date(Date.now() + 60_000) } });
+    await request(app).post('/api/auth/phone/verify').set('Authorization', authorization).send({ code: '999999' }).expect(400);
+    const verification = await request(app).post('/api/auth/phone/verify').set('Authorization', authorization).send({ code }).expect(200);
+    expect(verification.body.linked).toBe(1);
+    await request(app).get(`/api/appointments/${guestId}`).set('Authorization', authorization).expect(200);
+    await request(app).get(`/api/appointments/${guestId}`).set('Authorization', `Bearer ${otherPatientToken}`).expect(404);
+    const ticket = await request(app).post('/api/complaints').set('Authorization', `Bearer ${receptionToken}`).send({ subject: 'Schedule assistance', message: 'Please check the morning schedule.', category: 'assistance', recipient_id: Number(doctorUser.id) }).expect(201);
+    const id = ticket.body.complaint.id;
+    await request(app).get(`/api/complaints/${id}`).set('Authorization', `Bearer ${otherDoctorToken}`).expect(403);
+    await request(app).post(`/api/complaints/${id}/reply`).set('Authorization', `Bearer ${doctorToken}`).send({ message: 'The schedule has been checked.' }).expect(200);
+  });
+
+  it('applies opening and payment cutoffs and preserves booked consultation times after recurring edits', async () => {
+    const doctorId = Number(docProfile.id);
+    await request(app).put(`/api/staff/doctor/${doctorId}/rules`).set('Authorization', `Bearer ${doctorToken}`).send({ booking_window_hours: 24, payment_deadline_hours: 24, payment_policy: 'within' }).expect(400);
+    await request(app).put(`/api/staff/doctor/${doctorId}/rules`).set('Authorization', `Bearer ${doctorToken}`).send({ booking_window_hours: 720, payment_deadline_hours: 4, payment_policy: 'within' }).expect(200);
+    const week = await request(app).post(`/api/catalog/schedules/weekly/${doctorId}`).set('Authorization', `Bearer ${doctorToken}`).send({ weekday: 5, start_time: '09:00', end_time: '10:00' }).expect(201);
+    await request(app).post(`/api/catalog/schedules/weekly/${doctorId}`).set('Authorization', `Bearer ${doctorToken}`).send({ weekday: 5, start_time: '09:30', end_time: '10:30' }).expect(409);
+    const slot = await prisma.appointmentSlot.findFirstOrThrow({ where: { doctorId: docProfile.id, templateId: BigInt(week.body.weekly.id), date: { gte: addDaysDate(localTodayDate(), 1), lte: addDaysDate(localTodayDate(), 14) } } });
+    const booked = await request(app).post('/api/appointments').set('Authorization', `Bearer ${patientToken}`).send({ slot_id: Number(slot.id), visit_type: 'first', payment_method: 'cash' }).expect(201);
+    await request(app).put(`/api/catalog/schedules/weekly/${doctorId}/${week.body.weekly.id}`).set('Authorization', `Bearer ${doctorToken}`).send({ weekday: 5, start_time: '10:30', end_time: '11:30' }).expect(200);
+    const detail = await request(app).get(`/api/appointments/${booked.body.appointment.id}`).set('Authorization', `Bearer ${patientToken}`).expect(200);
+    expect(detail.body.appointment.slot.start_time).toBe('09:00');
+    expect((await prisma.appointmentSlot.findUniqueOrThrow({ where: { id: slot.id } })).isOpen).toBe(false);
+  });
+
+  it('reconciles refunds on transaction dates independently of consultation dates', async () => {
+    const appt = await createAppointment({ actor: patientUser, slotId: slotOneId, patientId: patientUser.id });
+    await recordCashPayment(appt.id, receptionUser);
+    await cancelAppointment(appt.id, adminUser, { reason: 'Patient requested cancellation' });
+    const refund = await prisma.refundRequest.findUniqueOrThrow({ where: { appointmentId: appt.id } });
+    await approveRefund(refund.id, adminUser);
+    await request(app).post(`/api/refunds/${refund.id}/cash`).set('Authorization', `Bearer ${receptionToken}`).send({ transaction_reference: 'REFUND-001' }).expect(200);
+    const [charge, payout] = await Promise.all([
+      prisma.paymentTransaction.findFirstOrThrow({ where: { appointmentId: appt.id, kind: 'charge' } }),
+      prisma.paymentTransaction.findFirstOrThrow({ where: { appointmentId: appt.id, kind: 'refund' } }),
+    ]);
+    expect(payout.refundReference).toBe('REFUND-001');
+    const earlier = addDaysDate(localTodayDate(), -2);
+    await prisma.paymentTransaction.update({ where: { id: charge.id }, data: { processedAt: earlier } });
+    const response = await request(app).get(`/api/reports?from=${dateToIso(earlier)}&to=${dateToIso(localTodayDate())}`).set('Authorization', `Bearer ${adminToken}`).expect(200);
+    expect(response.body.appointments).toHaveLength(0);
+    expect(response.body.report).toMatchObject({ collected: 1000, refunded: 850, net: 150, hospital_cut: 15, doctor_cut: 135 });
+    await request(app).get('/api/payments').set('Authorization', `Bearer ${otherPatientToken}`).expect(200).expect(({ body }) => expect(body.rows).toHaveLength(0));
+  });
+
+  it('routes rescheduling requests without moving appointments until authorized', async () => {
+    const appt = await createAppointment({ actor: patientUser, slotId: slotOneId, patientId: patientUser.id });
+    const patientAuth = `Bearer ${patientToken}`;
+    const receptionistAuth = `Bearer ${receptionToken}`;
+    const newSlot = await prisma.appointmentSlot.create({ data: { doctorId: docProfile.id, date: addDaysDate(futureDate, 1), startTime: parseTimeStr('11:00')!, endTime: parseTimeStr('12:00')!, capacity: 5 } });
+    const reschedule = `/api/appointments/${appt.id}/reschedule`;
+    await request(app).put(reschedule).set('Authorization', patientAuth).send({ slot_id: Number(newSlot.id) }).expect(403);
+    await request(app).put(reschedule).set('Authorization', receptionistAuth).send({ slot_id: Number(newSlot.id) }).expect(403);
+    const payload = { appointment_id: Number(appt.id), subject: 'Move my consultation', category: 'reschedule', message: 'Please move my visit to the next available morning.' };
+    const first = await request(app).post('/api/complaints').set('Authorization', patientAuth).send(payload).expect(201);
+    const repeated = await request(app).post('/api/complaints').set('Authorization', patientAuth).send(payload).expect(201);
+    expect(repeated.body.complaint.id).toBe(first.body.complaint.id);
+    expect((await prisma.appointment.findUniqueOrThrow({ where: { id: appt.id } })).slotId).toBe(slotOneId);
+    const ticket = `/api/complaints/${first.body.complaint.id}`;
+    await request(app).put(ticket).set('Authorization', `Bearer ${adminToken}`).send({ status: 'approved', recipient_id: Number(receptionUser.id) }).expect(200);
+    const moved = await request(app).put(reschedule).set('Authorization', receptionistAuth).send({ slot_id: Number(newSlot.id) }).expect(200);
+    expect(moved.body.appointment.reference).toBe(appt.reference);
+    expect(moved.body.appointment.slot_id).toBe(Number(newSlot.id));
+    await request(app).get(ticket).set('Authorization', patientAuth).expect(200).expect(({ body }) => expect(body.complaint.status).toBe('resolved'));
+    const method = `/api/appointments/${appt.id}/payment-method`;
+    await request(app).put(method).set('Authorization', `Bearer ${otherPatientToken}`).send({ payment_method: 'online' }).expect(404);
+    await request(app).put(method).set('Authorization', patientAuth).send({ payment_method: 'online' }).expect(200).expect(({ body }) => expect(body.appointment.payment_method).toBe('online'));
+  });
+
+  it('requires a trusted gateway status before releasing checkout and verifies callbacks idempotently', async () => {
+    const appt = await createAppointment({ actor: patientUser, slotId: slotOneId, patientId: patientUser.id, paymentMethod: 'online' });
+    const transaction = await prisma.paymentTransaction.create({ data: {
+      appointmentId: appt.id, method: 'online', kind: 'charge', status: 'initiated', amount: appt.fee,
+      externalId: 'GHCHECKOUT001', gatewaySessionKey: 'fake-session-key',
+    } });
+    const backup = [env.sslcommerzStoreId, env.sslcommerzStorePassword];
+    env.sslcommerzStoreId = 'fixture';
+    env.sslcommerzStorePassword = 'fixture';
+    let status = 'PENDING';
+    const gateway = vi.fn(async () => Response.json({ APIConnect: 'DONE', tran_id: transaction.externalId, status }));
+    vi.stubGlobal('fetch', gateway);
+    try {
+      const method = `/api/appointments/${appt.id}/payment-method`;
+      const auth = `Bearer ${patientToken}`;
+      await request(app).post('/payments/callback/cancel').send({ tran_id: transaction.externalId, status: 'CANCELLED' }).expect(302);
+      expect((await prisma.paymentTransaction.findUniqueOrThrow({ where: { id: transaction.id } })).status).toBe('initiated');
+      await request(app).put(method).set('Authorization', auth).send({ payment_method: 'cash' }).expect(409);
+      status = 'CANCELLED';
+      await request(app).put(method).set('Authorization', auth).send({ payment_method: 'cash' }).expect(200);
+      expect((await prisma.paymentTransaction.findUniqueOrThrow({ where: { id: transaction.id } })).status).toBe('failed');
+
+      await request(app).put(method).set('Authorization', auth).send({ payment_method: 'online' }).expect(200);
+      await prisma.paymentTransaction.create({ data: { appointmentId: appt.id, method: 'online', kind: 'charge', status: 'initiated', amount: appt.fee, externalId: 'GHCHECKOUT002' } });
+      gateway.mockImplementation(async () => Response.json({ status: 'VALID', currency: 'BDT', tran_id: 'GHCHECKOUT002', amount: String(appt.fee) }));
+      for (let i = 0; i < 2; i++) await request(app).post('/payments/callback/ipn').send({ val_id: 'fixture-validation' }).expect(200);
+      expect(await prisma.paymentTransaction.count({ where: { appointmentId: appt.id, kind: 'charge', status: 'verified' } })).toBe(1);
+    } finally {
+      [env.sslcommerzStoreId, env.sslcommerzStorePassword] = backup;
+      vi.unstubAllGlobals();
+    }
+  });
+  it('deducts a monthly commission from settled payments and reports actual admin dashboard totals', async () => {
+    const auth = `Bearer ${adminToken}`;
+    await request(app).put(`/api/staff/${doctorUser.id}`).set('Authorization', auth)
+      .send({ hospital_share_mode: 'monthly', hospital_share_value: 1250 }).expect(200);
+    const secondSlot = await prisma.appointmentSlot.create({ data: {
+      doctorId: docProfile.id, date: futureDate,
+      startTime: parseTimeStr('16:00')!, endTime: parseTimeStr('17:00')!, capacity: 2,
+    } });
+    const first = await createAppointment({ actor: patientUser, slotId: slotOneId, patientId: patientUser.id });
+    const second = await createAppointment({ actor: otherPatientUser, slotId: secondSlot.id, patientId: otherPatientUser.id });
+    expect(Number(first.hospitalCut)).toBe(0);
+    expect(Number((await recordCashPayment(first.id, receptionUser)).hospitalCut)).toBe(1000);
+    expect(Number((await recordCashPayment(second.id, receptionUser)).hospitalCut)).toBe(250);
+    await createAppointment({ actor: patientUser, slotId: secondSlot.id, patientId: patientUser.id });
+    await prisma.appointmentSlot.update({ where: { id: slotOneId }, data: { date: localTodayDate() } });
+    const dashboard = await request(app).get('/api/dashboard').set('Authorization', auth).expect(200);
+    expect(dashboard.body.counts).toEqual({ today: 1, total: 3, paid: 2, unpaid: 1, revenue_today: 1250, revenue_7_days: 1250, revenue_30_days: 1250 });
+    expect(dashboard.body.today_appointments.map((row: {id: number}) => row.id)).toEqual([Number(first.id)]);
+    const filtered = await request(app).get('/api/appointments?payment=paid&payment_method=cash&visit_type=first').set('Authorization', auth).expect(200);
+    expect(filtered.body.total).toBe(2);
+  });
+
+  it('manages multiple weekly sessions in one staff update and retains an existing appointment', async () => {
+    const template = await prisma.weeklyAvailability.findFirstOrThrow({ where: { doctorId: docProfile.id } });
+    await prisma.appointmentSlot.update({ where: { id: slotOneId }, data: { templateId: template.id } });
+    const booked = await createAppointment({ actor: patientUser, slotId: slotOneId, patientId: patientUser.id });
+    const auth = `Bearer ${adminToken}`;
+    const schedule_rules = [{ weekday: template.weekday, start_time: '17:00', end_time: '18:00' }, { weekday: template.weekday, start_time: '18:00', end_time: '19:00' }];
+    await request(app).put(`/api/staff/${doctorUser.id}`).set('Authorization', auth).send({ schedule_rules }).expect(200);
+    const prior = await prisma.appointmentSlot.findUniqueOrThrow({ where: { id: slotOneId } });
+    expect(prior.isOpen).toBe(false);
+    expect((await prisma.appointment.findUniqueOrThrow({ where: { id: booked.id } })).slotId).toBe(slotOneId);
+    expect(await prisma.weeklyAvailability.count({ where: { doctorId: docProfile.id, active: true } })).toBe(2);
+  });
+
+  it('stores refund review notes and documents with assigned staff access', async () => {
+    const appt = await createAppointment({ actor: patientUser, slotId: slotOneId, patientId: patientUser.id });
+    await recordCashPayment(appt.id, receptionUser);
+    await cancelAppointment(appt.id, adminUser, { reason: 'Patient requested cancellation' });
+    const refund = await prisma.refundRequest.findUniqueOrThrow({ where: { appointmentId: appt.id } });
+    const endpoint = `/api/refunds/${refund.id}/evidence`;
+    const admin = `Bearer ${adminToken}`;
+    const desk = `Bearer ${receptionToken}`;
+    await request(app).post(endpoint).set('Authorization', desk).field('note', 'Unapproved').expect(404);
+    await request(app).post(endpoint).set('Authorization', admin).field('note', 'Counter receipt reviewed')
+      .attach('document', Buffer.from('%PDF-1.4 refund fixture'), 'receipt.pdf').expect(200);
+    await request(app).get(endpoint).set('Authorization', `Bearer ${patientToken}`).expect(403);
+    await approveRefund(refund.id, adminUser);
+    const visible = await request(app).get('/api/refunds?status=approved').set('Authorization', desk).expect(200);
+    expect(visible.body.refunds[0].review_note).toBe('Counter receipt reviewed');
+    await request(app).get(endpoint).set('Authorization', desk).expect(200);
+  });
+
 });

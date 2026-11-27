@@ -10,6 +10,7 @@ export type UserRole = 'patient' | 'doctor' | 'receptionist' | 'admin';
 export interface AuthTokenPayload {
   sub: string;
   role: string;
+  version: number;
 }
 
 declare global {
@@ -20,8 +21,8 @@ declare global {
   }
 }
 
-export function signToken(user: Pick<User, 'id' | 'role'>): string {
-  return jwt.sign({ sub: String(user.id), role: user.role }, env.jwtSecret, {
+export function signToken(user: Pick<User, 'id' | 'role' | 'sessionVersion'>): string {
+  return jwt.sign({ sub: String(user.id), role: user.role, version: user.sessionVersion }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn as jwt.SignOptions['expiresIn'],
   });
 }
@@ -31,7 +32,7 @@ async function resolveUserFromToken(token: string): Promise<User | null> {
     const decoded = jwt.verify(token, env.jwtSecret) as AuthTokenPayload;
     const id = BigInt(decoded.sub);
     const user = await prisma.user.findUnique({ where: { id } });
-    if (!user || !user.isActive) return null;
+    if (!user?.loginAllowed || (!user.isActive && user.role !== 'patient') || user.sessionVersion !== decoded.version) return null;
     return user;
   } catch {
     return null;
@@ -43,8 +44,7 @@ function extractBearerToken(req: Request): string | null {
   if (auth && auth.startsWith('Bearer ')) {
     return auth.slice(7).trim();
   }
-  const queryToken = typeof req.query.token === 'string' ? req.query.token : null;
-  return queryToken;
+  return null;
 }
 
 export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
@@ -56,19 +56,28 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
   next();
 }
 
-export async function authenticate(req: Request, _res: Response, next: NextFunction): Promise<void> {
-  const token = extractBearerToken(req);
-  if (!token) {
-    next(new HttpError(401, 'Authentication required.'));
-    return;
-  }
-  const user = await resolveUserFromToken(token);
-  if (!user) {
-    next(new HttpError(401, 'Invalid or expired authentication session.'));
-    return;
-  }
-  req.user = user;
-  next();
+export const authenticate = resolveSession(false);
+export const authenticateSupport = resolveSession(true);
+
+function resolveSession(allowInactive: boolean) {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    const token = extractBearerToken(req);
+    if (!token) {
+      next(new HttpError(401, 'Authentication required.'));
+      return;
+    }
+    const user = await resolveUserFromToken(token);
+    if (!user) {
+      next(new HttpError(401, 'Invalid or expired authentication session.'));
+      return;
+    }
+    if (!user.isActive && !allowInactive) {
+      next(new HttpError(403, 'This account has access to support and complaints only.'));
+      return;
+    }
+    req.user = user;
+    next();
+  };
 }
 
 export function requireRoles(...roles: UserRole[]) {

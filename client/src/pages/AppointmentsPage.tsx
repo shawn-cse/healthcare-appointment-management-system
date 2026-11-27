@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { GreenDatePicker } from '../components/DateTimePickers.tsx';
 import { Icon } from '../components/Icons.tsx';
+import { PageSizeControl, SortableColumn } from '../components/ManagementTable.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen, StatusPill, formatDisplayDate } from '../components/UI.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -31,6 +32,8 @@ export default function AppointmentsPage() {
   // Filters synced to URL search params
   const status = searchParams.get('status') || '';
   const payment = searchParams.get('payment') || '';
+  const paymentMethod = searchParams.get('payment_method') || '';
+  const visitType = searchParams.get('visit_type') || '';
   const q = searchParams.get('q') || '';
   const datePreset = searchParams.get('date_preset') || '';
   const dateFrom = searchParams.get('date_from') || '';
@@ -38,6 +41,7 @@ export default function AppointmentsPage() {
   const doctor = searchParams.get('doctor') || '';
   const sort = searchParams.get('sort') || 'date_desc';
   const page = Number(searchParams.get('page') || 1) || 1;
+  const size = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 25));
 
   const [searchInput, setSearchInput] = useState(q);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -54,11 +58,6 @@ export default function AppointmentsPage() {
   const [qNotes, setQNotes] = useState('');
   const [qSaving, setQSaving] = useState(false);
 
-  // Cancel modal state (Patient)
-  const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const [cancelling, setCancelling] = useState(false);
-
   const isPatient = user?.role === 'patient';
 
   const fetchList = useCallback(() => {
@@ -66,6 +65,8 @@ export default function AppointmentsPage() {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
     if (payment) params.set('payment', payment);
+    if (paymentMethod) params.set('payment_method', paymentMethod);
+    if (visitType) params.set('visit_type', visitType);
     if (q) params.set('q', q);
     if (datePreset) params.set('date_preset', datePreset);
     if (dateFrom) params.set('date_from', dateFrom);
@@ -73,6 +74,7 @@ export default function AppointmentsPage() {
     if (doctor) params.set('doctor', doctor);
     if (sort) params.set('sort', sort);
     params.set('page', String(page));
+    params.set('limit', String(size));
 
     api
       .get<ApptsResponse>(`/appointments?${params.toString()}`)
@@ -82,7 +84,7 @@ export default function AppointmentsPage() {
       })
       .catch((err) => showToast(getApiErrorMessage(err, 'Failed to load appointments.'), 'error'))
       .finally(() => setLoading(false));
-  }, [status, payment, q, datePreset, dateFrom, dateTo, doctor, sort, page, showToast]);
+  }, [status, payment, paymentMethod, visitType, q, datePreset, dateFrom, dateTo, doctor, sort, page, size, showToast]);
 
   useEffect(() => {
     fetchList();
@@ -153,8 +155,8 @@ export default function AppointmentsPage() {
       const res = await api.post<{ message: string; appointment: Appointment }>(
         `/appointments/${quickTarget.id}/quick-update`,
         {
-          visit_type: qVisitType,
-          fee: qFee,
+          visit_type: qVisitType !== quickTarget.visit_type ? qVisitType : undefined,
+          fee: Number(qFee) !== quickTarget.fee ? qFee : undefined,
           status: qStatus,
           cancellation_reason: qStatus === 'cancelled' ? qCancelReason : undefined,
           notes: qNotes,
@@ -168,36 +170,6 @@ export default function AppointmentsPage() {
       showToast(getApiErrorMessage(err, 'Failed to save update.'), 'error');
     } finally {
       setQSaving(false);
-    }
-  };
-
-  const submitPatientCancel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!cancelTarget) return;
-    setCancelling(true);
-    try {
-      const res = await api.post<{ message: string }>(`/appointments/${cancelTarget.id}/cancel`, {
-        reason: cancelReason,
-      });
-      showToast(res.data.message || 'Appointment cancelled.', 'success');
-      setCancelTarget(null);
-      setCancelReason('');
-      fetchList();
-    } catch (err) {
-      showToast(getApiErrorMessage(err, 'Could not cancel appointment.'), 'error');
-    } finally {
-      setCancelling(false);
-    }
-  };
-
-  const handlePayOnline = async (id: number) => {
-    try {
-      const res = await api.post<{ gateway_url: string }>(`/appointments/${id}/pay-online`);
-      if (res.data.gateway_url) {
-        window.location.href = res.data.gateway_url;
-      }
-    } catch (err) {
-      showToast(getApiErrorMessage(err, 'Online payment gateway unavailable.'), 'error');
     }
   };
 
@@ -256,7 +228,7 @@ export default function AppointmentsPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">{isPatient ? 'MY CONSULTATIONS' : 'CLINICAL SCHEDULING'}</p>
-          <h1>{isPatient ? 'My Appointments' : 'Appointments Desk'}</h1>
+          <h1>{isPatient ? 'My Appointments' : 'Appointments'}</h1>
           <p>
             {isPatient
               ? 'View your booking serials, consultation timings, online payments, and visit status.'
@@ -422,6 +394,12 @@ export default function AppointmentsPage() {
                   <option value="partially_refunded">Partly Refunded</option>
                   <option value="refunded">Refunded</option>
                 </select>
+                <select className="field-control activity-select" aria-label="Filter by payment method" value={paymentMethod} onChange={(e) => setParam({ payment_method: e.target.value || null })}>
+                  <option value="">Any payment method</option><option value="cash">Cash</option><option value="online">Online</option>
+                </select>
+                <select className="field-control activity-select" aria-label="Filter by visit type" value={visitType} onChange={(e) => setParam({ visit_type: e.target.value || null })}>
+                  <option value="">Any visit type</option><option value="first">First visit</option><option value="followup">Follow-up</option><option value="report">Report review</option>
+                </select>
               </>
             )}
 
@@ -431,8 +409,9 @@ export default function AppointmentsPage() {
               value={sort}
               onChange={(e) => setParam({ sort: e.target.value })}
             >
-              <option value="date_desc">Latest Schedule Date</option>
-              <option value="date_asc">Earliest Schedule Date</option>
+              {sort.includes('.') && <option value={sort}>Column sort</option>}
+              <option value="date_desc">Latest to oldest</option>
+              <option value="date_asc">Oldest to latest</option>
               <option value="newest">Recently Booked</option>
               <option value="fee_desc">Highest Fee</option>
               <option value="fee_asc">Lowest Fee</option>
@@ -503,14 +482,14 @@ export default function AppointmentsPage() {
                       />
                     </th>
                   )}
-                  <th>Ref &amp; Serial</th>
-                  <th>Schedule Date &amp; Slot</th>
-                  {!isPatient && <th>Patient Details</th>}
-                  <th>Specialist &amp; Room No</th>
-                  <th>Visit &amp; Fee</th>
-                  <th>Status</th>
-                  <th>Payment</th>
-                  <th className="no-print">Actions</th>
+                  <SortableColumn name="reference" sort={sort} onChange={(sort) => setParam({ sort })}>Appointment ID</SortableColumn>
+                  {!isPatient && <SortableColumn name="patient" sort={sort} onChange={(sort) => setParam({ sort })}>Patient</SortableColumn>}
+                  {user?.role !== 'doctor' && <SortableColumn name="doctor" sort={sort} onChange={(sort) => setParam({ sort })}>Doctor</SortableColumn>}
+                  <SortableColumn name="date" sort={sort} onChange={(sort) => setParam({ sort })}>Date &amp; Time</SortableColumn>
+                  <SortableColumn name="visit" sort={sort} onChange={(sort) => setParam({ sort })}>Visit Type</SortableColumn>
+                  <SortableColumn name="payment" sort={sort} onChange={(sort) => setParam({ sort })}>Payment</SortableColumn>
+                  <SortableColumn name="status" sort={sort} onChange={(sort) => setParam({ sort })}>Appointment Status</SortableColumn>
+                  <th className="no-print">{isPatient ? 'Report Issue' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -540,12 +519,6 @@ export default function AppointmentsPage() {
                         Serial #{ap.serial_number} · {ap.source_display}
                       </div>
                     </td>
-                    <td>
-                      <strong>{formatDisplayDate(ap.slot.date)}</strong>
-                      <div className="muted" style={{ fontSize: '0.82rem' }}>
-                        {ap.slot.start_time_12h} – {ap.slot.end_time_12h}
-                      </div>
-                    </td>
                     {!isPatient && (
                       <td>
                         <strong>{ap.patient_name}</strong>
@@ -555,28 +528,26 @@ export default function AppointmentsPage() {
                         </div>
                       </td>
                     )}
-                    <td>
+                    {user?.role !== 'doctor' && <td>
                       <strong>{ap.doctor.name}</strong>
                       <div className="muted" style={{ fontSize: '0.82rem' }}>
                         {ap.doctor.department?.name || 'General Consultation'}
                         {ap.doctor.active_room ? ` · ${ap.doctor.active_room}` : ''}
                       </div>
-                    </td>
+                    </td>}
                     <td>
-                      <strong>BDT {ap.fee.toFixed(0)}</strong>
-                      <div className="muted" style={{ fontSize: '0.8rem' }}>
-                        {ap.visit_type_display}
+                      <strong>{formatDisplayDate(ap.slot.date)}</strong>
+                      <div className="muted" style={{ fontSize: '0.82rem' }}>
+                        {ap.slot.start_time_12h} – {ap.slot.end_time_12h}
                       </div>
                     </td>
+                    <td>{ap.visit_type_display}</td>
                     <td>
-                      <StatusPill status={ap.status} label={ap.status_display} />
-                    </td>
-                    <td>
+                      <strong>BDT {ap.fee.toFixed(2)}</strong>
+                      <div className="muted">{ap.payment_method_display}</div>
                       <StatusPill status={ap.payment_status} label={ap.payment_status_display} />
-                      <div className="muted" style={{ fontSize: '0.78rem', marginTop: 2 }}>
-                        {ap.payment_method_display}
-                      </div>
                     </td>
+                    <td><StatusPill status={ap.status} label={ap.status_display} /></td>
                     <td className="no-print">
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {!isPatient && (
@@ -588,37 +559,8 @@ export default function AppointmentsPage() {
                             Quick Edit
                           </button>
                         )}
-                        {isPatient &&
-                          ap.payment_status === 'unpaid' &&
-                          ['pending', 'confirmed'].includes(ap.status) &&
-                          ap.payment_method === 'online' && (
-                            <button
-                              type="button"
-                              className="button button-small button-primary"
-                              onClick={() => handlePayOnline(ap.id)}
-                            >
-                              Pay Online
-                            </button>
-                          )}
-                        {isPatient && ['pending', 'confirmed'].includes(ap.status) && (
-                          <button
-                            type="button"
-                            className="button button-small button-outline"
-                            style={{ color: 'var(--red)', borderColor: 'rgba(220,38,38,0.3)' }}
-                            onClick={() => {
-                              setCancelTarget(ap);
-                              setCancelReason('');
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        )}
-                        <Link
-                          className="button button-small button-outline"
-                          to={`/appointments/${ap.id}`}
-                        >
-                          Details
-                        </Link>
+                        {isPatient && <Link className="button button-small button-outline" to={`/complaints/new?appointment=${ap.id}&issue=1`}>Report Issue</Link>}
+                        {!isPatient && <Link className="button button-small button-outline" to={`/appointments/${ap.id}`}>Details</Link>}
                       </div>
                     </td>
                   </tr>
@@ -629,7 +571,7 @@ export default function AppointmentsPage() {
         )}
 
         {/* Pagination */}
-        {data && data.total_pages > 1 && (
+        {data && (
           <div
             className="no-print"
             style={{
@@ -640,7 +582,8 @@ export default function AppointmentsPage() {
               borderTop: '1px solid var(--line)',
             }}
           >
-            <span className="muted">
+            <PageSizeControl size={size} onChange={(next) => setParam({ limit: String(next) })} />
+              <span className="muted">
               Showing page {data.page} of {data.total_pages} ({data.total} total)
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -696,6 +639,7 @@ export default function AppointmentsPage() {
                 <label htmlFor="qu-visit">Visit Type</label>
                 <select
                   id="qu-visit"
+                  disabled={quickTarget.payment_status !== 'unpaid' || user?.role === 'receptionist'}
                   className="field-control"
                   value={qVisitType}
                   onChange={(e) =>
@@ -712,6 +656,7 @@ export default function AppointmentsPage() {
                 <label htmlFor="qu-fee">Consultation Fee (BDT)</label>
                 <input
                   id="qu-fee"
+                  disabled={quickTarget.payment_status !== 'unpaid' || user?.role === 'receptionist'}
                   type="number"
                   min={0}
                   step="1"
@@ -736,7 +681,7 @@ export default function AppointmentsPage() {
                   <option value="confirmed">Confirmed</option>
                   <option value="completed">Completed</option>
                   <option value="no_show">Did not attend</option>
-                  <option value="cancelled">Cancelled</option>
+                  {(user?.role === 'doctor' || user?.role === 'admin' || qStatus === 'cancelled') && <option value="cancelled">Cancelled</option>}
                 </select>
               </div>
 
@@ -754,7 +699,7 @@ export default function AppointmentsPage() {
                 </div>
               )}
 
-              {quickTarget.payment_status === 'unpaid' && qStatus !== 'cancelled' && (
+              {user?.role !== 'doctor' && quickTarget.accepted_payment_methods.includes('cash') && quickTarget.payment_status === 'unpaid' && qStatus !== 'cancelled' && (
                 <div className="form-group full">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                     <input
@@ -768,7 +713,7 @@ export default function AppointmentsPage() {
               )}
 
               <div className="form-group full">
-                <label htmlFor="qu-notes">Desk Notes</label>
+                <label htmlFor="qu-notes">Appointment note</label>
                 <textarea
                   id="qu-notes"
                   rows={2}
@@ -796,62 +741,6 @@ export default function AppointmentsPage() {
       )}
 
       {/* Patient Cancel Modal */}
-      {cancelTarget && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: 16,
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setCancelTarget(null);
-          }}
-        >
-          <div className="panel" style={{ width: '100%', maxWidth: 460, padding: 24 }}>
-            <h2 style={{ marginTop: 0 }}>Cancel Appointment {cancelTarget.reference}?</h2>
-            <p className="muted">
-              Consultation with <strong>{cancelTarget.doctor.name}</strong> on{' '}
-              {formatDisplayDate(cancelTarget.slot.date)}. If already paid, cancellation policy
-              applies and an eligible refund will be queued for review.
-            </p>
-            <form onSubmit={submitPatientCancel}>
-              <div className="form-group">
-                <label htmlFor="pc-reason">Reason (Optional)</label>
-                <textarea
-                  id="pc-reason"
-                  rows={3}
-                  className="field-control"
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder="Let us know why you need to cancel..."
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-                <button
-                  type="button"
-                  className="button button-outline"
-                  onClick={() => setCancelTarget(null)}
-                >
-                  Keep Appointment
-                </button>
-                <button
-                  type="submit"
-                  className="button button-primary"
-                  style={{ background: 'var(--red)', borderColor: 'var(--red)' }}
-                  disabled={cancelling}
-                >
-                  {cancelling ? 'Cancelling...' : 'Confirm Cancellation'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </AppLayout>
   );
 }

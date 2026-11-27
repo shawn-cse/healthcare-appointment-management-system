@@ -1,55 +1,57 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import api from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
 import { PublicLayout } from '../components/Layout.tsx';
 import type { Department } from '../types/index.ts';
 
 export default function HomePage() {
+  const location = useLocation();
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [phone, setPhone] = useState('+88096100016211');
+  const [hospital, setHospital] = useState({ phone: '+88096100016211', address: 'Mirpur, Dhaka' });
+  const { phone, address } = hospital;
 
   useEffect(() => {
     api
-      .get<{ departments: Department[]; hospital: { phone: string } }>('/catalog/home')
+      .get<{ departments: Department[]; hospital: { phone: string; address: string } }>('/catalog/home')
       .then((res) => {
         setDepartments(res.data.departments || []);
-        if (res.data.hospital?.phone) setPhone(res.data.hospital.phone);
+        if (res.data.hospital?.phone) setHospital(res.data.hospital);
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!location.hash) return;
+    const target = document.getElementById(location.hash.slice(1));
+    if (!target) return;
+    const frame = requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [location.hash]);
 
   return (
     <PublicLayout>
       <section className="hero">
         <div className="container hero-layout">
           <div className="hero-copy">
-            <div className="hero-kicker">
-              <span className="green-dot" /> YOUR HEALTH. OUR PRIORITY.
-            </div>
-            <h1>
-              Thoughtful care.
-              <br />
-              <span>Right when you need it.</span>
-            </h1>
-            <p>
-              Consult with trusted specialist departments at Green Hospital, Dhaka. A clear and
-              convenient way to plan your next medical consultation.
-            </p>
+            <h1>Specialist consultations at <span>Green Hospital</span></h1>
+            <p>Find a doctor, check consultation times, and book an appointment in {address}.</p>
             <div className="hero-actions">
               <Link className="button button-primary button-lg" to="/doctors">
-                Consult with a Doctor <Icon id="ic-arrow" />
+                Find Doctors <Icon id="ic-arrow" />
               </Link>
             </div>
             <div className="hero-trust">
               <span className="trust-symbol">
                 <Icon id="ic-check" />
               </span>
-              <span>Sequential serial numbers</span>
+              <span>Instant queue confirmation</span>
               <span className="trust-sep" />
-              <span>Flexible clinic schedules</span>
+              <span>Convenient clinic hours</span>
               <span className="trust-sep" />
-              <span>Transparent consultation fees</span>
+              <span>Clear upfront fees</span>
             </div>
           </div>
 
@@ -64,24 +66,6 @@ export default function HomePage() {
                 GREEN
                 <br />
                 HOSPITAL<span>.</span>
-              </div>
-            </div>
-            <div className="floating-info floating-one">
-              <span className="float-icon">
-                <Icon id="ic-calendar" />
-              </span>
-              <div>
-                <b>Consultations</b>
-                <small>At your convenience</small>
-              </div>
-            </div>
-            <div className="floating-info floating-two">
-              <span className="float-icon">
-                <Icon id="ic-stethoscope" />
-              </span>
-              <div>
-                <b>Specialist care</b>
-                <small>Across 10 departments</small>
               </div>
             </div>
           </div>
@@ -127,9 +111,7 @@ export default function HomePage() {
             }}
           >
             <div>
-              <p className="eyebrow">CARE SPECIALTIES</p>
-              <h2>Explore our clinical departments</h2>
-              <p>Find the right care team and specialists for your medical needs.</p>
+              <h2>Departments</h2>
             </div>
             <Link to="/doctors" className="button button-outline button-sm">
               Find Specialists <Icon id="ic-arrow" />
@@ -160,19 +142,66 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="cta-band" id="specialists">
-        <div className="container cta-band-inner">
-          <div>
-            <p className="eyebrow">YOUR NEXT CONSULTATION</p>
-            <h2>One less thing to worry about.</h2>
-            <p>
-              Explore doctor availability, room locations, and reserve a consultation in
-              minutes.
-            </p>
+      <section className="home-section home-info-summary" id="about-contact">
+        <div className="container">
+          <div className="hospital-section-head">
+            <div>
+              <span className="hospital-section-eyebrow">HOSPITAL INFORMATION</span>
+              <h2>About Us, Hospital Policy &amp; Contact</h2>
+            </div>
+            <Link to="/hospital-info" className="button button-outline button-sm">
+              View All Hospital Info <Icon id="ic-arrow" />
+            </Link>
           </div>
-          <Link className="button button-white button-lg" to="/doctors">
-            Consult Specialist <Icon id="ic-arrow" />
-          </Link>
+
+          <div className="home-info-cards">
+            <article className="panel home-info-card">
+              <span className="home-info-card-icon">
+                <Icon id="ic-building" />
+              </span>
+              <h3>About Us</h3>
+              <p>
+                Green Hospital Medical Center &amp; Diagnostic provides verified multi-specialty
+                consultations, dedicated chamber receptionists, and instant appointment confirmation in{' '}
+                {address}.
+              </p>
+              <Link to="/hospital-info#about-us" className="text-link">
+                Read About Green Hospital ›
+              </Link>
+            </article>
+
+            <article className="panel home-info-card">
+              <span className="home-info-card-icon">
+                <Icon id="ic-clipboard" />
+              </span>
+              <h3>Hospital Policy</h3>
+              <p>
+                Transparent first-visit, follow-up, and report-review fees, online and reception
+                payment deadlines, and clear cancellation &amp; refund guidelines.
+              </p>
+              <Link to="/hospital-info#hospital-policy" className="text-link">
+                Review Hospital Policies ›
+              </Link>
+            </article>
+
+            <article className="panel home-info-card">
+              <span className="home-info-card-icon">
+                <Icon id="ic-phone" />
+              </span>
+              <h3>Contact Us</h3>
+              <p>
+                Outpatient clinics run <strong>8:00 AM – 10:00 PM</strong> daily and Emergency care
+                is open <strong>24/7</strong>. Call{' '}
+                <a href={`tel:${phone}`}>
+                  <strong>{phone}</strong>
+                </a>
+                .
+              </p>
+              <Link to="/hospital-info#contact-us" className="text-link">
+                Get Contact &amp; Support Details ›
+              </Link>
+            </article>
+          </div>
         </div>
       </section>
     </PublicLayout>

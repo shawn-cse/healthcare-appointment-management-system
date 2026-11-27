@@ -1,5 +1,5 @@
 import { ensureDatabaseSchema, prisma } from './config/db.js';
-import { materializeWeekly, reconcileExpired } from './services/appointments.js';
+import { bookingHorizonDays, materializeWeekly, reconcileExpired } from './services/appointments.js';
 import { logAudit } from './services/audit.js';
 import { gatewayEnabled, gatewayRefundStatus } from './services/gateway.js';
 
@@ -8,12 +8,12 @@ export async function runMaintenanceCycle(): Promise<{ expired: number; material
 
   const doctors = await prisma.doctorProfile.findMany({
     where: { isAvailable: true, user: { isActive: true } },
-    select: { id: true, maxPatientsPerSession: true, bookingAdvanceDays: true },
+    select: { id: true, maxPatientsPerSession: true, bookingAdvanceDays: true, bookingWindowHours: true },
   });
 
   let materialized = 0;
   for (const doctor of doctors) {
-    materialized += await materializeWeekly(doctor, Math.min(180, doctor.bookingAdvanceDays));
+    materialized += await materializeWeekly(doctor, bookingHorizonDays(doctor));
   }
 
   if (gatewayEnabled()) {
@@ -69,6 +69,7 @@ export async function runMaintenanceCycle(): Promise<{ expired: number; material
                     : 'partially_refunded',
               },
             });
+            await tx.complaint.updateMany({ where: { appointmentId: appt.id, category: 'refund_request', status: { in: ['submitted', 'reviewing', 'approved'] } }, data: { status: 'resolved', response: 'The payment gateway confirmed the refund.' } });
             await logAudit(null, 'refund.gateway_confirmed', appt.reference, txn.refundReference, tx);
           });
         }

@@ -12,7 +12,7 @@ import type {
   User,
   WeeklyAvailability,
 } from '@prisma/client';
-import { dateToIso, timeTo12h, timeToHm, WEEKDAY_NAMES, WEEKDAY_SHORT } from '../utils/dateTime.js';
+import { dateToIso, localTodayDate, timeTo12h, timeToHm, WEEKDAY_NAMES, WEEKDAY_SHORT } from '../utils/dateTime.js';
 import { mediaUrl } from '../utils/upload.js';
 import { formatAuditEventMeta } from './audit.js';
 
@@ -96,12 +96,25 @@ const COMPLAINT_CATEGORY_DISPLAY: Record<string, string> = {
   staff: 'Staff & Reception',
   billing: 'Billing & Payment',
   other: 'Other Issue',
+  cancel_appointment: 'Cancel Appointment',
+  reschedule: 'Adjust Date & Time',
+  adjust_visit: 'Adjust Consultation Fee or Visit Type',
+  payment_issue: 'Payment Issue',
+  refund_request: 'Refund Request',
+  other_issue: 'Other Issue',
+  assistance: 'Assistance Request',
+  internal_complaint: 'Internal Complaint',
+  admin_request: 'Administrative Request',
+  technical: 'Technical Issue',
+  important_message: 'Important Message',
 };
 
 const COMPLAINT_STATUS_DISPLAY: Record<string, string> = {
   submitted: 'Complaint Generated',
   reviewing: 'Under Review & Inquiring',
   resolved: 'Issue Solved',
+  approved: 'Approved',
+  rejected: 'Rejected',
 };
 
 export function userDisplayName(u: Pick<User, 'firstName' | 'lastName' | 'username'>): string {
@@ -110,6 +123,9 @@ export function userDisplayName(u: Pick<User, 'firstName' | 'lastName' | 'userna
 }
 
 export function serializeUser(u: User & { chamber?: Chamber | null }) {
+  const today = dateToIso(localTodayDate());
+  const birth = u.dob ? dateToIso(u.dob) : null;
+  const age = birth ? Math.max(0, Number(today.slice(0, 4)) - Number(birth.slice(0, 4)) - Number(today.slice(5) < birth.slice(5))) : null;
   return {
     id: Number(u.id),
     username: u.username,
@@ -120,13 +136,17 @@ export function serializeUser(u: User & { chamber?: Chamber | null }) {
     last_name: u.lastName,
     display_name: userDisplayName(u),
     phone: u.phone || '',
-    dob: u.dob ? dateToIso(u.dob) : null,
+    dob: birth,
+    age,
     nid: u.nid,
     address: u.address,
     avatar: mediaUrl(u.avatar),
     chamber_id: u.chamberId ? Number(u.chamberId) : null,
     room_number: u.chamber?.roomNumber || '',
     is_active: u.isActive,
+    login_allowed: u.loginAllowed,
+    phone_verified: Boolean(u.phoneVerifiedAt),
+    gender: u.gender || '',
     is_staff: u.isStaff,
     is_superuser: u.isSuperuser,
     date_joined: u.dateJoined.toISOString(),
@@ -251,7 +271,7 @@ export function serializeDoctor(d: DoctorWithRelations) {
     ? reg.toUpperCase().startsWith('BMDC')
       ? reg
       : `BMDC Reg: ${reg}`
-    : `BMDC Reg: A-${10000 + ((Number(d.id) * 317) % 89999)}`;
+    : '';
 
   const qualificationsList = (d.qualifications || '')
     .split(/\r?\n/)
@@ -289,6 +309,7 @@ export function serializeDoctor(d: DoctorWithRelations) {
     gender: d.gender,
     qualifications: d.qualifications,
     qualifications_list: qualificationsList,
+    professional_experience: d.professionalExperience,
     designation: d.designation,
     institute: d.institute,
     registration_number: d.registrationNumber,
@@ -299,6 +320,9 @@ export function serializeDoctor(d: DoctorWithRelations) {
     followup_fee: Number(d.followupFee),
     followup_within_days: d.followupWithinDays,
     report_fee: Number(d.reportFee),
+    report_within_days: d.reportWithinDays,
+    accepted_payment_methods: d.acceptedPaymentMethods.split(','),
+    booking_window_hours: d.bookingWindowHours,
     max_patients_per_session: d.maxPatientsPerSession,
     hospital_share_mode: d.hospitalShareMode,
     hospital_share_value: Number(d.hospitalShareValue),
@@ -314,12 +338,18 @@ export function serializeDoctor(d: DoctorWithRelations) {
     active_contact: activeContact,
     assigned_receptionist_id: activeRecep ? Number(activeRecep.id) : null,
     assigned_receptionist_name: activeRecep ? userDisplayName(activeRecep) : 'Front Desk Reception',
+    assigned_receptionist_phone: activeRecep?.phone || '',
     is_available: d.isAvailable,
     weekly: weekly
       .filter((w) => w.active)
       .sort((a, b) => a.weekday - b.weekday || timeToHm(a.startTime).localeCompare(timeToHm(b.startTime)))
       .map(serializeWeekly),
   };
+}
+
+export function serializePublicDoctor(d: DoctorWithRelations) {
+  const { hospital_share_mode, hospital_share_value, biography, experience_years, max_patients_per_session, ...profile } = serializeDoctor(d);
+  return { ...profile, active_room: d.chamber?.roomNumber || '', room_number: d.chamber?.roomNumber || '' };
 }
 
 export function serializeWeekly(w: WeeklyAvailability) {
@@ -467,6 +497,9 @@ export function serializeAppointment(a: AppointmentWithRelations) {
     payment_status: a.paymentStatus,
     payment_status_display: PAYMENT_STATUS_DISPLAY[a.paymentStatus] || a.paymentStatus,
     payment_method: a.paymentMethod,
+    accepted_payment_methods: a.acceptedPaymentMethods.split(','),
+    guest_age: a.guestAge,
+    guest_gender: a.guestGender,
     payment_method_display: PAYMENT_METHOD_DISPLAY[a.paymentMethod] || a.paymentMethod,
     source: a.source,
     source_display: SOURCE_DISPLAY[a.source] || a.source,
@@ -524,15 +557,16 @@ export function serializeComplaint(
     status_step: statusStep,
     step_label: stepLabel,
     subject: c.subject,
+    recipient_id: c.recipientId ? Number(c.recipientId) : null,
     category: c.category,
     category_display: COMPLAINT_CATEGORY_DISPLAY[c.category] || c.category,
     message: c.message,
-    attachment: mediaUrl(c.attachment),
+    attachment: c.attachment ? `/complaints/${c.id}/attachments/original` : null,
     attachment_name: c.attachment ? c.attachment.split('/').pop() || c.attachment : null,
     status: c.status,
     status_display: COMPLAINT_STATUS_DISPLAY[c.status] || c.status,
     response: c.response,
-    admin_attachment: mediaUrl(c.adminAttachment),
+    admin_attachment: c.adminAttachment ? `/complaints/${c.id}/attachments/response` : null,
     admin_attachment_name: c.adminAttachment
       ? c.adminAttachment.split('/').pop() || c.adminAttachment
       : null,

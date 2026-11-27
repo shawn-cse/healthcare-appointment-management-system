@@ -4,7 +4,7 @@ import { prisma } from '../config/db.js';
 import { env } from '../config/env.js';
 import { HttpError } from '../middleware/error.js';
 import { doctorAllowed, managedDoctorIds } from '../services/access.js';
-import { ACTIVE_APPOINTMENT_STATUSES, materializeWeekly } from '../services/appointments.js';
+import { ACTIVE_APPOINTMENT_STATUSES, bookingHorizonDays, materializeWeekly, validateSlotForBooking } from '../services/appointments.js';
 import { logAudit } from '../services/audit.js';
 import { gatewayHttpsReady } from '../services/gateway.js';
 import {
@@ -15,6 +15,7 @@ import {
   serializeChamber,
   serializeDepartment,
   serializeDoctor,
+  serializePublicDoctor,
   serializeSlot,
   serializeWeekly,
   userDisplayName,
@@ -47,6 +48,16 @@ const doctorInclude = {
   weekly: { orderBy: [{ weekday: 'asc' as const }, { startTime: 'asc' as const }] },
   receptionists: { include: { user: true } },
 };
+
+function allowsBooking(slot: Parameters<typeof validateSlotForBooking>[0], staff = false) {
+  try {
+    validateSlotForBooking(slot, staff);
+    return true;
+  } catch (error) {
+    if (error instanceof HttpError) return false;
+    throw error;
+  }
+}
 
 // ---------- Public Home ----------
 export async function publicHome(_req: Request, res: Response): Promise<void> {
@@ -87,7 +98,7 @@ export async function publicHome(_req: Request, res: Response): Promise<void> {
       address: env.hospitalAddress,
     },
     departments: departments.map(serializeDepartment),
-    doctors: doctors.map(serializeDoctor),
+    doctors: doctors.map(serializePublicDoctor),
     doctor_count: doctorCount,
   });
 }
@@ -116,7 +127,7 @@ export async function doctorDirectory(req: Request, res: Response): Promise<void
   const where: Prisma.DoctorProfileWhereInput = {
     isAvailable: true,
     user: { isActive: true },
-    OR: [{ departmentId: null }, { department: { isActive: true } }],
+    AND: [{ OR: [{ departmentId: null }, { department: { isActive: true } }] }],
     ...(deptIds.length ? { departmentId: { in: deptIds } } : {}),
     ...(genders.length === 1 ? { gender: genders[0] } : {}),
     ...(q
@@ -158,7 +169,7 @@ export async function doctorDirectory(req: Request, res: Response): Promise<void
   ]);
 
   res.json({
-    doctors: doctors.map(serializeDoctor),
+    doctors: doctors.map(serializePublicDoctor),
     departments: departments.map(serializeDepartment),
     total_doctors_count: totalCount,
   });
@@ -245,15 +256,16 @@ export async function doctorDetail(req: Request, res: Response): Promise<void> {
   const doc = await resolveDoctor(req.params.identifier || '');
   if (!doc) throw new HttpError(404, 'Specialist doctor not found.');
 
-  const isStaff = Boolean(req.user && ['doctor', 'receptionist', 'admin'].includes(req.user.role));
-  if (!isStaff && doc.department && !doc.department.isActive) {
+  const isStaff = Boolean(req.user?.isActive && ['doctor', 'receptionist', 'admin'].includes(req.user.role));
+  if (!doc.user.isActive || !doc.isAvailable || (doc.department && !doc.department.isActive)) {
     throw new HttpError(404, 'Specialist doctor is currently unavailable.');
   }
 
-  await materializeWeekly(doc, 45);
+  const horizon = bookingHorizonDays(doc);
+  await materializeWeekly(doc, horizon);
 
   const today = localTodayDate();
-  const until = addDaysDate(today, 45);
+  const until = addDaysDate(today, horizon);
   const now = new Date();
 
   const slots = await prisma.appointmentSlot.findMany({
@@ -281,12 +293,7 @@ export async function doctorDetail(req: Request, res: Response): Promise<void> {
   const upcomingSlots = slots.map((s) => {
     const reserved = countMap.get(s.id) || 0;
     const remaining = Math.max(0, s.capacity - reserved);
-    const startUtc = localStartUtc(s.date, s.startTime);
-    const bookingOpen = isStaff
-      ? remaining > 0 && startUtc > now
-      : remaining > 0 &&
-        startUtc.getTime() >= now.getTime() + doc.bookingNoticeHours * 3600 * 1000 &&
-        startUtc.getTime() <= now.getTime() + doc.bookingAdvanceDays * 86400 * 1000;
+    const bookingOpen = remaining > 0 && allowsBooking({ ...s, doctor: doc }, isStaff);
 
     return {
       raw: s,
@@ -322,7 +329,7 @@ export async function doctorDetail(req: Request, res: Response): Promise<void> {
     });
 
   res.json({
-    doctor: serializeDoctor(doc),
+    doctor: serializePublicDoctor(doc),
     upcoming_slots: upcomingSlots.map((u) => u.serialized),
     weekly_schedules: weeklySchedules,
     is_staff: isStaff,
@@ -338,7 +345,8 @@ export async function getSlotDetail(req: Request, res: Response): Promise<void> 
     where: { id: slotId },
     include: { doctor: { include: doctorInclude } },
   });
-  if (!slot) throw new HttpError(404, 'Consultation slot not found.');
+  if (!slot || !allowsBooking(slot, req.user!.role !== 'patient')) throw new HttpError(404, 'Consultation slot not found.');
+  if (req.user!.role !== 'patient' && !(await doctorAllowed(req.user!, slot.doctor))) throw new HttpError(404, 'Consultation slot not found.');
 
   const reserved = await prisma.appointment.count({
     where: { slotId: slot.id, status: { in: ACTIVE_APPOINTMENT_STATUSES } },
@@ -346,7 +354,7 @@ export async function getSlotDetail(req: Request, res: Response): Promise<void> 
 
   res.json({
     slot: serializeSlot(slot, reserved),
-    doctor: serializeDoctor(slot.doctor),
+    doctor: serializePublicDoctor(slot.doctor),
     gateway_enabled: gatewayHttpsReady(),
   });
 }
@@ -362,7 +370,7 @@ export async function staffSlotsApi(req: Request, res: Response): Promise<void> 
   const doctorId = BigInt(doctorIdRaw);
   const doctor = await prisma.doctorProfile.findUnique({
     where: { id: doctorId },
-    include: { user: true },
+    include: { user: true, department: true, chamber: true },
   });
   if (!doctor || !(await doctorAllowed(req.user!, doctor))) {
     throw new HttpError(404, 'Doctor not found.');
@@ -372,6 +380,7 @@ export async function staffSlotsApi(req: Request, res: Response): Promise<void> 
     res.json({ slots: [] });
     return;
   }
+  await materializeWeekly(doctor, bookingHorizonDays(doctor));
 
   const slots = await prisma.appointmentSlot.findMany({
     where: { doctorId, date: day, isOpen: true },
@@ -380,7 +389,7 @@ export async function staffSlotsApi(req: Request, res: Response): Promise<void> 
   const now = new Date();
   const out = [];
   for (const s of slots) {
-    if (localStartUtc(s.date, s.startTime) <= now) continue;
+    if (!allowsBooking({ ...s, doctor }, true)) continue;
     const reserved = await prisma.appointment.count({
       where: { slotId: s.id, status: { in: ACTIVE_APPOINTMENT_STATUSES } },
     });
@@ -399,7 +408,7 @@ export async function staffSlotsApi(req: Request, res: Response): Promise<void> 
 export async function openSlots(req: Request, res: Response): Promise<void> {
   const doctorRaw = String(req.query.doctor || '');
   const dateRaw = String(req.query.date || '');
-  const where: Prisma.AppointmentSlotWhereInput = { isOpen: true };
+  const where: Prisma.AppointmentSlotWhereInput = { isOpen: true, date: { gte: localTodayDate() }, doctor: { isAvailable: true, user: { isActive: true }, OR: [{ departmentId: null }, { department: { isActive: true } }] } };
   if (/^\d+$/.test(doctorRaw)) where.doctorId = BigInt(doctorRaw);
   const parsedDate = parseIsoDate(dateRaw);
   if (parsedDate) where.date = parsedDate;
@@ -413,6 +422,7 @@ export async function openSlots(req: Request, res: Response): Promise<void> {
 
   const out = [];
   for (const s of slots) {
+    if (!allowsBooking(s)) continue;
     const reserved = await prisma.appointment.count({
       where: { slotId: s.id, status: { in: ACTIVE_APPOINTMENT_STATUSES } },
     });
@@ -424,8 +434,7 @@ export async function openSlots(req: Request, res: Response): Promise<void> {
 
 // ---------- Departments ----------
 export async function listDepartments(req: Request, res: Response): Promise<void> {
-  const includeInactive =
-    req.user?.role === 'admin' || req.query.all === '1' || req.query.all === 'true';
+  const includeInactive = req.user?.role === 'admin' && req.user.isActive;
 
   const items = await prisma.department.findMany({
     where: includeInactive ? {} : { isActive: true },
@@ -565,6 +574,7 @@ export async function createChamber(req: Request, res: Response): Promise<void> 
   const name = String(req.body?.name || roomNumber).trim() || roomNumber;
   const address = String(req.body?.address || 'Mirpur, Dhaka').trim();
   const contactNumber = String(req.body?.contact_number || '+88096100016211').trim();
+  const departmentId = /^\d+$/.test(String(req.body?.department_id ?? '')) ? BigInt(String(req.body.department_id)) : null;
 
   const chamber = await prisma.chamber.create({
     data: {
@@ -575,6 +585,7 @@ export async function createChamber(req: Request, res: Response): Promise<void> 
       description,
       address,
       contactNumber,
+      departmentId,
       isActive: true,
     },
   });
@@ -604,7 +615,8 @@ export async function updateChamber(req: Request, res: Response): Promise<void> 
       building: existing.building || '',
       address: existing.address || 'Mirpur, Dhaka',
       contactNumber: existing.contactNumber || '+88096100016211',
-      isActive: true,
+      isActive: typeof req.body?.is_active === 'boolean' ? req.body.is_active : existing.isActive,
+      ...(req.body?.department_id === null || req.body?.department_id === '' ? { departmentId: null } : /^\d+$/.test(String(req.body?.department_id ?? '')) ? { departmentId: BigInt(String(req.body.department_id)) } : {}),
     },
   });
 
@@ -645,7 +657,13 @@ export async function deleteChamber(req: Request, res: Response): Promise<void> 
 export async function getSchedule(req: Request, res: Response): Promise<void> {
   const docIds = await managedDoctorIds(req.user!);
   const docs = await prisma.doctorProfile.findMany({
-    where: docIds === null ? {} : { id: { in: docIds } },
+    where: {
+      ...(docIds === null ? {} : { id: { in: docIds } }),
+      ...(req.query.bookable === '1' ? { isAvailable: true, user: { isActive: true }, AND: [
+        { OR: [{ departmentId: null }, { department: { isActive: true } }] },
+        { OR: [{ chamberId: null }, { chamber: { isActive: true } }] },
+      ] } : {}),
+    },
     include: doctorInclude,
     orderBy: [{ user: { firstName: 'asc' } }, { user: { lastName: 'asc' } }],
   });
@@ -704,9 +722,9 @@ export async function saveWeekly(req: Request, res: Response): Promise<void> {
   const weekday = Number(req.body?.weekday);
   const startTime = parseTimeStr(String(req.body?.start_time || ''));
   const endTime = parseTimeStr(String(req.body?.end_time || ''));
-  const durationMinutes = Number(req.body?.duration_minutes ?? 30);
-  const capacity = Number(req.body?.capacity ?? 1);
-  const active = req.body?.active !== undefined ? Boolean(req.body.active) : true;
+  const durationMinutes = 30;
+  const capacity = 1;
+  const active = true;
 
   if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) {
     throw new HttpError(400, 'Select a valid weekday.');
@@ -726,9 +744,14 @@ export async function saveWeekly(req: Request, res: Response): Promise<void> {
 
   const weeklyId = req.params.id && /^\d+$/.test(req.params.id) ? BigInt(req.params.id) : null;
   const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM hospital_doctorprofile WHERE id = ${doctor.id} FOR UPDATE`;
+    const currentDoctor = await tx.doctorProfile.findUniqueOrThrow({ where: { id: doctor.id } });
+    if (currentDoctor.chamberId) await tx.$queryRaw`SELECT id FROM hospital_chamber WHERE id = ${currentDoctor.chamberId} FOR UPDATE`;
+    const conflict = await tx.weeklyAvailability.findFirst({ where: { doctorId, weekday, active: true, startTime: { lt: endTime }, endTime: { gt: startTime }, ...(weeklyId ? { id: { not: weeklyId } } : {}) } });
+    if (conflict) throw new HttpError(409, 'This period overlaps another consultation period for the doctor.');
     if (active) {
       await assertNoRoomWeeklyConflict(tx, {
-        chamberId: doctor.chamberId,
+        chamberId: currentDoctor.chamberId,
         excludeDoctorId: doctor.id,
         rules: [{ weekday, startTime, endTime }],
       });
@@ -749,14 +772,15 @@ export async function saveWeekly(req: Request, res: Response): Promise<void> {
         where: { templateId: saved.id, date: { gte: today } },
         include: {
           appointments: {
-            where: { status: { notIn: ['cancelled', 'expired'] } },
             select: { id: true },
           },
         },
       });
       for (const s of futureSlots) {
-        if (s.isOpen && s.appointments.length === 0) {
+        if (s.appointments.length === 0) {
           await tx.appointmentSlot.delete({ where: { id: s.id } });
+        } else if (s.isOpen && (pythonWeekday(s.date) !== weekday || timeToHm(s.startTime) !== timeToHm(startTime) || timeToHm(s.endTime) !== timeToHm(endTime))) {
+          await tx.appointmentSlot.update({ where: { id: s.id }, data: { isOpen: false } });
         }
       }
     } else {
@@ -803,12 +827,12 @@ export async function deleteWeekly(req: Request, res: Response): Promise<void> {
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM hospital_doctorprofile WHERE id = ${obj.doctorId} FOR UPDATE`;
     const today = localTodayDate();
     const slots = await tx.appointmentSlot.findMany({
       where: { templateId: obj.id, date: { gte: today } },
       include: {
         appointments: {
-          where: { status: { notIn: ['cancelled', 'expired'] } },
           select: { id: true },
         },
       },

@@ -17,6 +17,10 @@ export interface User {
   chamber_id?: number | null;
   room_number?: string;
   is_active: boolean;
+  login_allowed: boolean;
+  phone_verified: boolean;
+  age: number | null;
+  gender: string;
   is_staff: boolean;
   is_superuser: boolean;
   date_joined: string;
@@ -26,6 +30,9 @@ export interface User {
     id: number;
     designation: string;
     qualifications: string;
+    professional_experience: string;
+    registration_number: string;
+    receptionist_name: string;
     room_number: string;
     department_name: string;
   } | null;
@@ -120,6 +127,8 @@ export interface Doctor {
   gender: 'male' | 'female' | 'other';
   qualifications: string;
   qualifications_list: string[];
+  professional_experience: string;
+  assigned_receptionist_phone: string;
   designation: string;
   institute: string;
   registration_number: string;
@@ -130,8 +139,11 @@ export interface Doctor {
   followup_fee: number;
   followup_within_days: number;
   report_fee: number;
+  report_within_days: number;
+  accepted_payment_methods: ('cash' | 'online')[];
+  booking_window_hours: number | null;
   max_patients_per_session: number;
-  hospital_share_mode: 'percent' | 'fixed';
+  hospital_share_mode: 'percent' | 'fixed' | 'monthly';
   hospital_share_value: number;
   booking_notice_hours: number;
   booking_advance_days: number;
@@ -226,6 +238,8 @@ export interface Appointment {
   guest_name: string;
   guest_phone: string;
   guest_dob: string | null;
+  guest_age: number | null;
+  guest_gender: string | null;
   visit_type: 'first' | 'followup' | 'report';
   visit_type_display: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'expired' | 'no_show';
@@ -233,6 +247,7 @@ export interface Appointment {
   payment_status: 'unpaid' | 'paid' | 'refund_pending' | 'partially_refunded' | 'refunded';
   payment_status_display: string;
   payment_method: 'cash' | 'online';
+  accepted_payment_methods: ('cash' | 'online')[];
   payment_method_display: string;
   source: 'web' | 'phone' | 'desk';
   source_display: string;
@@ -278,12 +293,13 @@ export interface Complaint {
   status_step: number;
   step_label: string;
   subject: string;
+  recipient_id: number | null;
   category: string;
   category_display: string;
   message: string;
   attachment: string | null;
   attachment_name: string | null;
-  status: 'submitted' | 'reviewing' | 'resolved';
+  status: 'submitted' | 'reviewing' | 'resolved' | 'approved' | 'rejected';
   status_display: string;
   response: string;
   admin_attachment: string | null;

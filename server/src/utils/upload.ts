@@ -56,6 +56,7 @@ function makeDiskStorage(subdir: string, allowedExts: Set<string>) {
 export const uploadAvatar = makeDiskStorage('profiles', ALLOWED_AVATAR_EXT);
 export const uploadComplaintFile = makeDiskStorage('complaints/patient', ALLOWED_EXTENSIONS);
 export const uploadAdminComplaintFile = makeDiskStorage('complaints/admin', ALLOWED_EXTENSIONS);
+export const uploadRefundDocument = makeDiskStorage('refunds', new Set(['.pdf', '.png', '.jpg', '.jpeg', '.webp']));
 
 export function toRelativeMediaPath(subdir: string, filename: string): string {
   return `${subdir}/${filename}`;

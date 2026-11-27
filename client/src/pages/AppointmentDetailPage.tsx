@@ -11,6 +11,9 @@ import type { Appointment } from '../types/index.ts';
 
 interface DetailResponse {
   appointment: Appointment;
+  patient_access?: { is_active: boolean; login_allowed: boolean } | null;
+  operational_requests?: Array<{ id: number; subject: string; category: string; status: string }>;
+  patient_history?: Array<{ id: number; reference: string; date: string; status: string }>;
   linked_candidate: { id: number; display_name: string } | null;
 }
 
@@ -23,6 +26,9 @@ export default function AppointmentDetailPage() {
   const [data, setData] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [newDate, setNewDate] = useState('');
+  const [newSlot, setNewSlot] = useState('');
+  const [rescheduleSlots, setRescheduleSlots] = useState<Array<{ id: number; label: string }>>([]);
 
   // Cancel modal
   const [cancelModal, setCancelModal] = useState(false);
@@ -45,6 +51,16 @@ export default function AppointmentDetailPage() {
     loadDetail();
   }, [loadDetail]);
 
+  useEffect(() => {
+    setNewSlot('');
+    setRescheduleSlots([]);
+    if (!newDate || !data?.appointment.doctor.id) return;
+    api.get<{ slots: Array<{ id: number; label: string }> }>('/catalog/slots-api', { params: { doctor: data.appointment.doctor.id, date: newDate } })
+      .then(({ data }) => setRescheduleSlots(data.slots))
+      .catch((err) => showToast(getApiErrorMessage(err, 'Could not load available times.'), 'error'));
+  }, [newDate, data?.appointment.doctor.id, showToast]);
+
+  if (!loading && !data) return <AppLayout><p role="alert">Appointment not found.</p></AppLayout>;
   if (loading || !data) {
     return (
       <AppLayout>
@@ -57,7 +73,10 @@ export default function AppointmentDetailPage() {
   const isStaff = user && ['admin', 'receptionist', 'doctor'].includes(user.role);
   const canDoctorCancel = user && ['admin', 'doctor'].includes(user.role);
   const isCancellable = ['pending', 'confirmed'].includes(ap.status);
-  const canCollectCash = isStaff && ap.payment_status === 'unpaid' && !['cancelled', 'expired'].includes(ap.status);
+  const canCollectCash = (user?.role === 'admin' || user?.role === 'receptionist') && ap.accepted_payment_methods.includes('cash') && ap.payment_status === 'unpaid' && !['cancelled', 'expired'].includes(ap.status);
+
+  const approval = (category: string) => data.operational_requests?.some((item) => item.category === category && item.status === 'approved');
+  const canReschedule = isCancellable && (canDoctorCancel || (user?.role === 'receptionist' && approval('reschedule')));
 
   const handleCollectCash = async () => {
     const ok = await confirm({
@@ -300,7 +319,17 @@ export default function AppointmentDetailPage() {
           <h2 style={{ marginTop: 0 }}>Desk &amp; Patient Actions</h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {user?.role === 'patient' &&
+            {user?.role === 'patient' && ap.payment_status === 'unpaid' && isCancellable && <label className="form-group">Payment method
+              <select className="field-control" disabled={busy} value={ap.payment_method} onChange={async (event) => {
+                setBusy(true);
+                try {
+                  const { data } = await api.put<{ appointment: Appointment }>(`/appointments/${ap.id}/payment-method`, { payment_method: event.target.value });
+                  setData((previous) => previous && { ...previous, appointment: data.appointment });
+                } catch (err) { showToast(getApiErrorMessage(err, 'Could not change the payment method.'), 'error'); }
+                finally { setBusy(false); }
+              }}>{ap.accepted_payment_methods.map((method) => <option key={method} value={method}>{method === 'cash' ? 'Reception counter' : 'Online'}</option>)}</select>
+            </label>}
+            {user?.role === 'patient' && ap.payment_method === 'online' &&
               ap.payment_status === 'unpaid' &&
               ['pending', 'confirmed'].includes(ap.status) && (
                 <button
@@ -324,18 +353,7 @@ export default function AppointmentDetailPage() {
               </button>
             )}
 
-            {isStaff && ap.status === 'pending' && (
-              <button
-                type="button"
-                className="button button-outline"
-                disabled={busy}
-                onClick={() => handleStatusChange('confirmed')}
-              >
-                Mark Confirmed
-              </button>
-            )}
-
-            {isStaff && ['pending', 'confirmed'].includes(ap.status) && (
+            {isStaff && ap.status === 'confirmed' && (
               <>
                 <button
                   type="button"
@@ -356,7 +374,7 @@ export default function AppointmentDetailPage() {
               </>
             )}
 
-            {isCancellable && (
+            {isCancellable && (canDoctorCancel || (user?.role === 'receptionist' && approval('cancel_appointment'))) && (
               <button
                 type="button"
                 className="button button-outline"
@@ -374,22 +392,59 @@ export default function AppointmentDetailPage() {
 
             {user?.role === 'patient' && (
               <Link
-                to={`/complaints/new?appointment=${ap.id}`}
+                to={`/complaints/new?appointment=${ap.id}&issue=1`}
                 className="button button-outline"
               >
-                <Icon id="ic-help" /> File Support / Complaint on This Visit
+                <Icon id="ic-help" /> Report Issue
               </Link>
             )}
+            {canReschedule && <form className="form-grid" onSubmit={async (event) => {
+              event.preventDefault();
+              setBusy(true);
+              try {
+                await api.put(`/appointments/${ap.id}/reschedule`, { slot_id: newSlot });
+                setNewDate(''); loadDetail(); showToast('Appointment rescheduled.', 'success');
+              } catch (err) { showToast(getApiErrorMessage(err, 'Could not reschedule the appointment.'), 'error'); }
+              finally { setBusy(false); }
+            }}>
+              <label className="form-group">New consultation date<input className="field-control" type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required /></label>
+              <label className="form-group">Available time<select className="field-control" value={newSlot} onChange={(e) => setNewSlot(e.target.value)} required>
+                <option value="">Select time</option>{rescheduleSlots.map((slot) => <option key={slot.id} value={slot.id}>{slot.label}</option>)}
+              </select></label>
+              <button className="button button-outline" type="submit" disabled={busy || !newSlot}>Reschedule</button>
+            </form>}
+            {data.patient_access && ap.patient_id && <>
+              <h3>Patient account</h3>
+              <button type="button" className="button button-outline" onClick={async () => {
+                try { await api.post(`/staff/${ap.patient_id}/toggle-active`); loadDetail(); }
+                catch (err) { showToast(getApiErrorMessage(err, 'Account status could not be updated.'), 'error'); }
+              }}>{data.patient_access.is_active ? 'Deactivate account' : 'Activate account'}</button>
+              <button type="button" className="button button-outline" onClick={async () => {
+                try { await api.put(`/staff/${ap.patient_id}/login-permission`, { login_allowed: !data.patient_access?.login_allowed }); loadDetail(); }
+                catch (err) { showToast(getApiErrorMessage(err, 'Login permission could not be updated.'), 'error'); }
+              }}>{data.patient_access.login_allowed ? 'Block login' : 'Allow login'}</button>
+            </>}
           </div>
         </div>
       </div>
+
+      {!!data.operational_requests?.length && <section className="panel padded-panel">
+        <h2>Appointment requests</h2><ul>{data.operational_requests.map((request) => <li key={request.id}>
+          <Link to={`/complaints/${request.id}`}>{request.subject}</Link> <StatusPill status={request.status} />
+        </li>)}</ul>
+      </section>}
+      {!!data.patient_history?.length && <section className="panel padded-panel">
+        <h2>Patient appointment history</h2><ul>{data.patient_history.map((visit) => <li key={visit.id}>
+          <Link to={`/appointments/${visit.id}`}>{visit.reference}</Link> {formatLongDate(visit.date)} <StatusPill status={visit.status} />
+        </li>)}</ul>
+      </section>}
 
       {/* Payment Transactions */}
       {ap.transactions && ap.transactions.length > 0 && (
         <div className="panel" style={{ marginTop: 20 }}>
           <div className="panel-header">
             <div>
-              <h2>Payment &amp; Refund Ledger</h2>
+              <h2>Payment &amp; Refund Ledger</h2>{ap.transactions.some((payment) => payment.kind === 'charge' && payment.status === 'verified') && <button type="button" className="button button-small button-outline no-print" onClick={() => window.print()}>Print receipt</button>}
               <p>Audited transaction history recorded for this appointment</p>
             </div>
           </div>
@@ -408,7 +463,7 @@ export default function AppointmentDetailPage() {
               </thead>
               <tbody>
                 {ap.transactions.map((tx) => (
-                  <tr key={tx.id}>
+                  <tr key={tx.id} id={`payment-${tx.id}`}>
                     <td>{tx.kind_display}</td>
                     <td>{tx.method_display}</td>
                     <td>

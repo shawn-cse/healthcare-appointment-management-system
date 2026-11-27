@@ -25,17 +25,17 @@ export default function DoctorRulesPage() {
 
   const [designation, setDesignation] = useState('');
   const [qualifications, setQualifications] = useState('');
-  const [experienceYears, setExperienceYears] = useState(0);
-  const [biography, setBiography] = useState('');
   const [isAvailable, setIsAvailable] = useState(true);
 
   const [initialFee, setInitialFee] = useState(1200);
   const [followupFee, setFollowupFee] = useState(700);
   const [followupWithinDays, setFollowupWithinDays] = useState(30);
   const [reportFee, setReportFee] = useState(400);
+  const [reportDays, setReportDays] = useState(30);
+  const [windowHours, setWindowHours] = useState(48);
+  const [cash, setCash] = useState(true);
+  const [online, setOnline] = useState(true);
 
-  const [noticeHours, setNoticeHours] = useState(2);
-  const [advanceDays, setAdvanceDays] = useState(30);
   const [paymentPolicy, setPaymentPolicy] = useState<'on_day' | 'within'>('on_day');
   const [deadlineHours, setDeadlineHours] = useState(6);
   const [cancelMode, setCancelMode] = useState<'percent' | 'fixed'>('percent');
@@ -47,7 +47,7 @@ export default function DoctorRulesPage() {
   const [receptionistId, setReceptionistId] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
   const [regNumber, setRegNumber] = useState('');
-  const [hospMode, setHospMode] = useState<'percent' | 'fixed'>('percent');
+  const [hospMode, setHospMode] = useState<Doctor['hospital_share_mode']>('percent');
   const [hospVal, setHospVal] = useState(20);
 
   useEffect(() => {
@@ -58,17 +58,17 @@ export default function DoctorRulesPage() {
         const d = res.data.doctor;
         setDesignation(d.designation);
         setQualifications(d.qualifications);
-        setExperienceYears(d.experience_years);
-        setBiography(d.biography);
         setIsAvailable(d.is_available);
 
         setInitialFee(d.initial_fee);
         setFollowupFee(d.followup_fee);
         setFollowupWithinDays(d.followup_within_days);
         setReportFee(d.report_fee);
+        setReportDays(d.report_within_days);
+        setWindowHours(d.booking_window_hours ?? d.booking_advance_days * 24);
+        setCash(d.accepted_payment_methods.includes('cash'));
+        setOnline(d.accepted_payment_methods.includes('online'));
 
-        setNoticeHours(d.booking_notice_hours);
-        setAdvanceDays(d.booking_advance_days);
         setPaymentPolicy(d.payment_policy);
         setDeadlineHours(d.payment_deadline_hours);
         setCancelMode(d.cancel_fee_mode);
@@ -96,15 +96,14 @@ export default function DoctorRulesPage() {
       const payload: Record<string, unknown> = {
         designation,
         qualifications,
-        experience_years: experienceYears,
-        biography,
         is_available: isAvailable,
         initial_fee: initialFee,
         followup_fee: followupFee,
         followup_within_days: followupWithinDays,
         report_fee: reportFee,
-        booking_notice_hours: noticeHours,
-        booking_advance_days: advanceDays,
+        report_within_days: reportDays,
+        booking_window_hours: windowHours,
+        accepted_payment_methods: [...(cash ? ['cash'] : []), ...(online ? ['online'] : [])],
         payment_policy: paymentPolicy,
         payment_deadline_hours: deadlineHours,
         cancel_fee_mode: cancelMode,
@@ -115,7 +114,7 @@ export default function DoctorRulesPage() {
         payload.chamber_id = chamberId || null;
         payload.receptionist_id = receptionistId || null;
         payload.gender = gender;
-        payload.registration_number = regNumber;
+        if (regNumber.trim()) payload.registration_number = regNumber;
         payload.hospital_share_mode = hospMode;
         payload.hospital_share_value = hospVal;
       }
@@ -153,7 +152,7 @@ export default function DoctorRulesPage() {
         </div>
         <div className="heading-actions">
           <Link className="button button-outline" to={`/schedules?doctor=${meta.doctor.id}`}>
-            Manage Slots
+            Manage recurring schedule
           </Link>
         </div>
       </div>
@@ -173,39 +172,9 @@ export default function DoctorRulesPage() {
               />
             </div>
 
-            <div className="form-group">
-              <label htmlFor="dr-exp">Experience (Years)</label>
-              <input
-                id="dr-exp"
-                type="number"
-                min={0}
-                className="field-control"
-                value={experienceYears}
-                onChange={(e) => setExperienceYears(Number(e.target.value))}
-              />
-            </div>
-
-            <div className="form-group full">
-              <label htmlFor="dr-qual">Qualifications (comma-separated)</label>
-              <input
-                id="dr-qual"
-                type="text"
-                className="field-control"
-                value={qualifications}
-                onChange={(e) => setQualifications(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group full">
-              <label htmlFor="dr-bio">Clinical Biography</label>
-              <textarea
-                id="dr-bio"
-                rows={3}
-                className="field-control"
-                value={biography}
-                onChange={(e) => setBiography(e.target.value)}
-              />
-            </div>
+            <label className="form-group full">Educational qualifications
+              <textarea className="field-control" rows={3} value={qualifications} onChange={(e) => setQualifications(e.target.value)} />
+            </label>
 
             <div className="form-group">
               <label htmlFor="dr-ifee">First Visit Fee (BDT)</label>
@@ -244,7 +213,7 @@ export default function DoctorRulesPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="dr-rfee">Report Review Fee (BDT)</label>
+              <label htmlFor="dr-rfee">Report Checking Fee (BDT)</label>
               <input
                 id="dr-rfee"
                 type="number"
@@ -271,30 +240,16 @@ export default function DoctorRulesPage() {
         <div className="panel" style={{ padding: 24, alignSelf: 'start' }}>
           <h2 style={{ marginTop: 0 }}>Booking &amp; Settlement Rules</h2>
           <div className="form-grid two-col">
-            <div className="form-group">
-              <label htmlFor="dr-notice">Minimum Notice (Hours)</label>
-              <input
-                id="dr-notice"
-                type="number"
-                min={0}
-                className="field-control"
-                value={noticeHours}
-                onChange={(e) => setNoticeHours(Number(e.target.value))}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="dr-adv">Max Advance Window (Days)</label>
-              <input
-                id="dr-adv"
-                type="number"
-                min={1}
-                className="field-control"
-                value={advanceDays}
-                onChange={(e) => setAdvanceDays(Number(e.target.value))}
-              />
-            </div>
-
+            <label className="form-group">Advance booking window (hours)
+              <input className="field-control" type="number" min={1} max={4320} required value={windowHours} onChange={(e) => setWindowHours(Number(e.target.value))} />
+            </label>
+            <label className="form-group">Report checking eligibility (days)
+              <input className="field-control" type="number" min={1} max={4320} required value={reportDays} onChange={(e) => setReportDays(Number(e.target.value))} />
+            </label>
+            <fieldset className="form-group full"><legend>Accepted payment methods</legend>
+              <label><input type="checkbox" checked={cash} onChange={(e) => setCash(e.target.checked)} /> Reception counter</label>
+              <label><input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} /> Online</label>
+            </fieldset>
             <div className="form-group">
               <label htmlFor="dr-pol">Payment Requirement</label>
               <select
@@ -309,7 +264,7 @@ export default function DoctorRulesPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="dr-dead">Prepayment Deadline (Hours)</label>
+              <label htmlFor="dr-dead">Payment cutoff before consultation (hours)</label>
               <input
                 id="dr-dead"
                 type="number"
@@ -421,10 +376,11 @@ export default function DoctorRulesPage() {
                     id="dr-hmode"
                     className="field-control"
                     value={hospMode}
-                    onChange={(e) => setHospMode(e.target.value as 'percent' | 'fixed')}
+                    onChange={(e) => setHospMode(e.target.value as Doctor['hospital_share_mode'])}
                   >
                     <option value="percent">Percentage (%)</option>
                     <option value="fixed">Fixed Fee (BDT)</option>
+                    <option value="monthly">Fixed monthly amount (BDT)</option>
                   </select>
                 </div>
 

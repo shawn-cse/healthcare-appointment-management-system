@@ -30,7 +30,11 @@ if (env.nodeEnv !== 'test') {
 fs.mkdirSync(env.mediaRoot, { recursive: true });
 app.use(
   '/media',
-  (_req, res, next) => {
+  (req, res, next) => {
+    let path: string;
+    try { path = decodeURIComponent(req.path); }
+    catch { res.sendStatus(400); return; }
+    if (!/^\/profiles\/[A-Za-z0-9_.-]+$/.test(path)) { res.sendStatus(404); return; }
     res.setHeader('X-Content-Type-Options', 'nosniff');
     next();
   },

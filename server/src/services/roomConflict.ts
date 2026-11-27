@@ -21,6 +21,7 @@ export async function assertNoRoomWeeklyConflict(
   }
 ): Promise<void> {
   if (!opts.chamberId || opts.rules.length === 0) return;
+  await db.$queryRaw`SELECT id FROM hospital_chamber WHERE id = ${opts.chamberId} FOR UPDATE`;
 
   const existing = await db.weeklyAvailability.findMany({
     where: {

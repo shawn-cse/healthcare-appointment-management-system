@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
 import { AppLayout, PublicLayout } from '../components/Layout.tsx';
 import { LoadingScreen } from '../components/UI.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
+import DoctorCard from '../components/DoctorCard.tsx';
 import type { Department, Doctor } from '../types/index.ts';
 
 export default function DoctorsPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -22,6 +24,7 @@ export default function DoctorsPage() {
   );
   const [genderMale, setGenderMale] = useState(() => searchParams.get('gender') === 'male');
   const [genderFemale, setGenderFemale] = useState(() => searchParams.get('gender') === 'female');
+  const lastSyncedSearchRef = useRef(searchParams.toString());
 
   useEffect(() => {
     api
@@ -37,11 +40,25 @@ export default function DoctorsPage() {
   }, []);
 
   useEffect(() => {
+    const incoming = searchParams.toString();
+    if (incoming === lastSyncedSearchRef.current) return;
+    lastSyncedSearchRef.current = incoming;
+    setQuery(searchParams.get('q') || '');
+    setSelectedDepts(searchParams.getAll('department').filter(Boolean));
+    const gender = searchParams.get('gender');
+    setGenderMale(gender === 'male');
+    setGenderFemale(gender === 'female');
+  }, [searchParams]);
+
+  useEffect(() => {
     const params = new URLSearchParams();
     if (query.trim()) params.set('q', query.trim());
     selectedDepts.forEach((d) => params.append('department', d));
     if (genderMale && !genderFemale) params.set('gender', 'male');
     else if (genderFemale && !genderMale) params.set('gender', 'female');
+    const nextSearch = params.toString();
+    if (nextSearch === lastSyncedSearchRef.current) return;
+    lastSyncedSearchRef.current = nextSearch;
     setSearchParams(params, { replace: true });
   }, [query, selectedDepts, genderMale, genderFemale, setSearchParams]);
 
@@ -60,13 +77,24 @@ export default function DoctorsPage() {
       if (terms.length > 0) {
         const haystack = [
           d.full_doctor_title,
+          d.name,
+          d.first_name,
+          d.last_name,
           d.department?.name,
           d.qualifications,
+          d.professional_experience,
           d.active_room,
+          d.chamber?.room_number,
+          d.chamber?.name,
+          d.chamber?.building,
           d.designation,
+          d.institute,
           d.registration_number,
+          d.bmdc_display,
           d.assigned_receptionist_name,
+          d.assigned_days_text,
         ]
+          .filter(Boolean)
           .join(' ')
           .toLowerCase();
         if (!terms.every((t) => haystack.includes(t))) return false;
@@ -95,11 +123,7 @@ export default function DoctorsPage() {
       <div className="doctor-directory-container container">
         <div className="directory-header-bar">
           <div>
-            <h1 className="directory-title">Consult Our Specialist Doctors</h1>
-            <p className="directory-subtitle">
-              Consult verified senior professors, consultants, and surgeons at Green Hospital.
-              Choose your consultation date and receive sequential serial numbers directly.
-            </p>
+            <h1 className="directory-title">Find Doctors</h1>
           </div>
         </div>
 
@@ -126,7 +150,10 @@ export default function DoctorsPage() {
                       <button
                         type="button"
                         className="quick-clear-link"
-                        onClick={() => setQuery('')}
+                        onClick={() => {
+                          setQuery('');
+                          searchInputRef.current?.focus();
+                        }}
                       >
                         Clear
                       </button>
@@ -135,6 +162,7 @@ export default function DoctorsPage() {
                   <div className="filter-search-box">
                     <Icon id="ic-search" className="icon search-icon" />
                     <input
+                      ref={searchInputRef}
                       type="text"
                       id="left-doctor-search-input"
                       className="filter-search-input"
@@ -148,7 +176,10 @@ export default function DoctorsPage() {
                         type="button"
                         className="clear-search-btn"
                         title="Clear search"
-                        onClick={() => setQuery('')}
+                        onClick={() => {
+                          setQuery('');
+                          searchInputRef.current?.focus();
+                        }}
                       >
                         ✕
                       </button>
@@ -268,150 +299,7 @@ export default function DoctorsPage() {
             ) : (
               <div className="directory-cards-grid">
                 {filteredDoctors.length ? (
-                  filteredDoctors.map((d) => (
-                    <article key={d.id} className="doctor-card panel">
-                      <div className="doctor-card-top">
-                        <div className="doctor-avatar-wrapper">
-                          {d.avatar ? (
-                            <img
-                              src={d.avatar}
-                              alt={d.full_doctor_title}
-                              className="doctor-avatar-img"
-                            />
-                          ) : (
-                            <div className="doctor-avatar-circle">
-                              <svg className="doctor-vector-avatar" viewBox="0 0 64 64">
-                                <use href={`#${d.default_avatar}`} />
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                        <div className="doctor-primary-meta">
-                          <div className="doctor-badge-row">
-                            <span className="dept-tag">{d.department?.name || 'General Consultation'}</span>
-                            <span className="bmdc-tag">{d.bmdc_display}</span>
-                          </div>
-                          <h2 className="doctor-name-heading">
-                            <Link to={`/doctors/${d.profile_slug}`}>{d.full_doctor_title}</Link>
-                          </h2>
-                          <p className="doctor-designation-text">{d.designation}</p>
-                        </div>
-                      </div>
-
-                      <div className="doctor-card-middle">
-                        <div className="doctor-qual-block">
-                          <div className="qual-label">
-                            <Icon id="ic-stethoscope" />
-                            <span>Degrees &amp; Qualifications</span>
-                          </div>
-                          <div className="qual-list">
-                            {d.qualifications_list.length ? (
-                              d.qualifications_list.map((line, i) => (
-                                <div key={i} className="qual-line">
-                                  <span className="qual-dot" />
-                                  <span className="qual-text">{line}</span>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="qual-line">
-                                <span className="qual-dot" />
-                                <span className="qual-text">MBBS, Specialist Consultant</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="doctor-chamber-section">
-                          {d.active_room && (
-                            <div className="chamber-info-item">
-                              <span className="chamber-icon-box chamber-icon-building">
-                                <Icon id="ic-building" />
-                              </span>
-                              <span className="chamber-info-text">
-                                <span className="chamber-lbl">Room No:</span>
-                                <b className="chamber-val">{d.active_room}</b>
-                              </span>
-                            </div>
-                          )}
-                          <div className="chamber-info-item">
-                            <span className="chamber-icon-box chamber-icon-user">
-                              <Icon id="ic-user" />
-                            </span>
-                            <span className="chamber-info-text">
-                              <span className="chamber-lbl">Receptionist:</span>
-                              <b className="chamber-val">{d.assigned_receptionist_name}</b>
-                            </span>
-                          </div>
-                          <div className="chamber-info-item helpline-item">
-                            <span className="chamber-icon-box chamber-icon-phone">
-                              <Icon id="ic-phone" />
-                            </span>
-                            <span className="chamber-info-text">
-                              <span className="chamber-lbl">Helpline:</span>
-                              <a
-                                href={`tel:${d.active_contact || '+88096100016211'}`}
-                                className="helpline-link"
-                              >
-                                <b>{d.active_contact || '+88096100016211'}</b>
-                              </a>
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="doctor-fees-grid">
-                          <div className="fee-tile">
-                            <span className="fee-tile-label">1st Visit / New</span>
-                            <b className="fee-tile-amount">Tk. {Math.round(d.initial_fee)}</b>
-                          </div>
-                          <div className="fee-tile">
-                            <span className="fee-tile-label">
-                              Follow-up (<small>{d.followup_within_days}d</small>)
-                            </span>
-                            <b className="fee-tile-amount">Tk. {Math.round(d.followup_fee)}</b>
-                          </div>
-                          <div className="fee-tile">
-                            <span className="fee-tile-label">Report Review</span>
-                            <b className="fee-tile-amount">Tk. {Math.round(d.report_fee)}</b>
-                          </div>
-                        </div>
-
-                        <div className="doctor-schedule-preview">
-                          <div className="schedule-label">
-                            <Icon id="ic-clock" />
-                            <span>APPOINTMENT SCHEDULE:</span>
-                          </div>
-                          <div className="schedule-pills-wrap">
-                            {d.weekly.length ? (
-                              d.weekly.map((sched) => (
-                                <div key={sched.id} className="sched-pill">
-                                  <span className="sched-day-badge">
-                                    {sched.weekday_short.toUpperCase()}
-                                  </span>
-                                  <span className="sched-time-text">
-                                    {sched.start_time_12h}–{sched.end_time_12h}
-                                  </span>
-                                </div>
-                              ))
-                            ) : (
-                              <span className="sched-pill sched-pill-open">
-                                Consultation by Appointment
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="doctor-card-bottom">
-                        <Link
-                          to={`/doctors/${d.profile_slug}`}
-                          className="button button-primary button-full appt-action-btn"
-                        >
-                          <span>Make Appointment</span>
-                          <Icon id="ic-arrow" className="icon btn-arrow-icon" />
-                        </Link>
-                      </div>
-                    </article>
-                  ))
+                  filteredDoctors.map((doctor) => <DoctorCard key={doctor.id} doctor={doctor} />)
                 ) : (
                   <div className="panel empty-state full-grid">
                     <span className="empty-icon">

@@ -1,5 +1,7 @@
+import crypto from 'node:crypto';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { signToken } from '../middleware/auth.js';
 import { HttpError } from '../middleware/error.js';
@@ -8,60 +10,46 @@ import { serializeUser, userDisplayName } from '../services/serialize.js';
 import { parseIsoDate } from '../utils/dateTime.js';
 import { hashPassword, validatePasswordStrength, verifyPassword } from '../utils/password.js';
 import { toRelativeMediaPath } from '../utils/upload.js';
+import { normalizePhone, PHONE_REGEX } from '../utils/phone.js';
 
-const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
+const profileInclude = { chamber: true, department: true, receptionists: { include: { user: true } } } as const;
 
-async function getNextPatientUsername(): Promise<string> {
-  const rows = await prisma.user.findMany({
-    where: { username: { startsWith: 'patient', mode: 'insensitive' } },
-    select: { username: true },
-  });
-  const usedNums = new Set<number>();
-  for (const r of rows) {
-    const m = /^patient(\d+)$/i.exec(r.username);
-    if (m) usedNums.add(Number(m[1]));
-  }
-  let n = 1;
-  for (;;) {
-    if (!usedNums.has(n)) {
-      const candidate = `patient${n}`;
-      const conflict = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { username: { equals: candidate, mode: 'insensitive' } },
-            { phone: candidate },
-            { email: { equals: candidate, mode: 'insensitive' } },
-          ],
-        },
-        select: { id: true },
-      });
-      if (!conflict) return candidate;
-    }
-    n++;
-  }
+function serializeAccountDoctor(profile: Prisma.DoctorProfileGetPayload<{ include: typeof profileInclude }> | null) {
+  if (!profile) return null;
+  const receptionist = profile.receptionists.find((assignment) => assignment.user.isActive)?.user;
+  return {
+    id: Number(profile.id),
+    designation: profile.designation,
+    qualifications: profile.qualifications,
+    professional_experience: profile.professionalExperience,
+    registration_number: profile.registrationNumber,
+    receptionist_name: receptionist ? userDisplayName(receptionist) : '',
+    room_number: profile.chamber?.roomNumber || profile.roomNumber || '',
+    department_name: profile.department?.name || '',
+  };
 }
 
 const registerSchema = z.object({
-  first_name: z.string().trim().min(1, 'First name is required.').max(150),
-  last_name: z.string().trim().min(1, 'Last name is required.').max(150),
+  full_name: z.string().trim().min(1, 'Full name is required.').max(150),
   username: z.string().trim().max(150).optional().default(''),
   phone: z
     .string()
-    .trim()
-    .regex(PHONE_REGEX, 'Enter a valid phone number (10–15 digits).'),
+    .transform(normalizePhone)
+    .pipe(z.string().regex(PHONE_REGEX, 'Enter a valid phone number (10–15 digits).')),
+  gender: z.enum(['female', 'male', 'other']),
   dob: z.string().trim().min(1, 'Date of birth is required.'),
   email: z.string().trim().max(254).optional().default(''),
   nid: z.string().trim().max(30).optional().default(''),
   address: z.string().trim().optional().default(''),
   password1: z.string().optional(),
-  password2: z.string().optional(),
+  password2: z.string().min(1, 'Confirm your password.'),
   password: z.string().optional(),
 });
 
 export async function register(req: Request, res: Response): Promise<void> {
   const parsed = registerSchema.parse(req.body);
   const pw1 = parsed.password1 ?? parsed.password ?? '';
-  const pw2 = parsed.password2 ?? pw1;
+  const pw2 = parsed.password2;
 
   if (pw1 !== pw2) {
     throw new HttpError(400, 'Passwords do not match.');
@@ -107,7 +95,27 @@ export async function register(req: Request, res: Response): Promise<void> {
       throw new HttpError(400, 'An account with this username, phone or email already exists.');
     }
   } else {
-    finalUsername = await getNextPatientUsername();
+    const slug = parsed.full_name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '')
+      .slice(0, 12) || 'patient';
+    for (;;) {
+      const candidate = `${slug}_${crypto.randomBytes(3).toString('hex')}`;
+      const conflict = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: { equals: candidate, mode: 'insensitive' } },
+            { phone: candidate },
+            { email: { equals: candidate, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!conflict) {
+        finalUsername = candidate;
+        break;
+      }
+    }
   }
 
   const passwordHash = await hashPassword(pw1);
@@ -117,8 +125,8 @@ export async function register(req: Request, res: Response): Promise<void> {
       email: cleanEmail,
       password: passwordHash,
       role: 'patient',
-      firstName: parsed.first_name,
-      lastName: parsed.last_name,
+      firstName: parsed.full_name,
+      gender: parsed.gender,
       phone: parsed.phone,
       dob: dobDate,
       nid: parsed.nid,
@@ -150,7 +158,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     where: {
       OR: [
         { username: { equals: identifier, mode: 'insensitive' } },
-        { phone: identifier },
+        { phone: normalizePhone(identifier) },
         { email: { equals: identifier, mode: 'insensitive' } },
       ],
     },
@@ -170,7 +178,7 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   const user = matches[0];
   const valid = await verifyPassword(password, user.password);
-  if (!valid || !user.isActive) {
+  if (!valid || !user.loginAllowed || (!user.isActive && user.role !== 'patient')) {
     throw new HttpError(401, 'Incorrect login details. Please verify your credentials and try again.');
   }
 
@@ -211,7 +219,7 @@ export async function me(req: Request, res: Response): Promise<void> {
     user.role === 'doctor'
       ? await prisma.doctorProfile.findUnique({
           where: { userId: user.id },
-          include: { chamber: true, department: true },
+          include: profileInclude,
         })
       : null;
 
@@ -219,15 +227,7 @@ export async function me(req: Request, res: Response): Promise<void> {
     user: {
       ...serializeUser(user),
       doctor_profile_id: doctorProfile ? Number(doctorProfile.id) : null,
-      doctor_profile: doctorProfile
-        ? {
-            id: Number(doctorProfile.id),
-            designation: doctorProfile.designation,
-            qualifications: doctorProfile.qualifications,
-            room_number: doctorProfile.chamber?.roomNumber || doctorProfile.roomNumber || '',
-            department_name: doctorProfile.department?.name || 'General Consultation',
-          }
-        : null,
+      doctor_profile: serializeAccountDoctor(doctorProfile),
     },
   });
 }
@@ -308,7 +308,7 @@ export async function checkEmail(req: Request, res: Response): Promise<void> {
 }
 
 export async function checkPhone(req: Request, res: Response): Promise<void> {
-  const phone = String(req.query.phone || '').trim();
+  const phone = normalizePhone(String(req.query.phone || ''));
   const role = String(req.query.role || 'patient').trim().toLowerCase();
   const excludeIdRaw = String(req.query.exclude_id || '').trim();
   if (!phone) {
@@ -349,16 +349,18 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
   const user = req.user!;
   const body = req.body as Record<string, string | undefined>;
 
-  const firstName = (body.first_name ?? user.firstName).trim();
-  const lastName = (body.last_name ?? user.lastName).trim();
+  const firstName = (body.full_name ?? body.first_name ?? user.firstName).trim();
+  const lastName = body.full_name !== undefined ? '' : (body.last_name ?? user.lastName).trim();
   const username = (body.username ?? user.username).trim();
   const email = (body.email ?? user.email).trim().toLowerCase();
-  const phoneRaw = body.phone !== undefined ? body.phone.trim() : (user.phone ?? '').trim();
+  const phoneRaw = normalizePhone(body.phone ?? user.phone ?? '');
   const nid = (body.nid ?? user.nid).trim();
   const address = (body.address ?? user.address).trim();
   const dobRaw = body.dob !== undefined ? String(body.dob || '').trim() : undefined;
+  const gender = body.gender || user.gender;
+  if (gender && !['female', 'male', 'other'].includes(gender)) throw new HttpError(400, 'Select a valid gender.');
 
-  if (!firstName) throw new HttpError(400, 'Name is required.');
+  if (!firstName || firstName.length > 150 || lastName.length > 150) throw new HttpError(400, 'Enter a name up to 150 characters.');
   if (!username) throw new HttpError(400, 'Username cannot be empty.');
   if (user.role === 'patient') {
     if (!phoneRaw || !PHONE_REGEX.test(phoneRaw)) {
@@ -422,7 +424,7 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
 
   const updated = await prisma.$transaction(async (tx) => {
     let syncedChamberId: bigint | null | undefined = undefined;
-    if (body.room_number !== undefined) {
+    if (user.role === 'admin' && body.room_number !== undefined) {
       const rVal = body.room_number.trim();
       if (!rVal) {
         syncedChamberId = null;
@@ -442,7 +444,9 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
         username,
         email,
         phone,
+        ...(phone !== user.phone ? { phoneVerifiedAt: null } : {}),
         dob: dobDate,
+        gender,
         nid,
         address,
         ...(syncedChamberId !== undefined ? { chamberId: syncedChamberId } : {}),
@@ -456,24 +460,14 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
       if (doc) {
         const docUpdate: Record<string, unknown> = {};
         if (body.designation !== undefined) docUpdate.designation = body.designation.trim();
-        if (body.qualifications !== undefined) docUpdate.qualifications = body.qualifications;
-        if (body.room_number !== undefined) {
-          const rVal = body.room_number.trim();
-          docUpdate.roomNumber = rVal;
-          if (!rVal) {
-            docUpdate.chamberId = null;
-          } else {
-            const ch = await tx.chamber.findFirst({
-              where: { roomNumber: { equals: rVal, mode: 'insensitive' } },
-            });
-            if (ch) {
-              docUpdate.chamberId = ch.id;
-              docUpdate.roomNumber = ch.roomNumber;
-              docUpdate.chamberAddress = ch.address;
-              docUpdate.contactNumber = ch.contactNumber;
-            }
-          }
+        if (body.registration_number !== undefined) {
+          const registration = body.registration_number.trim();
+          if (!registration || registration.length > 100) throw new HttpError(400, 'Enter a valid BMDC registration number.');
+          docUpdate.registrationNumber = registration;
         }
+        if (body.qualifications !== undefined) docUpdate.qualifications = body.qualifications;
+        if (body.professional_experience !== undefined) docUpdate.professionalExperience = body.professional_experience;
+        if (gender) docUpdate.gender = gender;
         if (Object.keys(docUpdate).length) {
           await tx.doctorProfile.update({ where: { id: doc.id }, data: docUpdate });
         }
@@ -488,7 +482,7 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     updated.role === 'doctor'
       ? await prisma.doctorProfile.findUnique({
           where: { userId: updated.id },
-          include: { chamber: true, department: true },
+          include: profileInclude,
         })
       : null;
 
@@ -496,15 +490,7 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     user: {
       ...serializeUser(updated),
       doctor_profile_id: doctorProfile ? Number(doctorProfile.id) : null,
-      doctor_profile: doctorProfile
-        ? {
-            id: Number(doctorProfile.id),
-            designation: doctorProfile.designation,
-            qualifications: doctorProfile.qualifications,
-            room_number: doctorProfile.chamber?.roomNumber || doctorProfile.roomNumber || '',
-            department_name: doctorProfile.department?.name || 'General Consultation',
-          }
-        : null,
+      doctor_profile: serializeAccountDoctor(doctorProfile),
     },
     message: 'Profile updated successfully.',
   });
@@ -526,10 +512,11 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   if (err) throw new HttpError(400, err);
 
   const hash = await hashPassword(newPassword);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { password: hash },
+  const changed = await prisma.user.updateMany({
+    where: { id: user.id, sessionVersion: user.sessionVersion },
+    data: { password: hash, sessionVersion: { increment: 1 } },
   });
+  if (!changed.count) throw new HttpError(409, 'The account changed. Sign in again to update your password.');
 
   res.json({ message: 'Your password has been updated.', name: userDisplayName(user) });
 }

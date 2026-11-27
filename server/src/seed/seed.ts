@@ -188,7 +188,9 @@ export async function seedDatabase(): Promise<void> {
     return;
   }
 
-  const defaultPasswordHash = await hashPassword('abc123');
+  const starterPassword = process.env.SEED_STARTER_PASSWORD || (process.env.NODE_ENV !== 'production' ? 'abc123' : '');
+  if (!starterPassword) throw new Error('Set SEED_STARTER_PASSWORD for the starter dataset.');
+  const defaultPasswordHash = await hashPassword(starterPassword);
 
   // Admin
   const existingAdmin = await prisma.user.findUnique({ where: { username: 'admin' } });

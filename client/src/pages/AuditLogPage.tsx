@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { GreenDatePicker } from '../components/DateTimePickers.tsx';
 import { Icon } from '../components/Icons.tsx';
+import { PageSizeControl, SortableColumn } from '../components/ManagementTable.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen, formatDateTime } from '../components/UI.tsx';
 import { useToast } from '../context/ToastContext.tsx';
@@ -52,7 +53,9 @@ export default function AuditLogPage() {
   const date = searchParams.get('date') || 'all';
   const fromDate = searchParams.get('from') || '';
   const toDate = searchParams.get('to') || '';
+  const sort = searchParams.get('sort') || 'date.desc';
   const page = Number(searchParams.get('page') || 1) || 1;
+  const size = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 30));
 
   const [searchInput, setSearchInput] = useState(q);
   const [data, setData] = useState<AuditResponse | null>(null);
@@ -71,13 +74,15 @@ export default function AuditLogPage() {
       if (toDate) params.set('to', toDate);
     }
     params.set('page', String(page));
+    params.set('limit', String(size));
+    params.set('sort', sort);
 
     api
       .get<AuditResponse>(`/audit?${params.toString()}`)
       .then((res) => setData(res.data))
       .catch((err) => showToast(getApiErrorMessage(err, 'Failed to load activity log.'), 'error'))
       .finally(() => setLoading(false));
-  }, [q, category, actor, date, fromDate, toDate, page, showToast]);
+  }, [q, category, actor, date, fromDate, toDate, page, size, sort, showToast]);
 
   useEffect(() => {
     loadAudit();
@@ -294,11 +299,11 @@ export default function AuditLogPage() {
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>Timestamp</th>
-                    <th>Performer</th>
-                    <th>Action</th>
-                    <th>Target Record</th>
-                    <th>Details</th>
+                    <SortableColumn name="date" sort={sort} onChange={(sort) => setParam({ sort })}>Timestamp</SortableColumn>
+                    <SortableColumn name="actor" sort={sort} onChange={(sort) => setParam({ sort })}>Performer</SortableColumn>
+                    <SortableColumn name="action" sort={sort} onChange={(sort) => setParam({ sort })}>Action</SortableColumn>
+                    <SortableColumn name="target" sort={sort} onChange={(sort) => setParam({ sort })}>Target Record</SortableColumn>
+                    <SortableColumn name="detail" sort={sort} onChange={(sort) => setParam({ sort })}>Details</SortableColumn>
                   </tr>
                 </thead>
                 <tbody>
@@ -336,7 +341,7 @@ export default function AuditLogPage() {
             </div>
           )}
 
-          {data && data.total_pages > 1 && (
+          {data && (
             <div
               className="no-print"
               style={{
@@ -348,6 +353,7 @@ export default function AuditLogPage() {
                 background: '#f8fafc',
               }}
             >
+              <PageSizeControl size={size} onChange={(next) => setParam({ limit: String(next) })} />
               <span className="muted">
                 Page {data.page} of {data.total_pages} ({data.total} matching events)
               </span>

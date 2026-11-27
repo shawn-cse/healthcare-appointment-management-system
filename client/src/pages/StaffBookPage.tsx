@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
+import { BookingRules, VisitField } from '../components/BookingFields.tsx';
 import { GreenDatePicker } from '../components/DateTimePickers.tsx';
+import DoctorCard from '../components/DoctorCard.tsx';
 import { Icon } from '../components/Icons.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen, formatLongDate } from '../components/UI.tsx';
@@ -20,6 +22,8 @@ export default function StaffBookPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  const [doctorSearch, setDoctorSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
 
@@ -39,28 +43,27 @@ export default function StaffBookPage() {
   const [matchedPatient, setMatchedPatient] = useState<{ id: number; name: string } | null>(null);
   const [identityVerified, setIdentityVerified] = useState(false);
   const [name, setName] = useState('');
-  const [dob, setDob] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('');
   const [visitType, setVisitType] = useState<'first' | 'followup' | 'report'>('first');
   const [source, setSource] = useState<'desk' | 'phone' | 'web'>('desk');
-  const [paymentChoice, setPaymentChoice] = useState<'cash' | 'later'>('cash');
+  const [paymentChoice, setPaymentChoice] = useState<'cash' | 'later' | 'online'>('later');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     api
-      .get<{ doctors: Doctor[] }>('/catalog/schedules')
+      .get<{ doctors: Doctor[] }>('/catalog/schedules?bookable=1')
       .then((res) => {
         const list = res.data.doctors || [];
         setDoctors(list);
-        if (!doctorId && list.length > 0) {
-          setDoctorId(String(list[0].id));
-        }
+
       })
       .catch((err) => {
         showToast(getApiErrorMessage(err, 'Could not load doctors.'), 'error');
       })
       .finally(() => setLoadingDocs(false));
-  }, [showToast, doctorId]);
+  }, [showToast]);
 
   useEffect(() => {
     if (!doctorId || !date) {
@@ -106,6 +109,12 @@ export default function StaffBookPage() {
   }, [phone]);
 
   const selectedDoc = doctors.find((d) => String(d.id) === doctorId) || null;
+  useEffect(() => {
+    if (!selectedDoc) return;
+    if (selectedDoc.accepted_payment_methods.includes('cash')) setPaymentChoice('later');
+    else setPaymentChoice('online');
+  }, [selectedDoc?.id, selectedDoc?.accepted_payment_methods.join(',')]);
+
   const estFee = selectedDoc
     ? visitType === 'followup'
       ? selectedDoc.followup_fee
@@ -131,7 +140,9 @@ export default function StaffBookPage() {
           identity_verified: linkPatientId ? true : undefined,
           name: name.trim(),
           phone: phone.trim(),
-          dob: dob || undefined,
+          age: Number(age),
+          gender,
+          payment_method: paymentChoice === 'online' ? 'online' : 'cash',
           visit_type: visitType,
           source,
           payment_choice: paymentChoice,
@@ -159,12 +170,7 @@ export default function StaffBookPage() {
     <AppLayout>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">RECEPTION &amp; WALK-IN REGISTRATION</p>
-          <h1>Register Patient Booking</h1>
-          <p>
-            Book consultations for walk-in patients, telephone inquiries, and verified patient
-            accounts.
-          </p>
+          <h1>Register Booking</h1>
         </div>
         <div className="heading-actions">
           <Link className="button button-outline" to="/appointments">
@@ -173,35 +179,26 @@ export default function StaffBookPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="content-columns">
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>1. Select Specialist &amp; Session</h2>
-              <p>Only active open slots with available seat capacity are listed</p>
-            </div>
-          </div>
-
-          <div className="form-grid two-col" style={{ padding: '20px' }}>
-            <div className="form-group full">
-              <label htmlFor="sb-doctor">Specialist Doctor</label>
-              <select
-                id="sb-doctor"
-                className="field-control"
-                value={doctorId}
-                onChange={(e) => setDoctorId(e.target.value)}
-                required
-              >
-                <option value="">Choose a doctor...</option>
-                {doctors.map((doc) => (
-                  <option key={doc.id} value={doc.id}>
-                    {doc.name} — {doc.department?.name || 'General'}
-                    {doc.active_room ? ` (${doc.active_room})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
+      {!selectedDoc ? <>
+        <div className="management-table-tools">
+          <input className="field-control" type="search" aria-label="Search doctors" placeholder="Search doctors" value={doctorSearch} onChange={(e) => setDoctorSearch(e.target.value)} />
+          <select className="field-control" aria-label="Filter by department" value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}>
+            <option value="">All departments</option>
+            {[...new Map(doctors.flatMap((doctor) => doctor.department ? [[doctor.department.id, doctor.department.name] as const] : []))].map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+        </div>
+        <div className="directory-cards-grid">
+          {doctors.filter((doctor) => (!departmentFilter || String(doctor.department?.id) === departmentFilter) &&
+            `${doctor.full_doctor_title} ${doctor.department?.name || ''} ${doctor.designation}`.toLowerCase().includes(doctorSearch.trim().toLowerCase()))
+            .map((doctor) => <DoctorCard key={doctor.id} doctor={doctor} onBook={() => setDoctorId(String(doctor.id))} />)}
+        </div>
+        {doctors.length === 0 && <p>No doctors are available for booking.</p>}
+      </> : <>
+        <div className="desk-doctor-heading"><DoctorCard doctor={selectedDoc} onBook={() => setDoctorId('')} actionLabel="Change doctor" /></div>
+        <form onSubmit={handleSubmit} className="content-columns">
+          <div className="panel">
+            <div className="panel-header"><h2>Consultation session</h2></div>
+            <div className="form-grid two-col" style={{ padding: 20 }}>
             <div className="form-group">
               <label htmlFor="sb-date">Consultation Date</label>
               <GreenDatePicker
@@ -300,14 +297,16 @@ export default function StaffBookPage() {
             )}
 
             <div className="form-group">
-              <label htmlFor="sb-dob">Date of Birth (Optional)</label>
-              <GreenDatePicker
-                id="sb-dob"
-                value={dob}
-                onChange={setDob}
-                isDob
-                placeholder="YYYY-MM-DD"
-              />
+              <label htmlFor="sb-age">Patient age</label>
+              <input id="sb-age" className="field-control" type="number" min={0} max={130} required
+                value={age} onChange={(e) => setAge(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label htmlFor="sb-gender">Patient gender</label>
+              <select id="sb-gender" className="field-control" required value={gender} onChange={(e) => setGender(e.target.value)}>
+                <option value="">Select gender</option><option value="female">Female</option>
+                <option value="male">Male</option><option value="other">Other</option>
+              </select>
             </div>
 
             <div className="form-group">
@@ -324,30 +323,20 @@ export default function StaffBookPage() {
               </select>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="sb-visit">Visit Type</label>
-              <select
-                id="sb-visit"
-                className="field-control"
-                value={visitType}
-                onChange={(e) => setVisitType(e.target.value as 'first' | 'followup' | 'report')}
-              >
-                <option value="first">First Visit / New Patient</option>
-                <option value="followup">Second Visit / Follow-up</option>
-                <option value="report">Report Review</option>
-              </select>
-            </div>
+            <VisitField value={visitType} onChange={setVisitType} />
+            {selectedDoc && <BookingRules doctor={selectedDoc} visit={visitType} />}
 
             <div className="form-group">
-              <label htmlFor="sb-payment">Desk Cash Action</label>
+              <label htmlFor="sb-payment">Payment method</label>
               <select
                 id="sb-payment"
                 className="field-control"
                 value={paymentChoice}
-                onChange={(e) => setPaymentChoice(e.target.value as 'cash' | 'later')}
+                onChange={(e) => setPaymentChoice(e.target.value as 'cash' | 'later' | 'online')}
               >
-                <option value="cash">Collect Cash Now (Confirm immediately)</option>
-                <option value="later">Reserve Unpaid (Collect later)</option>
+                {selectedDoc?.accepted_payment_methods.includes('cash') && <option value="cash">Collect at reception now</option>}
+                {selectedDoc?.accepted_payment_methods.includes('cash') && <option value="later">Pay at reception later</option>}
+                {selectedDoc?.accepted_payment_methods.includes('online') && <option value="online">Online payment</option>}
               </select>
             </div>
 
@@ -419,7 +408,7 @@ export default function StaffBookPage() {
             </button>
           </div>
         </div>
-      </form>
+      </form></>}
     </AppLayout>
   );
 }

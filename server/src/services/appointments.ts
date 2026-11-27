@@ -8,6 +8,7 @@ import {
   dateToIso,
   localStartUtc,
   localTodayDate,
+  parseTimeStr,
   pythonWeekday,
   timeToHm,
 } from '../utils/dateTime.js';
@@ -16,6 +17,14 @@ import { logAudit } from './audit.js';
 import { userDisplayName } from './serialize.js';
 
 export const ACTIVE_APPOINTMENT_STATUSES = ['pending', 'confirmed', 'completed', 'no_show'];
+
+export function acceptsPayment(methods: string, method: string): boolean {
+  return ['cash', 'online'].includes(method) && methods.split(',').includes(method);
+}
+
+export function bookingHorizonDays(doctor: { bookingWindowHours: number | null; bookingAdvanceDays: number }): number {
+  return Math.min(180, Math.max(1, Math.ceil((doctor.bookingWindowHours ?? doctor.bookingAdvanceDays * 24) / 24)));
+}
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -28,10 +37,40 @@ export function calcHospitalCut(
   fee: number
 ): number {
   const shareVal = Number(doctor.hospitalShareValue);
+  if (doctor.hospitalShareMode === 'monthly') return 0;
   if (doctor.hospitalShareMode === 'fixed') {
     return round2(Math.min(fee, shareVal));
   }
   return round2(Math.min(fee, round2((fee * shareVal) / 100)));
+}
+
+/** Bookings snapshot the monthly limit. Actual monthly deductions are posted when payments settle. */
+export async function settleMonthlyCommission(
+  tx: Prisma.TransactionClient,
+  appointment: { commissionMode: string | null; commissionValue: unknown; fee: unknown },
+  doctorId: bigint,
+  paidAt: Date
+) {
+  if (appointment.commissionMode !== 'monthly') return {};
+  const firstDay = localTodayDate(paidAt);
+  firstDay.setUTCDate(1);
+  const nextMonth = new Date(firstDay);
+  nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+  const midnight = parseTimeStr('00:00')!;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`monthly-commission:${doctorId}:${dateToIso(firstDay)}`}, 0))`;
+  const payments = await tx.paymentTransaction.findMany({
+    where: { kind: 'charge', status: 'verified', processedAt: { gte: localStartUtc(firstDay, midnight), lt: localStartUtc(nextMonth, midnight) },
+      appointment: { commissionMode: 'monthly', slot: { doctorId } } },
+    select: { appointment: { select: { hospitalCut: true, fee: true, payments: { where: { kind: 'refund', status: 'refunded', processedAt: { lte: paidAt } }, select: { amount: true } } } } },
+  });
+  const alreadyDeducted = payments.reduce((sum, { appointment: row }) => {
+    const refunded = row.payments.reduce((total, refund) => total + Number(refund.amount), 0);
+    const fee = Number(row.fee);
+    return sum + (fee > 0 ? round2(Number(row.hospitalCut) * Math.max(0, fee - refunded) / fee) : 0);
+  }, 0);
+  const fee = Number(appointment.fee);
+  const hospitalCut = round2(Math.min(fee, Math.max(0, Number(appointment.commissionValue) - alreadyDeducted)));
+  return { hospitalCut, doctorCut: round2(fee - hospitalCut) };
 }
 
 export async function generateUniqueReference(db: DbClient = prisma): Promise<string> {
@@ -134,6 +173,11 @@ export function validateSlotForBooking(
       isAvailable: boolean;
       bookingNoticeHours: number;
       bookingAdvanceDays: number;
+      bookingWindowHours?: number | null;
+      paymentDeadlineHours?: number;
+      paymentPolicy?: string;
+      department?: { isActive: boolean } | null;
+      chamber?: { isActive: boolean } | null;
       user: { isActive: boolean };
     };
   },
@@ -143,11 +187,17 @@ export function validateSlotForBooking(
   const start = localStartUtc(slot.date, slot.startTime);
   const profile = slot.doctor;
 
-  if (!slot.isOpen || !profile.isAvailable || !profile.user.isActive || start <= now) {
+  if (!slot.isOpen || !profile.isAvailable || !profile.user.isActive || profile.department?.isActive === false || profile.chamber?.isActive === false || start <= now) {
     throw new HttpError(400, 'This consultation session is no longer open for booking.');
   }
 
-  if (!isStaffBooking) {
+  if (profile.bookingWindowHours != null) {
+    const hoursUntilStart = (start.getTime() - now.getTime()) / 3_600_000;
+    if (hoursUntilStart > profile.bookingWindowHours) throw new HttpError(400, `Booking opens ${profile.bookingWindowHours} hours before consultation.`);
+    if (profile.paymentPolicy === 'within' && hoursUntilStart <= (profile.paymentDeadlineHours ?? 0)) {
+      throw new HttpError(400, 'The payment deadline for this consultation has passed.');
+    }
+  } else if (!isStaffBooking) {
     const noticeMs = profile.bookingNoticeHours * 3600 * 1000;
     if (start.getTime() < now.getTime() + noticeMs) {
       const hours = profile.bookingNoticeHours;
@@ -184,11 +234,6 @@ export async function followupEligible(
   const identityFilter: Prisma.AppointmentWhereInput[] = [];
   if (opts.patient) {
     identityFilter.push({ patientId: opts.patient.id });
-    if (opts.patient.phone) {
-      identityFilter.push({ guestPhone: opts.patient.phone });
-    }
-  } else if (opts.phone) {
-    identityFilter.push({ guestPhone: opts.phone });
   }
 
   if (!identityFilter.length) return false;
@@ -214,21 +259,22 @@ export async function feeFor(
     followupFee: unknown;
     followupWithinDays: number;
     reportFee: unknown;
+    reportWithinDays?: number;
   },
   visitType: string,
   opts: { patient?: Pick<User, 'id' | 'phone'> | null; phone?: string; appointmentDate?: Date },
   db: DbClient = prisma
 ): Promise<number> {
-  if (visitType === 'report') return Number(doctor.reportFee);
-  if (visitType === 'followup') {
-    const ok = await followupEligible(doctor, opts, db);
+  if (visitType === 'followup' || visitType === 'report') {
+    const days = visitType === 'report' ? doctor.reportWithinDays ?? doctor.followupWithinDays : doctor.followupWithinDays;
+    const ok = await followupEligible({ id: doctor.id, followupWithinDays: days }, opts, db);
     if (!ok) {
       throw new HttpError(
         400,
-        'Follow-up rates require a completed visit with this doctor within the eligible period.'
+        'This visit type requires a completed visit with this doctor within the eligible period.'
       );
     }
-    return Number(doctor.followupFee);
+    return Number(visitType === 'report' ? doctor.reportFee : doctor.followupFee);
   }
   if (visitType !== 'first') {
     throw new HttpError(400, 'Select a valid consultation type.');
@@ -243,6 +289,9 @@ export interface CreateAppointmentInput {
   name?: string;
   phone?: string;
   dob?: Date | null;
+  age?: number | null;
+  gender?: string | null;
+  identityVerified?: boolean;
   visitType?: string;
   source?: string;
   paymentMethod?: string;
@@ -276,6 +325,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
     if (!slot) throw new HttpError(404, 'Consultation session not found.');
 
     const actor = input.actor;
+    if (!actor.isActive || !['admin', 'receptionist', 'patient'].includes(actor.role)) throw new HttpError(403, 'Not authorized to book appointments.');
     let patientObj: User | null = null;
     let name = (input.name || '').trim();
     let phone = (input.phone || '').trim();
@@ -283,6 +333,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
     const source = input.source || (actor.role === 'patient' ? 'web' : 'desk');
     const visitType = input.visitType || 'first';
     const paymentMethod = input.paymentMethod || 'cash';
+    if (!acceptsPayment(slot.doctor.acceptedPaymentMethods, paymentMethod)) throw new HttpError(400, 'Select an accepted payment method.');
 
     if (actor.role === 'patient') {
       if (
@@ -302,11 +353,12 @@ export async function createAppointment(input: CreateAppointmentInput) {
       }
       if (input.patientId) {
         patientObj = await tx.user.findFirst({
-          where: { id: input.patientId, role: 'patient' },
+          where: { id: input.patientId, role: 'patient', isActive: true },
         });
         if (!patientObj) {
           throw new HttpError(400, 'Selected patient account was not found.');
         }
+        if (!input.identityVerified || !patientObj.phoneVerifiedAt || phone !== patientObj.phone) throw new HttpError(400, 'Confirm identity and use the verified account phone to link this booking.');
       }
     }
 
@@ -316,10 +368,11 @@ export async function createAppointment(input: CreateAppointmentInput) {
 
     validateSlotForBooking(slot, actor.role !== 'patient');
 
-    if (patientObj) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`booking:${phone}`}, 0))`;
+    {
       const duplicate = await tx.appointment.findFirst({
         where: {
-          patientId: patientObj.id,
+          ...(patientObj ? { OR: [{ patientId: patientObj.id }, { patientId: null, guestPhone: phone }] } : { guestPhone: phone }),
           status: { in: ACTIVE_APPOINTMENT_STATUSES },
           slot: {
             date: slot.date,
@@ -346,7 +399,8 @@ export async function createAppointment(input: CreateAppointmentInput) {
       );
     }
 
-    const serialNumber = activeCount + 1;
+    const latest = await tx.appointment.aggregate({ where: { slotId: slot.id }, _max: { serialNumber: true } });
+    const serialNumber = (latest._max.serialNumber ?? 0) + 1;
     const fee = await feeFor(
       slot.doctor,
       visitType,
@@ -361,7 +415,9 @@ export async function createAppointment(input: CreateAppointmentInput) {
     if (within) {
       const deadline = new Date(Date.now() + slot.doctor.paymentDeadlineHours * 3600 * 1000);
       const startUtc = localStartUtc(slot.date, slot.startTime);
-      paymentDueAt = new Date(Math.min(deadline.getTime(), startUtc.getTime()));
+      paymentDueAt = slot.doctor.bookingWindowHours != null
+        ? new Date(startUtc.getTime() - slot.doctor.paymentDeadlineHours * 3_600_000)
+        : new Date(Math.min(deadline.getTime(), startUtc.getTime()));
     }
 
     const reference = await generateUniqueReference(tx);
@@ -374,10 +430,16 @@ export async function createAppointment(input: CreateAppointmentInput) {
         guestName: name,
         guestPhone: phone,
         guestDob: dob,
+        guestAge: input.age ?? null,
+        guestGender: input.gender ?? patientObj?.gender ?? null,
         visitType,
         status: within ? 'pending' : 'confirmed',
         paymentStatus: 'unpaid',
         paymentMethod,
+        acceptedPaymentMethods: slot.doctor.acceptedPaymentMethods,
+        commissionMode: slot.doctor.hospitalShareMode,
+        commissionValue: slot.doctor.hospitalShareValue,
+        paymentDeadlineHours: slot.doctor.bookingWindowHours != null && within ? slot.doctor.paymentDeadlineHours : null,
         source,
         fee,
         hospitalCut,
@@ -449,7 +511,7 @@ async function recordCashPaymentInTx(
   });
   if (!appt) throw new HttpError(404, 'Appointment not found.');
 
-  const isStaffRole = ['admin', 'receptionist', 'doctor'].includes(actor.role);
+  const isStaffRole = actor.isActive && ['admin', 'receptionist'].includes(actor.role);
   const allowed = await doctorAllowed(actor, appt.slot.doctor, tx);
   if (!isStaffRole || !allowed) {
     throw new HttpError(403, 'Not authorized to record this payment.');
@@ -464,10 +526,18 @@ async function recordCashPaymentInTx(
   if (appt.paymentStatus !== 'unpaid') {
     throw new HttpError(400, 'Payment has already been recorded.');
   }
+  if (!acceptsPayment(appt.acceptedPaymentMethods, 'cash')) throw new HttpError(400, 'Counter payment is unavailable for this appointment.');
+  if (await tx.paymentTransaction.count({ where: { appointmentId, status: 'initiated', kind: 'charge' } })) {
+    throw new HttpError(409, 'An online checkout is already in progress.');
+  }
+
+  const paidAt = new Date();
+  const shares = await settleMonthlyCommission(tx, appt, appt.slot.doctorId, paidAt);
 
   const updated = await tx.appointment.update({
     where: { id: appt.id },
     data: {
+      ...shares,
       paymentStatus: 'paid',
       paymentMethod: 'cash',
       status: appt.status === 'pending' ? 'confirmed' : appt.status,
@@ -483,7 +553,7 @@ async function recordCashPaymentInTx(
       amount: appt.fee,
       handledById: actor.id,
       note: note.slice(0, 255),
-      processedAt: new Date(),
+      processedAt: paidAt,
     },
   });
 
@@ -494,20 +564,23 @@ async function recordCashPaymentInTx(
 export async function recordCashPayment(
   appointmentId: bigint,
   actor: User,
-  note = 'Collected at reception'
+  note = 'Collected at reception',
+  transaction?: Prisma.TransactionClient
 ) {
+  if (transaction) return recordCashPaymentInTx(appointmentId, actor, note, transaction);
   return prisma.$transaction((tx) => recordCashPaymentInTx(appointmentId, actor, note, tx));
 }
 
 export async function cancelAppointment(
   appointmentId: bigint,
   actor: User,
-  opts: { byDoctor?: boolean; reason?: string } = {}
+  opts: { byDoctor?: boolean; reason?: string } = {},
+  transaction?: Prisma.TransactionClient
 ) {
   const byDoctor = Boolean(opts.byDoctor);
   const reason = (opts.reason || '').slice(0, 500);
 
-  return prisma.$transaction(async (tx) => {
+  const perform = async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`
       SELECT id FROM hospital_appointment WHERE id = ${appointmentId} FOR UPDATE
     `;
@@ -525,12 +598,12 @@ export async function cancelAppointment(
       throw new HttpError(400, 'Appointments that have started must be handled by hospital staff.');
     }
 
-    if (actor.role === 'patient') {
-      if (appt.patientId !== actor.id || byDoctor) {
-        throw new HttpError(403, 'You cannot cancel this appointment.');
-      }
-    } else if (!(await doctorAllowed(actor, appt.slot.doctor, tx))) {
+    if (!actor.isActive || actor.role === 'patient' || !(await doctorAllowed(actor, appt.slot.doctor, tx))) {
       throw new HttpError(403, 'Not authorized for this appointment.');
+    }
+    if (actor.role === 'receptionist') {
+      const authorized = await tx.complaint.findFirst({ where: { appointmentId, category: 'cancel_appointment', status: 'approved', recipientId: actor.id } });
+      if (!authorized) throw new HttpError(403, 'An administrator-approved cancellation request is required.');
     }
 
     if (byDoctor && actor.role !== 'doctor' && actor.role !== 'admin') {
@@ -541,7 +614,7 @@ export async function cancelAppointment(
     }
 
     const paid = appt.paymentStatus === 'paid';
-    let nextPaymentStatus = appt.paymentStatus;
+
 
     if (paid) {
       const fee = Number(appt.fee);
@@ -557,7 +630,6 @@ export async function cancelAppointment(
       }
 
       if (refundable > 0) {
-        nextPaymentStatus = 'refund_pending';
         const existingRefund = await tx.refundRequest.findUnique({
           where: { appointmentId: appt.id },
         });
@@ -568,7 +640,7 @@ export async function cancelAppointment(
               amount: refundable,
               mode: appt.paymentMethod === 'online' ? 'online' : 'cash',
               status: 'pending',
-              requestedById: actor.id,
+              requestedById: actor.role === 'doctor' ? null : actor.id,
               reason: reason || (byDoctor ? 'Doctor cancellation' : 'Patient cancellation'),
             },
           });
@@ -580,11 +652,11 @@ export async function cancelAppointment(
       where: { id: appt.id },
       data: {
         status: 'cancelled',
-        paymentStatus: nextPaymentStatus,
         cancelledById: actor.id,
         cancellationReason: reason,
       },
     });
+    await tx.complaint.updateMany({ where: { appointmentId, category: 'cancel_appointment', status: 'approved' }, data: { status: 'resolved', updatedById: actor.id } });
 
     await logAudit(
       actor,
@@ -594,11 +666,12 @@ export async function cancelAppointment(
       tx
     );
     return updated;
-  });
+  };
+  return transaction ? perform(transaction) : prisma.$transaction(perform);
 }
 
-export async function changeVisitStatus(appointmentId: bigint, actor: User, newStatus: string) {
-  return prisma.$transaction(async (tx) => {
+export async function changeVisitStatus(appointmentId: bigint, actor: User, newStatus: string, transaction?: Prisma.TransactionClient) {
+  const perform = async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`
       SELECT id FROM hospital_appointment WHERE id = ${appointmentId} FOR UPDATE
     `;
@@ -631,7 +704,8 @@ export async function changeVisitStatus(appointmentId: bigint, actor: User, newS
 
     await logAudit(actor, `appointment.${newStatus}`, appt.reference, '', tx);
     return updated;
-  });
+  };
+  return transaction ? perform(transaction) : prisma.$transaction(perform);
 }
 
 export async function reconcileExpired(): Promise<number> {

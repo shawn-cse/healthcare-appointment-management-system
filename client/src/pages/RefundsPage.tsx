@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
-import { Icon } from '../components/Icons.tsx';
+import { AttachmentLink } from '../components/AttachmentLink.tsx';
+import { PageSizeControl, SortableColumn } from '../components/ManagementTable.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen, StatusPill, formatDateTime } from '../components/UI.tsx';
-import { useConfirm } from '../context/ConfirmContext.tsx';
+import { useAuth } from '../context/AuthContext.tsx';
 import { useToast } from '../context/ToastContext.tsx';
 import type { RefundRequest } from '../types/index.ts';
 
+type ReviewRefund = RefundRequest & { review_note: string; evidence_url: string | null; evidence_name: string | null };
+
 interface RefundsResponse {
-  refunds: RefundRequest[];
+  refunds: ReviewRefund[];
   total: number;
   page: number;
   total_pages: number;
@@ -17,18 +20,21 @@ interface RefundsResponse {
 
 export default function RefundsPage() {
   const { showToast } = useToast();
-  const { confirm } = useConfirm();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [cashRefund, setCashRefund] = useState<RefundRequest | null>(null);
+  const [transactionReference, setTransactionReference] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
 
   const status = searchParams.get('status') || '';
   const q = searchParams.get('q') || '';
   const sort = searchParams.get('sort') || 'newest';
   const page = Number(searchParams.get('page') || 1) || 1;
+  const size = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 25));
 
   const [searchInput, setSearchInput] = useState(q);
   const [data, setData] = useState<RefundsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   // Reject note modal
@@ -42,16 +48,16 @@ export default function RefundsPage() {
     if (q) params.set('q', q);
     if (sort) params.set('sort', sort);
     params.set('page', String(page));
+    params.set('limit', String(size));
 
     api
       .get<RefundsResponse>(`/refunds?${params.toString()}`)
       .then((res) => {
         setData(res.data);
-        setSelectedIds([]);
       })
       .catch((err) => showToast(getApiErrorMessage(err, 'Failed to load refunds.'), 'error'))
       .finally(() => setLoading(false));
-  }, [status, q, sort, page, showToast]);
+  }, [status, q, sort, page, size, showToast]);
 
   useEffect(() => {
     loadRefunds();
@@ -80,23 +86,37 @@ export default function RefundsPage() {
     }
   };
 
-  const handleBulkApprove = async () => {
-    if (!selectedIds.length) return;
-    const ok = await confirm({
-      title: 'Bulk Approve Refunds',
-      message: `Approve ${selectedIds.length} selected pending refund request(s)?`,
-      confirmText: 'Approve Selected',
-      type: 'warning',
-    });
-    if (!ok) return;
+  const [review, setReview] = useState<ReviewRefund | null>(null);
+  const [reviewNote, setReviewNote] = useState('');
+  const [reviewDocument, setReviewDocument] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (q === searchInput.trim()) return;
+    const timer = setTimeout(() => {
+      const next = new URLSearchParams(searchParams);
+      if (searchInput.trim()) next.set('q', searchInput.trim());
+      else next.delete('q');
+      next.set('page', '1');
+      setSearchParams(next, { replace: true });
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [q, searchInput, searchParams, setSearchParams]);
+
+  async function saveReview(event: React.FormEvent) {
+    event.preventDefault();
+    if (!review) return;
+    const fields = new FormData();
+    fields.set('note', reviewNote);
+    if (reviewDocument) fields.set('document', reviewDocument);
+    setBusyId(review.id);
     try {
-      const res = await api.post<{ message: string }>('/refunds/bulk', { selected: selectedIds });
-      showToast(res.data.message, 'success');
+      await api.post(`/refunds/${review.id}/evidence`, fields);
+      showToast('Refund details saved.', 'success');
+      setReview(null);
       loadRefunds();
-    } catch (err) {
-      showToast(getApiErrorMessage(err, 'Bulk approval failed.'), 'error');
-    }
-  };
+    } catch (error) { showToast(getApiErrorMessage(error, 'Could not save refund details.'), 'error'); }
+    finally { setBusyId(null); }
+  }
 
   const handleRejectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +127,6 @@ export default function RefundsPage() {
   };
 
   const refunds = data?.refunds || [];
-  const allChecked = refunds.length > 0 && selectedIds.length === refunds.length;
 
   return (
     <AppLayout>
@@ -122,87 +141,19 @@ export default function RefundsPage() {
         </div>
       </div>
 
-      <div className="filter-tabs" style={{ marginBottom: 14 }}>
-        {[
-          ['', 'All Requests'],
-          ['pending', 'Pending Approval'],
-          ['approved', 'Approved (Ready for Payout)'],
-          ['processing', 'Processing'],
-          ['completed', 'Completed'],
-          ['rejected', 'Rejected'],
-        ].map(([val, lbl]) => (
-          <button
-            key={val || 'all'}
-            type="button"
-            className={`filter-tab ${status === val ? 'active' : ''}`}
-            onClick={() => setParam({ status: val || null })}
-          >
-            {lbl}
-          </button>
-        ))}
+      <div className="panel management-table-tools">
+        <input type="search" className="field-control" aria-label="Search refunds" placeholder="Search refunds" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+        <select className="field-control" aria-label="Refund status" value={status} onChange={(e) => setParam({ status: e.target.value || null })}>
+          <option value="">All statuses</option>{isAdmin && <option value="pending">Pending approval</option>}
+          <option value="approved">Approved</option><option value="processing">Processing</option>
+          <option value="completed">Completed</option>{isAdmin && <option value="rejected">Rejected</option>}
+        </select>
+        <select className="field-control" aria-label="Sort refunds" value={sort} onChange={(e) => setParam({ sort: e.target.value })}>
+          {sort.includes('.') && <option value={sort}>Column sort</option>}
+          <option value="newest">Latest to oldest</option><option value="oldest">Oldest to latest</option>
+          <option value="amount_high">Highest amount</option><option value="amount_low">Lowest amount</option>
+        </select>
       </div>
-
-      <div className="panel" style={{ padding: 16, marginBottom: 16 }}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setParam({ q: searchInput.trim() || null });
-          }}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}
-        >
-          <input
-            type="search"
-            className="field-control"
-            style={{ flex: '1 1 240px' }}
-            placeholder="Search appointment ref, patient, phone, or doctor..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-          <select
-            className="field-control"
-            style={{ width: 'auto' }}
-            value={sort}
-            onChange={(e) => setParam({ sort: e.target.value })}
-          >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="amount_high">Highest Amount</option>
-            <option value="amount_low">Lowest Amount</option>
-          </select>
-          <button type="submit" className="button button-primary button-small">
-            <Icon id="ic-search" /> Apply
-          </button>
-          {(status || q) && (
-            <button
-              type="button"
-              className="button button-outline button-small"
-              onClick={() => {
-                setSearchInput('');
-                setSearchParams(new URLSearchParams());
-              }}
-            >
-              Reset
-            </button>
-          )}
-        </form>
-      </div>
-
-      {selectedIds.length > 0 && (
-        <div
-          className="notice notice-info"
-          style={{
-            marginBottom: 14,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <strong>{selectedIds.length} refund request(s) selected</strong>
-          <button type="button" className="button button-small button-primary" onClick={handleBulkApprove}>
-            Bulk Approve Pending
-          </button>
-        </div>
-      )}
 
       <div className="panel">
         {loading ? (
@@ -217,38 +168,18 @@ export default function RefundsPage() {
             <table className="excel-sheet">
               <thead>
                 <tr>
-                  <th style={{ width: 38 }}>
-                    <input
-                      type="checkbox"
-                      checked={allChecked}
-                      onChange={(e) =>
-                        setSelectedIds(e.target.checked ? refunds.map((r) => r.id) : [])
-                      }
-                    />
-                  </th>
-                  <th>Appointment</th>
-                  <th>Patient</th>
-                  <th>Specialist</th>
-                  <th>Refund Amount</th>
-                  <th>Status</th>
-                  <th>Requested</th>
+                  <SortableColumn name="reference" sort={sort} onChange={(sort) => setParam({ sort })}>Appointment</SortableColumn>
+                  <SortableColumn name="patient" sort={sort} onChange={(sort) => setParam({ sort })}>Patient</SortableColumn>
+                  <SortableColumn name="doctor" sort={sort} onChange={(sort) => setParam({ sort })}>Specialist</SortableColumn>
+                  <SortableColumn name="amount" sort={sort} onChange={(sort) => setParam({ sort })}>Refund Amount</SortableColumn>
+                  <SortableColumn name="status" sort={sort} onChange={(sort) => setParam({ sort })}>Status</SortableColumn>
+                  <SortableColumn name="date" sort={sort} onChange={(sort) => setParam({ sort })}>Requested</SortableColumn>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {refunds.map((r) => (
                   <tr key={r.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(r.id)}
-                        onChange={(e) =>
-                          setSelectedIds((prev) =>
-                            e.target.checked ? [...prev, r.id] : prev.filter((x) => x !== r.id)
-                          )
-                        }
-                      />
-                    </td>
                     <td>
                       {r.appointment ? (
                         <Link
@@ -295,7 +226,8 @@ export default function RefundsPage() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {r.status === 'pending' && (
+                        <button type="button" className="button button-small button-outline" onClick={() => { setReview(r); setReviewNote(r.review_note); setReviewDocument(null); }}>Notes and document</button>
+                        {isAdmin && r.status === 'pending' && (
                           <>
                             <button
                               type="button"
@@ -324,7 +256,7 @@ export default function RefundsPage() {
                             type="button"
                             className="button button-small button-primary"
                             disabled={busyId === r.id}
-                            onClick={() => runAction(r.id, 'cash')}
+                            onClick={() => { setCashRefund(r); setTransactionReference(''); }}
                           >
                             Mark Cash Paid
                           </button>
@@ -348,7 +280,7 @@ export default function RefundsPage() {
           </div>
         )}
 
-        {data && data.total_pages > 1 && (
+        {data && (
           <div
             style={{
               display: 'flex',
@@ -358,7 +290,8 @@ export default function RefundsPage() {
               borderTop: '1px solid var(--line)',
             }}
           >
-            <span className="muted">
+            <PageSizeControl size={size} onChange={(next) => setParam({ limit: String(next) })} />
+              <span className="muted">
               Page {data.page} of {data.total_pages} ({data.total} total)
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -436,6 +369,30 @@ export default function RefundsPage() {
           </div>
         </div>
       )}
+      {cashRefund && <div className="modal-backdrop is-open"><form className="panel padded-panel form-grid" onSubmit={async (event) => {
+        event.preventDefault();
+        await runAction(cashRefund.id, 'cash', { transaction_reference: transactionReference });
+        setCashRefund(null);
+      }}>
+        <h2>Record cash refund</h2>
+        <label className="form-group">Transaction reference
+          <input className="field-control" value={transactionReference} onChange={(e) => setTransactionReference(e.target.value)} maxLength={90} required />
+        </label>
+        <button type="button" className="button button-outline" onClick={() => setCashRefund(null)}>Cancel</button>
+        <button type="submit" className="button button-primary" disabled={!transactionReference.trim() || busyId === cashRefund.id}>Record payout</button>
+      </form></div>}
+      {review && <div className="modal-backdrop is-open">
+        <form className="panel padded-panel refund-review-form" onSubmit={saveReview}>
+          <h2>Refund notes and document</h2>
+          {review.evidence_url && <AttachmentLink path={review.evidence_url} filename={review.evidence_name || 'Download refund document'} />}
+          <label className="form-group">Note<textarea className="field-control" rows={4} maxLength={3000} value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} /></label>
+          <label className="form-group">Refund document<input className="field-control" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={(e) => setReviewDocument(e.target.files?.[0] || null)} /></label>
+          <div className="consultation-times">
+            <button type="button" className="button button-outline" onClick={() => setReview(null)}>Cancel</button>
+            <button type="submit" className="button button-primary" disabled={busyId === review.id}>Save details</button>
+          </div>
+        </form>
+      </div>}
     </AppLayout>
   );
 }

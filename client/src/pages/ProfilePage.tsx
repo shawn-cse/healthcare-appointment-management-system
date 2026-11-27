@@ -8,11 +8,10 @@ import { useToast } from '../context/ToastContext.tsx';
 import type { User } from '../types/index.ts';
 
 export default function ProfilePage() {
-  const { user, setUserState } = useAuth();
+  const { user, setUserState, refreshMe } = useAuth();
   const { showToast } = useToast();
 
-  const [firstName, setFirstName] = useState(user?.first_name || '');
-  const [lastName, setLastName] = useState(user?.last_name || '');
+  const [fullName, setFullName] = useState(user?.display_name || '');
   const [username, setUsername] = useState(user?.username || '');
   const [usernameCheck, setUsernameCheck] = useState<{ valid: boolean; message: string } | null>(null);
   const [email, setEmail] = useState(user?.email || '');
@@ -25,7 +24,11 @@ export default function ProfilePage() {
   // Doctor profile fields
   const [designation, setDesignation] = useState(user?.doctor_profile?.designation || '');
   const [qualifications, setQualifications] = useState(user?.doctor_profile?.qualifications || '');
-  const [roomNumber, setRoomNumber] = useState(user?.doctor_profile?.room_number || '');
+  const [registration, setRegistration] = useState(user?.doctor_profile?.registration_number || '');
+  const [experience, setExperience] = useState(user?.doctor_profile?.professional_experience || '');
+  const [gender, setGender] = useState(user?.gender || '');
+  const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState('');
   const [saving, setSaving] = useState(false);
 
   if (!user) return null;
@@ -51,12 +54,12 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       const formData = new FormData();
-      formData.append('first_name', firstName.trim());
-      formData.append('last_name', lastName.trim());
+      formData.append('full_name', fullName.trim());
       formData.append('username', username.trim());
       formData.append('email', email.trim());
       formData.append('phone', phone.trim());
       formData.append('dob', dob);
+      formData.append('gender', gender);
       formData.append('nid', nid.trim());
       formData.append('address', address.trim());
       if (avatarFile) {
@@ -64,8 +67,9 @@ export default function ProfilePage() {
       }
       if (user.role === 'doctor') {
         formData.append('designation', designation.trim());
+        if (registration.trim()) formData.append('registration_number', registration.trim());
         formData.append('qualifications', qualifications.trim());
-        formData.append('room_number', roomNumber.trim());
+        formData.append('professional_experience', experience.trim());
       }
 
       const res = await api.put<{ user: User; message: string }>('/auth/profile', formData);
@@ -85,6 +89,7 @@ export default function ProfilePage() {
         <div>
           <p className="eyebrow">ACCOUNT SETTINGS</p>
           <h1>My Profile</h1>
+          {user.age !== null && <p>Age {user.age}</p>}
           <p>Update your personal contact details, portal username, and display photo.</p>
         </div>
         <div className="heading-actions">
@@ -94,31 +99,34 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {user.role === 'patient' && <section className="panel padded-panel">
+        <h2>Phone verification</h2>
+        <p>{user.phone_verified ? 'Your phone is verified.' : 'Verify your saved phone number to link eligible past appointments.'}</p>
+        {!user.phone_verified && <button className="button button-outline" type="button" onClick={async () => {
+          try { await api.post('/auth/phone/send-code'); setCodeSent(true); showToast('Verification code sent.', 'success'); }
+          catch (err) { showToast(getApiErrorMessage(err, 'Could not send the verification code.'), 'error'); }
+        }}>Send verification code</button>}
+        {codeSent && !user.phone_verified && <form className="form-grid" onSubmit={async (event) => {
+          event.preventDefault();
+          try {
+            const { data } = await api.post<{ linked: number }>('/auth/phone/verify', { code });
+            await refreshMe(); setCodeSent(false); showToast(`Phone verified. ${data.linked} historical appointments linked.`, 'success');
+          } catch (err) { showToast(getApiErrorMessage(err, 'Could not verify the code.'), 'error'); }
+        }}>
+          <label className="form-group">Verification code<input className="field-control" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required value={code} onChange={(e) => setCode(e.target.value)} /></label>
+          <button className="button button-primary">Verify phone</button>
+        </form>}
+      </section>}
       <div className="panel" style={{ maxWidth: 820, padding: 24 }}>
         <form onSubmit={handleSubmit} className="form-grid two-col">
-          <div className="form-group">
-            <label htmlFor="pr-fname">First Name</label>
-            <input
-              id="pr-fname"
-              type="text"
-              className="field-control"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              required
-            />
-          </div>
+          <h2 className="form-group full">Personal Information</h2>
+          <label className="form-group">Full Name
+            <input className="field-control" required maxLength={150} autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          </label>
 
-          <div className="form-group">
-            <label htmlFor="pr-lname">Last Name</label>
-            <input
-              id="pr-lname"
-              type="text"
-              className="field-control"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-            />
-          </div>
-
+          <label className="form-group">Gender<select className="field-control" value={gender} onChange={(e) => setGender(e.target.value)}>
+            <option value="">Select gender</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option>
+          </select></label>
           <div className="form-group">
             <label htmlFor="pr-user">
               Username{' '}
@@ -213,6 +221,12 @@ export default function ProfilePage() {
 
           {user.role === 'doctor' && (
             <>
+              <h2 className="form-group full">Professional Information</h2>
+              <label className="form-group">BMDC registration number
+                <input className="field-control" maxLength={100} value={registration} onChange={(e) => setRegistration(e.target.value)} />
+              </label>
+              <div className="form-group"><span>Department</span><strong>{user.doctor_profile?.department_name || 'Unassigned'}</strong></div>
+              <div className="form-group"><span>Assigned receptionist</span><strong>{user.doctor_profile?.receptionist_name || 'Unassigned'}</strong></div>
               <div className="form-group">
                 <label htmlFor="pr-desig">Designation</label>
                 <input
@@ -229,10 +243,14 @@ export default function ProfilePage() {
                   id="pr-room"
                   type="text"
                   className="field-control"
-                  value={roomNumber}
-                  onChange={(e) => setRoomNumber(e.target.value)}
+                  value={user.doctor_profile?.room_number || user.room_number || ''}
+                  readOnly
                 />
               </div>
+              <h2 className="form-group full">Educational Qualifications &amp; Professional Experience</h2>
+              <label className="form-group full">Professional experience
+                <textarea className="field-control" rows={3} value={experience} onChange={(e) => setExperience(e.target.value)} />
+              </label>
               <div className="form-group full">
                 <label htmlFor="pr-qual">Education &amp; Qualifications</label>
                 <textarea

@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import api from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
 import { AppLayout } from '../components/Layout.tsx';
-import { LoadingScreen, StatusPill, formatLongDate } from '../components/UI.tsx';
+import { LoadingScreen, StatusPill, formatLongDate, formatDateTime } from '../components/UI.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
-import type { Appointment } from '../types/index.ts';
+import type { Appointment, Doctor } from '../types/index.ts';
 
 interface DashboardResponse {
   role: string;
@@ -15,18 +15,92 @@ interface DashboardResponse {
   history?: Appointment[];
   today_appointments?: Appointment[];
   recent_appointments?: Appointment[];
+  unpaid_appointments?: Appointment[];
+  assigned_doctors?: Doctor[];
+  notifications: Array<{ id: string; date: string; label: string; link: string }>;
+}
+
+function Updates({ items }: { items: DashboardResponse['notifications'] }) {
+  return <section className="panel padded-panel dashboard-updates"><h2>Notifications</h2>
+    {items.length ? <ul>{items.map((item) => <li key={item.id}><Link to={item.link}>{item.label}</Link><time dateTime={item.date}>{formatDateTime(item.date)}</time></li>)}</ul> : <p>No notifications yet.</p>}
+  </section>;
+}
+
+function TodayQueue({ date, todayAppointments }: { date: string; todayAppointments: Appointment[] }) {
+  return (
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Today&apos;s appointment queue</h2>
+              <p>{formatLongDate(date)}</p>
+            </div>
+            <Link to="/appointments?date_preset=today" className="text-link">
+              Full queue <Icon id="ic-arrow" />
+            </Link>
+          </div>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>Doctor / time</th>
+                  <th>Payment</th>
+                  <th>Status</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {todayAppointments.length ? (
+                  todayAppointments.map((a) => (
+                    <tr key={a.id}>
+                      <td>
+                        <span className="table-primary">{a.patient_name}</span>
+                        <small className="table-sub">{a.reference}</small>
+                      </td>
+                      <td>
+                        <span>{a.doctor.name}</span>
+                        <small className="table-sub">{a.slot.start_time_12h}</small>
+                      </td>
+                      <td>
+                        <StatusPill status={a.payment_status} label={a.payment_status_display} />
+                      </td>
+                      <td>
+                        <StatusPill status={a.status} label={a.status_display} />
+                      </td>
+                      <td>
+                        <Link className="table-action" to={`/appointments/${a.id}`}>
+                          Open
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="table-empty">
+                      No consultations scheduled for today.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+  );
 }
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardResponse | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     api
       .get<DashboardResponse>('/dashboard')
       .then((res) => setData(res.data))
-      .catch(() => {});
+      .catch(() => setError(true));
   }, []);
+
+  if (error) return <AppLayout><p role="alert">The dashboard could not load. Refresh the page to try again.</p></AppLayout>;
 
   if (!user || !data) {
     return (
@@ -56,6 +130,13 @@ export default function DashboardPage() {
               </Link>
             </div>
           </div>
+
+          <Updates items={data.notifications} />
+          {!!data.unpaid_appointments?.length && <section className="panel padded-panel">
+            <h2>Unpaid appointments</h2><ul>{data.unpaid_appointments.map((appt) => <li key={appt.id}>
+              <Link to={`/appointments/${appt.id}`}>{appt.reference} - {appt.doctor.name}</Link> BDT {appt.fee.toFixed(2)}
+            </li>)}</ul>
+          </section>}
 
           <div className="metric-grid three-metrics">
             <div className="metric-card">
@@ -186,21 +267,37 @@ export default function DashboardPage() {
   }
 
   const todayAppointments = data.today_appointments || [];
+  if (user.role === 'admin') {
+    const money = new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT', currencyDisplay: 'code' });
+    return <AppLayout>
+      <div className="page-heading"><h1>Dashboard</h1>
+        <Link to="/reception/book" className="button button-primary"><Icon id="ic-plus" /> New Appointment</Link>
+      </div>
+      <div className="metric-grid">
+        {([['today', "Today's patients"], ['total', 'Total appointment bookings'], ['paid', 'Paid bookings'], ['unpaid', 'Unpaid bookings']]).map(([key, label]) =>
+          <div className="metric-card" key={key}><span>{label}</span><strong>{data.counts[key].toLocaleString('en-BD')}</strong></div>
+        )}
+      </div>
+      <div className="metric-grid three-metrics">
+        {([['revenue_today', 'Hospital revenue today'], ['revenue_7_days', 'Hospital revenue over 7 days'], ['revenue_30_days', 'Hospital revenue over 30 days']]).map(([key, label]) =>
+          <div className="metric-card" key={key}><span>{label}</span><strong>{money.format(data.counts[key])}</strong></div>
+        )}
+      </div>
+      <TodayQueue date={data.today} todayAppointments={todayAppointments} />
+    </AppLayout>;
+  }
+
   return (
     <AppLayout>
       <div className="page-heading">
         <div>
           <p className="eyebrow">
-            {user.role === 'admin'
-              ? 'HOSPITAL OVERVIEW'
-              : user.role === 'doctor'
+            {user.role === 'doctor'
                 ? 'YOUR CLINIC'
                 : 'RECEPTION WORKSPACE'}
           </p>
           <h1>
-            {user.role === 'admin'
-              ? 'Hospital operations'
-              : user.role === 'doctor'
+            {user.role === 'doctor'
                 ? `Good day, Dr. ${user.first_name || user.username}`
                 : 'Welcome to the front desk'}
           </h1>
@@ -221,6 +318,16 @@ export default function DashboardPage() {
         )}
       </div>
 
+      <Updates items={data.notifications} />
+      {!!data.assigned_doctors?.length && <section className="panel padded-panel dashboard-updates">
+        <h2>{user.role === 'doctor' ? 'Consultation assignment' : 'Assigned doctors'}</h2>
+        <ul>{data.assigned_doctors.map((doc) => <li key={doc.id}><strong>{doc.full_doctor_title}</strong> {doc.department?.name || 'Department pending'} {doc.active_room} {doc.assigned_receptionist_name} {doc.assigned_days_text}</li>)}</ul>
+      </section>}
+      <div className="metric-grid">
+        {[['completed', 'Completed appointments'], ['cancelled', 'Cancelled appointments'], ['complaints', 'Pending complaints'], ['support', 'Support requests'],
+          ...(user.role !== 'receptionist' ? [['doctor_earnings', 'Doctor earnings']] : []),
+        ].map(([key, title]) => <div className="metric-card" key={key}><span>{title}</span><strong>{key === 'doctor_earnings' || key === 'hospital_revenue' ? `BDT ${(data.counts[key] || 0).toFixed(2)}` : data.counts[key] || 0}</strong></div>)}
+      </div>
       <div className="metric-grid">
         <div className="metric-card">
           <div className="metric-top">
@@ -265,63 +372,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="content-columns">
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Today&apos;s appointment queue</h2>
-              <p>{formatLongDate(data.today)} · Your scheduled patients</p>
-            </div>
-            <Link to={`/appointments?date=${data.today}`} className="text-link">
-              Full queue <Icon id="ic-arrow" />
-            </Link>
-          </div>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Patient</th>
-                  <th>Doctor / time</th>
-                  <th>Payment</th>
-                  <th>Status</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {todayAppointments.length ? (
-                  todayAppointments.map((a) => (
-                    <tr key={a.id}>
-                      <td>
-                        <span className="table-primary">{a.patient_name}</span>
-                        <small className="table-sub">{a.reference}</small>
-                      </td>
-                      <td>
-                        <span>{a.doctor.name}</span>
-                        <small className="table-sub">{a.slot.start_time_12h}</small>
-                      </td>
-                      <td>
-                        <StatusPill status={a.payment_status} label={a.payment_status_display} />
-                      </td>
-                      <td>
-                        <StatusPill status={a.status} label={a.status_display} />
-                      </td>
-                      <td>
-                        <Link className="table-action" to={`/appointments/${a.id}`}>
-                          Open
-                        </Link>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="table-empty">
-                      No consultations scheduled for today.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <TodayQueue date={data.today} todayAppointments={todayAppointments} />
 
         <div className="side-stack">
           <div className="panel padded-panel quick-actions">
@@ -349,7 +400,7 @@ export default function DashboardPage() {
               </span>
               <Icon id="ic-arrow" />
             </Link>
-            {user.role === 'admin' || user.role === 'receptionist' ? (
+            {user.role === 'receptionist' ? (
               <Link to="/finance/refunds">
                 <span className="quick-icon">
                   <Icon id="ic-wallet" />
@@ -383,18 +434,6 @@ export default function DashboardPage() {
               <span>Awaiting confirmation</span>
               <strong>{data.counts.pending ?? 0}</strong>
             </div>
-            {user.role === 'admin' && (
-              <>
-                <div>
-                  <span>Active doctors</span>
-                  <strong>{data.counts.doctors ?? 0}</strong>
-                </div>
-                <div>
-                  <span>Registered patients</span>
-                  <strong>{data.counts.patients ?? 0}</strong>
-                </div>
-              </>
-            )}
           </div>
         </div>
       </div>

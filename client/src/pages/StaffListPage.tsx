@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { GreenDatePicker, GreenTimePicker } from '../components/DateTimePickers.tsx';
 import { Icon } from '../components/Icons.tsx';
+import { PageSizeControl, SortableColumn } from '../components/ManagementTable.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen } from '../components/UI.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -27,6 +28,7 @@ interface StaffMetaResponse {
   departments: Department[];
   chambers: Chamber[];
   receptionists: User[];
+  default_commission: { mode: Doctor['hospital_share_mode']; value: number };
 }
 
 const WEEKDAY_CHOICES = [
@@ -47,10 +49,11 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
   const { id: routeEditId } = useParams<{ id?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const roleFilter = searchParams.get('role') || '';
+  const roleFilter = searchParams.get('role') || 'doctor';
   const q = searchParams.get('q') || '';
   const sort = searchParams.get('sort') || 'name';
   const page = Number(searchParams.get('page') || 1) || 1;
+  const size = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
 
   const [searchInput, setSearchInput] = useState(q);
   const [data, setData] = useState<StaffListResponse | null>(null);
@@ -61,7 +64,6 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
   // Unified Editor Modal State (Create or Edit right on this single page)
   const [editorOpen, setEditorOpen] = useState(false);
   const [editUserId, setEditUserId] = useState<number | null>(null);
-  const [editDoctorProfileId, setEditDoctorProfileId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Form fields
@@ -69,6 +71,9 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [avatar, setAvatar] = useState<File | null>(null);
+  const [registrationNumber, setRegistrationNumber] = useState('');
+  const [professionalExperience, setProfessionalExperience] = useState('');
   const [phone, setPhone] = useState('');
   const [dob, setDob] = useState('');
   const [nid, setNid] = useState('');
@@ -89,9 +94,10 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
   const [receptionistId, setReceptionistId] = useState('');
   const [designation, setDesignation] = useState('Consultant');
   const [qualifications, setQualifications] = useState('');
-  const [consultationDays, setConsultationDays] = useState<number[]>([]);
-  const [startTime, setStartTime] = useState('18:00');
-  const [endTime, setEndTime] = useState('21:00');
+  const [sessions, setSessions] = useState<Array<{ weekday: number; start_time: string; end_time: string }>>([]);
+  const [commissionMode, setCommissionMode] = useState<Doctor['hospital_share_mode']>('percent');
+  const [commissionValue, setCommissionValue] = useState('10');
+  const [sessionsChanged, setSessionsChanged] = useState(false);
 
   const isAdmin = user?.role === 'admin';
 
@@ -110,28 +116,31 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     if (q) params.set('q', q);
     if (sort) params.set('sort', sort);
     params.set('page', String(page));
+    params.set('limit', String(size));
 
     api
       .get<StaffListResponse>(`/staff?${params.toString()}`)
       .then((res) => setData(res.data))
       .catch((err) => showToast(getApiErrorMessage(err, 'Failed to load staff roster.'), 'error'))
       .finally(() => setLoading(false));
-  }, [roleFilter, q, sort, page, showToast]);
+  }, [roleFilter, q, sort, page, size, showToast]);
 
   useEffect(() => {
     loadStaff();
     loadMeta();
   }, [loadStaff, loadMeta]);
 
-  const openCreateModal = useCallback(() => {
+  const openCreateModal = useCallback((initialRole: 'doctor' | 'receptionist' = 'doctor') => {
     loadMeta();
     setEditUserId(null);
-    setEditDoctorProfileId(null);
-    setRole('doctor');
+    setRole(initialRole);
     setName('');
     setUsername('');
     setEmail('');
     setPhone('');
+    setAvatar(null);
+    setRegistrationNumber('');
+    setProfessionalExperience('');
     setDob('');
     setNid('');
     setAddress('');
@@ -143,9 +152,10 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     setReceptionistId('');
     setDesignation('Consultant');
     setQualifications('');
-    setConsultationDays([5, 0, 2]);
-    setStartTime('18:00');
-    setEndTime('21:00');
+    setSessions([]);
+    setSessionsChanged(false);
+    setCommissionMode('percent');
+    setCommissionValue('');
     setUsernameCheck(null);
     setEmailCheck(null);
     setEditorOpen(true);
@@ -155,12 +165,14 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     (m: StaffRow) => {
       loadMeta();
       setEditUserId(m.id);
-      setEditDoctorProfileId(m.doctor_profile?.id ?? null);
       setRole(m.role as 'doctor' | 'receptionist' | 'admin');
       setName(m.display_name || `${m.first_name} ${m.last_name}`.trim());
       setUsername(m.username);
       setEmail(m.email || '');
       setPhone(m.phone || '');
+      setAvatar(null);
+      setRegistrationNumber(m.doctor_profile?.registration_number || '');
+      setProfessionalExperience(m.doctor_profile?.professional_experience || '');
       setDob(m.dob || '');
       setNid(m.nid || '');
       setAddress(m.address || '');
@@ -178,16 +190,12 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
       setDesignation(m.doctor_profile?.designation || 'Consultant');
       setQualifications(m.doctor_profile?.qualifications || '');
 
-      const weekly = m.doctor_profile?.weekly || [];
-      if (weekly.length > 0) {
-        setConsultationDays(Array.from(new Set(weekly.map((w) => w.weekday))));
-        setStartTime(weekly[0].start_time.slice(0, 5));
-        setEndTime(weekly[0].end_time.slice(0, 5));
-      } else {
-        setConsultationDays(m.doctor_profile?.assigned_days_list || []);
-        setStartTime('18:00');
-        setEndTime('21:00');
-      }
+      setSessions((m.doctor_profile?.weekly || []).filter((w) => w.active).map((w) => ({
+        weekday: w.weekday, start_time: w.start_time.slice(0, 5), end_time: w.end_time.slice(0, 5),
+      })));
+      setSessionsChanged(false);
+      setCommissionMode(m.doctor_profile?.hospital_share_mode || 'percent');
+      setCommissionValue(String(m.doctor_profile?.hospital_share_value ?? 0));
       setUsernameCheck(null);
       setEmailCheck(null);
       setEditorOpen(true);
@@ -248,45 +256,20 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     return () => window.clearTimeout(timer);
   }, [email, editUserId, editorOpen]);
 
-  const selectedRoom = useMemo(
-    () => meta?.chambers.find((c) => String(c.id) === chamberId) || null,
-    [meta, chamberId]
-  );
-
-  // Other doctors sitting in the chosen room (excluding the doctor currently being edited)
-  const otherDoctorsInRoom = useMemo(() => {
-    if (!selectedRoom?.doctors) return [];
-    return selectedRoom.doctors.filter((d) =>
-      editDoctorProfileId ? d.id !== editDoctorProfileId : true
-    );
-  }, [selectedRoom, editDoctorProfileId]);
-
-  const otherStaffInRoom = useMemo(() => {
-    if (!selectedRoom?.staff_users) return [];
-    return selectedRoom.staff_users.filter((s) => (editUserId ? s.id !== editUserId : true));
-  }, [selectedRoom, editUserId]);
-
-  // Live schedule conflict check when configuring doctor room + days + times
-  const liveScheduleConflict = useMemo(() => {
-    if (role !== 'doctor' || !chamberId || !isActive || consultationDays.length === 0) return null;
-    if (!startTime || !endTime || endTime <= startTime) return null;
-
-    for (const doc of otherDoctorsInRoom) {
-      for (const sched of doc.schedules || []) {
-        if (!consultationDays.includes(sched.weekday)) continue;
-        if (startTime < sched.end_time && endTime > sched.start_time) {
-          return `Conflict with ${doc.name} on ${sched.weekday_name} (${sched.start_time_12h} – ${sched.end_time_12h}).`;
-        }
-      }
-    }
-    return null;
-  }, [role, chamberId, isActive, consultationDays, startTime, endTime, otherDoctorsInRoom]);
-
   const closeEditor = () => {
     setEditorOpen(false);
     if (initialCreate || routeEditId) {
       navigate('/staff', { replace: true });
     }
+  };
+
+  const changeLoginPermission = async (member: StaffRow) => {
+    if (!await confirm({ title: member.login_allowed ? 'Block login' : 'Allow login', message: `Change login permission for ${member.display_name}?`, confirmText: 'Confirm', type: 'warning' })) return;
+    try {
+      const { data } = await api.put<{ message: string }>(`/staff/${member.id}/login-permission`, { login_allowed: !member.login_allowed });
+      showToast(data.message, 'success');
+      await loadStaff();
+    } catch (err) { showToast(getApiErrorMessage(err, 'Could not change login permission.'), 'error'); }
   };
 
   const handleToggleActive = async (m: StaffRow) => {
@@ -324,12 +307,8 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
       showToast(emailCheck.message, 'error');
       return;
     }
-    if (liveScheduleConflict) {
-      showToast(liveScheduleConflict, 'error');
-      return;
-    }
-    if (role === 'doctor' && consultationDays.length > 0 && endTime <= startTime) {
-      showToast('Consultation end time must be later than start time.', 'error');
+    if (role === 'doctor' && sessions.some((session) => !session.start_time || !session.end_time || session.end_time <= session.start_time)) {
+      showToast('Enter a start and a later end time for each session.', 'error');
       return;
     }
 
@@ -352,17 +331,21 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
       if (role === 'doctor') {
         payload.department_id = departmentId || null;
         payload.gender = gender;
+        if (registrationNumber.trim()) payload.registration_number = registrationNumber.trim();
+        payload.professional_experience = professionalExperience;
         payload.assigned_receptionist_id = receptionistId || null;
         payload.designation = designation.trim();
         payload.qualifications = qualifications.trim();
-        payload.consultation_days = consultationDays;
-        payload.consultation_start_time = startTime;
-        payload.consultation_end_time = endTime;
+        if (sessionsChanged || !editUserId) payload.schedule_rules = sessions;
+        payload.hospital_share_mode = commissionValue === '' ? meta?.default_commission?.mode || commissionMode : commissionMode;
+        payload.hospital_share_value = commissionValue === '' ? meta?.default_commission?.value ?? 10 : commissionValue;
       }
 
+      const body = avatar ? new FormData() : payload;
+      if (body instanceof FormData && avatar) { body.append('staff', JSON.stringify(payload)); body.append('avatar', avatar); }
       const res = editUserId
-        ? await api.put<{ message: string }>(`/staff/${editUserId}`, payload)
-        : await api.post<{ message: string }>('/staff', payload);
+        ? await api.put<{ message: string }>(`/staff/${editUserId}`, body)
+        : await api.post<{ message: string }>('/staff', body);
       showToast(res.data.message, 'success');
       if (editUserId && user && editUserId === user.id) {
         await refreshMe();
@@ -377,8 +360,9 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     }
   };
 
-  const toggleDay = (d: number) => {
-    setConsultationDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+  const updateSession = (index: number, change: Partial<(typeof sessions)[number]>) => {
+    setSessions((current) => current.map((session, i) => i === index ? { ...session, ...change } : session));
+    setSessionsChanged(true);
   };
 
   const setParam = useCallback(
@@ -411,17 +395,12 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
       <div className="staff-directory-page">
         <div className="page-heading">
           <div>
-            <p className="eyebrow">CLINICAL ROSTER &amp; ACCOUNTS</p>
-            <h1>Staff &amp; Doctor Management</h1>
-            <p>
-              Onboard doctors, receptionists, and administrators, assign rooms without schedule
-              conflicts, and control portal access from one unified console.
-            </p>
+            <h1>{isAdmin ? 'Doctors & Staff Management' : 'Staff and Doctor List'}</h1>
           </div>
           {isAdmin && (
             <div className="heading-actions">
-              <button type="button" className="button button-primary" onClick={openCreateModal}>
-                <Icon id="ic-plus" /> Onboard Staff / Doctor
+              <button type="button" className="button button-primary" onClick={() => openCreateModal(roleFilter === 'staff' ? 'receptionist' : 'doctor')}>
+                <Icon id="ic-plus" /> {roleFilter === 'staff' ? 'Add Staff' : 'Add Doctor'}
               </button>
             </div>
           )}
@@ -430,10 +409,8 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
         {/* Instant Role Filter Pills */}
         <div className="filter-tabs" style={{ marginBottom: 14 }}>
           {[
-            ['', `All (${counts.all})`],
-            ['doctor', `Doctor (${counts.doctor})`],
-            ['receptionist', `Receptionist (${counts.receptionist})`],
-            ['admin', `Administrator (${counts.admin})`],
+            ['doctor', `Doctors (${counts.doctor})`],
+            ['staff', `Staff (${counts.receptionist + counts.admin})`],
           ].map(([val, lbl]) => (
             <button
               key={val || 'all'}
@@ -490,7 +467,8 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                   <option value="name">Sort: Name</option>
                   <option value="username">Sort: Username</option>
                   <option value="role">Sort: Role</option>
-                  <option value="recent">Sort: Newest</option>
+                  <option value="recent">Newest first</option>
+                  <option value="oldest">Oldest first</option>
                 </select>
               </div>
             </div>
@@ -506,24 +484,16 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
           ) : (
             <div className="excel-table-wrap">
               <table className="excel-grid-table">
-                <colgroup>
-                  <col style={{ width: '21%' }} />
-                  <col style={{ width: '11%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '19%' }} />
-                  <col style={{ width: '18%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '11%' }} />
-                </colgroup>
                 <thead>
                   <tr>
-                    <th>Name &amp; Username</th>
-                    <th>Room No</th>
-                    <th>Role</th>
-                    <th>Contact</th>
-                    <th>Clinical Assignment</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <SortableColumn name="name" sort={sort} onChange={(sort) => setParam({ sort })}>Name &amp; Username</SortableColumn>
+                    <SortableColumn name="room" sort={sort} onChange={(sort) => setParam({ sort })}>Room No</SortableColumn>
+                    <SortableColumn name="role" sort={sort} onChange={(sort) => setParam({ sort })}>Role</SortableColumn>
+                    <SortableColumn name="contact" sort={sort} onChange={(sort) => setParam({ sort })}>Contact</SortableColumn>
+                    <SortableColumn name="department" sort={sort} onChange={(sort) => setParam({ sort })}>Clinical Assignment</SortableColumn>
+                    {isAdmin && <SortableColumn name="active" sort={sort} onChange={(sort) => setParam({ sort })}>Account Status</SortableColumn>}
+                    {isAdmin && <SortableColumn name="login" sort={sort} onChange={(sort) => setParam({ sort })}>Login Permission</SortableColumn>}
+                    {isAdmin && <th>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -551,7 +521,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                           <span className="badge-role role-pill-badge">{m.role_display}</span>
                         </td>
                         <td>
-                          <div className="email-link">{m.email || '—'}</div>
+                          {isAdmin && <div className="email-link">{m.email || '—'}</div>}
                           <div className="muted" style={{ fontSize: '0.78rem', marginTop: 2 }}>
                             {m.phone || '—'}
                           </div>
@@ -563,7 +533,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                                 {m.doctor_profile.department?.name || 'No Department'}
                               </div>
                               <div className="muted" style={{ fontSize: '0.78rem' }}>
-                                {m.doctor_profile.assigned_days_text || 'Unscheduled'}
+                                {m.doctor_profile.assigned_receptionist_name || 'Unassigned'}
                               </div>
                             </div>
                           ) : m.role === 'receptionist' ? (
@@ -574,7 +544,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                             <span className="muted">Hospital Admin</span>
                           )}
                         </td>
-                        <td>
+                        {isAdmin && (<td>
                           {isAdmin ? (
                             <button
                               type="button"
@@ -597,8 +567,11 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                               {m.is_active ? 'Active' : 'Deactivated'}
                             </span>
                           )}
-                        </td>
-                        <td>
+                        </td>)}
+                        {isAdmin && <td><button type="button" className={`sm-status-toggle ${m.login_allowed ? 'active' : 'inactive'}`} disabled={m.id === user?.id || !m.is_active} onClick={() => void changeLoginPermission(m)}>
+                          {m.login_allowed ? 'Allowed' : 'Blocked'}
+                        </button></td>}
+                        {isAdmin && <td>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             {isAdmin && (
                               <button
@@ -606,27 +579,11 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                                 className="button button-small button-outline"
                                 onClick={() => openEditModal(m)}
                               >
-                                Edit
+                                Manage
                               </button>
                             )}
-                            {m.doctor_profile && (isAdmin || user?.id === m.id) && (
-                              <>
-                                <Link
-                                  className="button button-small button-outline"
-                                  to={`/doctors/${m.doctor_profile.id}/rules`}
-                                >
-                                  Rules
-                                </Link>
-                                <Link
-                                  className="button button-small button-outline"
-                                  to={`/schedules?doctor=${m.doctor_profile.id}`}
-                                >
-                                  Slots
-                                </Link>
-                              </>
-                            )}
                           </div>
-                        </td>
+                        </td>}
                       </tr>
                     );
                   })}
@@ -635,7 +592,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
             </div>
           )}
 
-          {data && data.total_pages > 1 && (
+          {data && (
             <div
               style={{
                 display: 'flex',
@@ -646,6 +603,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                 background: '#f8fafc',
               }}
             >
+              <PageSizeControl size={size} onChange={(next) => setParam({ limit: String(next) })} />
               <span className="muted">
                 Page {data.page} of {data.total_pages} ({data.total} staff)
               </span>
@@ -693,428 +651,82 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
             </div>
 
             <div className="sm-modal-body">
-              {/* Role & Active Status Controls */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  justifyContent: 'space-between',
-                  gap: 16,
-                  paddingBottom: 16,
-                  marginBottom: 18,
-                  borderBottom: '1px solid #e2e8f0',
-                }}
-              >
-                <div>
-                  <label className="filter-group-title" style={{ display: 'block', marginBottom: 8 }}>
-                    Staff Role
-                  </label>
-                  <div className="sm-radio-group" role="radiogroup" aria-label="Staff Role">
-                    {(['doctor', 'receptionist', 'admin'] as const).map((rVal) => {
-                      const label =
-                        rVal === 'doctor'
-                          ? 'Doctor'
-                          : rVal === 'receptionist'
-                            ? 'Receptionist'
-                            : 'Administrator';
-                      const locked = Boolean(editUserId && role !== rVal);
-                      return (
-                        <button
-                          key={rVal}
-                          type="button"
-                          disabled={locked}
-                          style={locked ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
-                          className={`sm-radio-btn ${role === rVal ? 'is-active' : ''}`}
-                          onClick={() => !editUserId && setRole(rVal)}
-                        >
-                          <span>{role === rVal ? '●' : '○'}</span>
-                          <span>{label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+              {!editUserId && <label className="form-group">Account role
+                <select className="field-control" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
+                  <option value="doctor">Doctor</option><option value="receptionist">Receptionist</option><option value="admin">Administrator</option>
+                </select>
+              </label>}
+              <div className="form-grid two-col">
+                <label className="form-group">Name<input className="field-control" required value={name} onChange={(e) => setName(e.target.value)} /></label>
+                <label className="form-group">Username<input className="field-control" required value={username} onChange={(e) => { setUsername(e.target.value); setUsernameCheck(null); }} />
+                  {usernameCheck && <small aria-live="polite">{usernameCheck.message}</small>}
+                </label>
+                <label className="form-group">Email address<input className="field-control" type="email" required value={email} onChange={(e) => { setEmail(e.target.value); setEmailCheck(null); }} />
+                  {emailCheck && <small aria-live="polite">{emailCheck.message}</small>}
+                </label>
+                <label className="form-group">Phone number<input className="field-control" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
+                <div className="form-group"><label htmlFor="sm-dob">Date of birth</label>
+                  <GreenDatePicker id="sm-dob" value={dob} onChange={setDob} isDob maxToday required={role === 'doctor' && !editUserId} />
                 </div>
-
-                <div>
-                  <label className="filter-group-title" style={{ display: 'block', marginBottom: 8 }}>
-                    Account Activity
-                  </label>
-                  <div className="sm-radio-group" role="radiogroup" aria-label="Account Activity">
-                    <button
-                      type="button"
-                      className={`sm-radio-btn ${isActive ? 'is-active' : ''}`}
-                      onClick={() => setIsActive(true)}
-                    >
-                      <span>{isActive ? '●' : '○'}</span>
-                      <span>Active</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={Boolean(editUserId && user && editUserId === user.id)}
-                      className={`sm-radio-btn ${!isActive ? 'is-danger-active' : ''}`}
-                      onClick={() => setIsActive(false)}
-                    >
-                      <span>{!isActive ? '●' : '○'}</span>
-                      <span>Deactivated</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Account Credentials & Personal Details */}
-              <div className="form-grid two-col" style={{ marginBottom: 20 }}>
-                <div className="form-group">
-                  <label htmlFor="sm-name">Name *</label>
-                  <input
-                    id="sm-name"
-                    type="text"
-                    className="field-control"
-                    placeholder="Full name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="sm-username">
-                    Username *
-                    {usernameCheck && (
-                      <span
-                        className={`sm-live-pill ${usernameCheck.valid ? 'is-ok' : 'is-err'}`}
-                      >
-                        {usernameCheck.valid ? '✓ OK' : `✕ ${usernameCheck.message}`}
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    id="sm-username"
-                    type="text"
-                    className="field-control"
-                    placeholder="Unique username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="sm-email">
-                    Email Address *
-                    {emailCheck && (
-                      <span className={`sm-live-pill ${emailCheck.valid ? 'is-ok' : 'is-err'}`}>
-                        {emailCheck.valid ? '✓ OK' : `✕ ${emailCheck.message}`}
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    id="sm-email"
-                    type="email"
-                    className="field-control"
-                    placeholder="Unique staff email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="sm-phone">Phone Number (Optional)</label>
-                  <input
-                    id="sm-phone"
-                    type="tel"
-                    className="field-control"
-                    placeholder="01XXXXXXXXX"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="sm-dob">Date of Birth (Optional)</label>
-                  <GreenDatePicker
-                    id="sm-dob"
-                    value={dob}
-                    onChange={setDob}
-                    isDob
-                    placeholder="Optional"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="sm-nid">NID (Optional)</label>
-                  <input
-                    id="sm-nid"
-                    type="text"
-                    className="field-control"
-                    placeholder="National ID number"
-                    value={nid}
-                    onChange={(e) => setNid(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="sm-addr">Address (Optional)</label>
-                  <input
-                    id="sm-addr"
-                    type="text"
-                    className="field-control"
-                    placeholder="Residential or clinic address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="sm-pw">
-                    {editUserId ? 'Set New Password (Leave blank to keep)' : 'Set Password *'}
-                  </label>
-                  <input
-                    id="sm-pw"
-                    type="password"
-                    className="field-control"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required={!editUserId}
-                    placeholder="Min 6 characters (not all numbers)"
-                  />
-                </div>
-              </div>
-
-              {/* Room Assignment (All Roles) + Live Schedule Occupancy */}
-              <div className="sm-room-box" style={{ marginBottom: role === 'doctor' ? 18 : 0 }}>
-                <div className="form-grid two-col">
-                  <div className="form-group full" style={{ marginBottom: 8 }}>
-                    <label htmlFor="sm-room">Room No (Optional — Any Staff Role)</label>
-                    <select
-                      id="sm-room"
-                      className="field-control"
-                      value={chamberId}
-                      onChange={(e) => setChamberId(e.target.value)}
-                    >
-                      <option value="">No Room / Leave Blank</option>
-                      {meta?.chambers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.room_number}
-                          {c.description ? ` — ${c.description}` : ''} · {c.doctors_count ?? 0}{' '}
-                          doctor(s)
-                        </option>
-                      ))}
+                <label className="form-group">NID<input className="field-control" maxLength={30} value={nid} onChange={(e) => setNid(e.target.value)} /></label>
+                <label className="form-group full">Address<textarea className="field-control" rows={2} value={address} onChange={(e) => setAddress(e.target.value)} /></label>
+                {role === 'doctor' && <>
+                  <label className="form-group">Gender
+                    <select className="field-control" value={gender} onChange={(e) => setGender(e.target.value as typeof gender)}>
+                      <option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
                     </select>
-                  </div>
-                </div>
-
-                {selectedRoom && (
-                  <div style={{ marginTop: 8 }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: 8,
-                      }}
-                    >
-                      <strong style={{ fontSize: '0.88rem', color: '#0d5c46' }}>
-                        Room Occupancy &amp; Schedule ({selectedRoom.room_number})
-                      </strong>
-                      {selectedRoom.description && (
-                        <span className="muted" style={{ fontSize: '0.8rem' }}>
-                          {selectedRoom.description}
-                        </span>
-                      )}
-                    </div>
-
-                    {otherDoctorsInRoom.length > 0 ? (
-                      otherDoctorsInRoom.map((doc) => (
-                        <div key={doc.id} className="sm-room-doc-card">
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              flexWrap: 'wrap',
-                              gap: 6,
-                            }}
-                          >
-                            <strong>{doc.name}</strong>
-                            <span className="muted" style={{ fontSize: '0.8rem' }}>
-                              {doc.department_name || 'General Consultation'}
-                            </span>
-                          </div>
-                          {doc.schedules && doc.schedules.length > 0 ? (
-                            <div
-                              style={{
-                                display: 'flex',
-                                flexWrap: 'wrap',
-                                gap: 6,
-                                marginTop: 6,
-                              }}
-                            >
-                              {doc.schedules.map((sc) => (
-                                <span
-                                  key={sc.id}
-                                  className="role-pill-badge"
-                                  style={{ fontSize: '0.76rem' }}
-                                >
-                                  {sc.weekday_name}: {sc.start_time_12h} – {sc.end_time_12h}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="muted" style={{ fontSize: '0.8rem', marginTop: 4 }}>
-                              Assigned Days: {doc.assigned_days_text || 'Unscheduled'}
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="notice notice-success" style={{ marginTop: 8, padding: 10 }}>
-                        No other doctor is currently assigned to {selectedRoom.room_number}.
-                      </div>
-                    )}
-
-                    {otherStaffInRoom.length > 0 && (
-                      <div className="muted" style={{ fontSize: '0.8rem', marginTop: 8 }}>
-                        <strong>Other Staff in Room:</strong>{' '}
-                        {otherStaffInRoom.map((s) => `${s.name} (${s.role_display})`).join(', ')}
-                      </div>
-                    )}
-                  </div>
-                )}
+                  </label>
+                  <label className="form-group">Designation<input className="field-control" value={designation} onChange={(e) => setDesignation(e.target.value)} /></label>
+                  <label className="form-group">BMDC registration number<input className="field-control" required={!editUserId} value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} /></label>
+                </>}
+                <label className="form-group">Profile picture<input className="field-control" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setAvatar(e.target.files?.[0] || null)} /></label>
+                {role === 'doctor' && <label className="form-group">Department
+                  <select className="field-control" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+                    <option value="">Unassigned</option>{meta?.departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </label>}
+                <label className="form-group">Room number
+                  <select className="field-control" value={chamberId} onChange={(e) => setChamberId(e.target.value)}>
+                    <option value="">Unassigned</option>{meta?.chambers.map((item) => <option key={item.id} value={item.id}>{item.room_number}</option>)}
+                  </select>
+                </label>
+                {role === 'doctor' && <>
+                  <label className="form-group full">Assigned receptionist
+                    <select className="field-control" value={receptionistId} onChange={(e) => setReceptionistId(e.target.value)}>
+                      <option value="">Unassigned</option>{meta?.receptionists.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}
+                    </select>
+                  </label>
+                  <label className="form-group full">Education and qualifications<textarea className="field-control" rows={3} value={qualifications} onChange={(e) => setQualifications(e.target.value)} /></label>
+                  <label className="form-group full">Professional experience<textarea className="field-control" rows={3} value={professionalExperience} onChange={(e) => setProfessionalExperience(e.target.value)} /></label>
+                  <fieldset className="form-group full staff-sessions">
+                    <legend>Weekly consultation sessions</legend>
+                    {sessions.map((session, i) => <div className="staff-session-row" key={i}>
+                      <label className="form-group">Day<select className="field-control" value={session.weekday} onChange={(e) => updateSession(i, { weekday: Number(e.target.value) })}>{[...WEEKDAY_CHOICES.slice(5), ...WEEKDAY_CHOICES.slice(0, 5)].map((day) => <option key={day.val} value={day.val}>{day.name}</option>)}</select></label>
+                      <div className="form-group"><label htmlFor={`staff-session-start-${i}`}>Session start</label><GreenTimePicker id={`staff-session-start-${i}`} value={session.start_time} onChange={(start_time) => updateSession(i, { start_time })} /></div>
+                      <div className="form-group"><label htmlFor={`staff-session-end-${i}`}>Session end</label><GreenTimePicker id={`staff-session-end-${i}`} value={session.end_time} onChange={(end_time) => updateSession(i, { end_time })} /></div>
+                      <button type="button" className="button button-outline button-small" aria-label={`Remove session ${i + 1}`} onClick={() => { setSessions((current) => current.filter((_, index) => i !== index)); setSessionsChanged(true); }}>Remove</button>
+                    </div>)}
+                    <button type="button" className="button button-outline button-small" onClick={() => { setSessions((current) => [...current, { weekday: 5, start_time: '', end_time: '' }]); setSessionsChanged(true); }}>Add session</button>
+                  </fieldset>
+                  <label className="form-group">Hospital commission type
+                    <select className="field-control" value={commissionValue === '' ? meta?.default_commission?.mode || commissionMode : commissionMode} onChange={(e) => { setCommissionMode(e.target.value as Doctor['hospital_share_mode']); if (!commissionValue) setCommissionValue('0'); }}>
+                      <option value="percent">Percentage per appointment</option><option value="fixed">Fixed amount per appointment</option><option value="monthly">Fixed monthly amount</option>
+                    </select>
+                  </label>
+                  <label className="form-group">Commission {commissionMode === 'percent' ? '(%)' : '(BDT)'}
+                    <input className="field-control" type="number" min={0} max={commissionMode === 'percent' ? 100 : 9999999.99} step="0.01" placeholder={String(meta?.default_commission?.value ?? 10)} value={commissionValue} onChange={(e) => setCommissionValue(e.target.value)} />
+                  </label>
+                </>}
+                <label className="form-group">{editUserId ? 'Set new password' : 'Set password'}
+                  <input className="field-control" type="password" autoComplete="new-password" required={!editUserId} value={password} onChange={(e) => setPassword(e.target.value)} />
+                  {editUserId && <small>Leave blank to keep the current password.</small>}
+                </label>
+                <label className="form-group">Account status
+                  <select className="field-control" value={isActive ? 'active' : 'inactive'} disabled={editUserId === user?.id} onChange={(e) => setIsActive(e.target.value === 'active')}>
+                    <option value="active">Active</option><option value="inactive">Deactivated</option>
+                  </select>
+                </label>
               </div>
-
-              {/* Doctor Clinical Profile & Weekly Schedule */}
-              {role === 'doctor' && (
-                <div
-                  style={{
-                    borderTop: '1px solid #e2e8f0',
-                    paddingTop: 18,
-                  }}
-                >
-                  <h3 style={{ margin: '0 0 12px' }}>
-                    Doctor Profile, Department &amp; Consultation Schedule
-                  </h3>
-                  <div className="form-grid two-col">
-                    <div className="form-group">
-                      <label htmlFor="sm-dept">Department (Optional)</label>
-                      <select
-                        id="sm-dept"
-                        className="field-control"
-                        value={departmentId}
-                        onChange={(e) => setDepartmentId(e.target.value)}
-                      >
-                        <option value="">No Department / Leave Blank</option>
-                        {meta?.departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor="sm-gender">Doctor Gender</label>
-                      <select
-                        id="sm-gender"
-                        className="field-control"
-                        value={gender}
-                        onChange={(e) => setGender(e.target.value as 'male' | 'female' | 'other')}
-                      >
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor="sm-rec">Assigned Receptionist (Optional)</label>
-                      <select
-                        id="sm-rec"
-                        className="field-control"
-                        value={receptionistId}
-                        onChange={(e) => setReceptionistId(e.target.value)}
-                      >
-                        <option value="">None / Leave Blank</option>
-                        {meta?.receptionists.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.display_name} (@{r.username})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor="sm-desig">Designation</label>
-                      <input
-                        id="sm-desig"
-                        type="text"
-                        className="field-control"
-                        value={designation}
-                        onChange={(e) => setDesignation(e.target.value)}
-                        placeholder="e.g. Professor & Senior Consultant"
-                      />
-                    </div>
-
-                    <div className="form-group full">
-                      <label htmlFor="sm-qual">Education &amp; Qualifications</label>
-                      <textarea
-                        id="sm-qual"
-                        rows={2}
-                        className="field-control"
-                        value={qualifications}
-                        onChange={(e) => setQualifications(e.target.value)}
-                        placeholder="MBBS, FCPS (Medicine), MD..."
-                      />
-                    </div>
-
-                    <div className="form-group full">
-                      <label>Weekly Office Days (Optional)</label>
-                      <div className="sm-day-chips" style={{ marginTop: 6 }}>
-                        {WEEKDAY_CHOICES.map((w) => {
-                          const selected = consultationDays.includes(w.val);
-                          return (
-                            <button
-                              key={w.val}
-                              type="button"
-                              className={`sm-day-chip ${selected ? 'is-selected' : ''}`}
-                              onClick={() => toggleDay(w.val)}
-                            >
-                              {w.short}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {consultationDays.length > 0 && (
-                      <>
-                        <div className="form-group">
-                          <label htmlFor="sm-st">Session Start Time</label>
-                          <GreenTimePicker
-                            id="sm-st"
-                            value={startTime}
-                            onChange={setStartTime}
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label htmlFor="sm-et">Session End Time</label>
-                          <GreenTimePicker id="sm-et" value={endTime} onChange={setEndTime} />
-                        </div>
-                      </>
-                    )}
-
-                    {liveScheduleConflict && (
-                      <div className="form-group full">
-                        <div className="form-errors">
-                          <strong>Room Schedule Conflict:</strong> {liveScheduleConflict}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="sm-modal-footer">
@@ -1126,7 +738,6 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                 className="button button-primary"
                 disabled={
                   saving ||
-                  Boolean(liveScheduleConflict) ||
                   Boolean(usernameCheck && !usernameCheck.valid) ||
                   Boolean(emailCheck && !emailCheck.valid)
                 }

@@ -6,6 +6,7 @@ import { logAudit } from './audit.js';
 import { gatewayRefund } from './gateway.js';
 
 export async function approveRefund(refundId: bigint, actor: User) {
+  if (!actor.isActive || actor.role !== 'admin') throw new HttpError(403, 'Only an active administrator can approve refunds.');
   return prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<Array<{ id: bigint }>>`
       SELECT id FROM hospital_refundrequest WHERE id = ${refundId} FOR UPDATE
@@ -17,13 +18,6 @@ export async function approveRefund(refundId: bigint, actor: User) {
       include: { appointment: { include: { slot: { include: { doctor: true } } } } },
     });
 
-    const allowed = await doctorAllowed(actor, refund.appointment.slot.doctor, tx);
-    if (!['admin', 'receptionist'].includes(actor.role) || !allowed) {
-      throw new HttpError(
-        403,
-        'Refund approval is restricted to authorized receptionists and administrators.'
-      );
-    }
     if (refund.status !== 'pending') {
       throw new HttpError(400, 'Only pending requests may be approved.');
     }
@@ -36,6 +30,7 @@ export async function approveRefund(refundId: bigint, actor: User) {
         reviewedAt: new Date(),
       },
     });
+    await tx.complaint.updateMany({ where: { appointmentId: refund.appointmentId, category: 'refund_request', status: { in: ['submitted', 'reviewing'] } }, data: { status: 'approved', updatedById: actor.id } });
 
     await logAudit(
       actor,
@@ -48,7 +43,7 @@ export async function approveRefund(refundId: bigint, actor: User) {
   });
 }
 
-export async function finalizeCashRefund(refundId: bigint, actor: User) {
+export async function finalizeCashRefund(refundId: bigint, actor: User, reference = '') {
   return prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<Array<{ id: bigint }>>`
       SELECT id FROM hospital_refundrequest WHERE id = ${refundId} FOR UPDATE
@@ -90,10 +85,12 @@ export async function finalizeCashRefund(refundId: bigint, actor: User) {
         method: 'cash',
         status: 'refunded',
         amount: refund.amount,
+        refundReference: reference,
         handledById: actor.id,
         processedAt: now,
       },
     });
+    await tx.complaint.updateMany({ where: { appointmentId: appt.id, category: 'refund_request', status: { in: ['submitted', 'reviewing', 'approved'] } }, data: { status: 'resolved', response: 'The refund has been paid at reception.', updatedById: actor.id } });
 
     await logAudit(
       actor,

@@ -1,6 +1,8 @@
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
+import path from 'node:path';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
+import { env } from '../config/env.js';
 import { HttpError } from '../middleware/error.js';
 import { managedDoctorIds } from '../services/access.js';
 import {
@@ -10,6 +12,7 @@ import {
   submitOnlineRefund,
 } from '../services/refunds.js';
 import { serializeRefundRequest } from '../services/serialize.js';
+import { logAudit } from '../services/audit.js';
 
 const refundInclude = {
   requestedBy: true,
@@ -34,11 +37,49 @@ const refundInclude = {
   },
 };
 
+async function editableRefund(req: Request) {
+  if (!/^\d+$/.test(req.params.id)) throw new HttpError(404, 'Refund request not found.');
+  const doctorIds = await managedDoctorIds(req.user!);
+  const where: Prisma.RefundRequestWhereInput = { id: BigInt(req.params.id), ...(doctorIds !== null ? {
+    appointment: { slot: { doctorId: { in: doctorIds } } }, status: { in: ['approved', 'processing', 'completed'] },
+  } : {}) };
+  const refund = await prisma.refundRequest.findFirst({ where });
+  if (!refund) throw new HttpError(404, 'Refund request not found.');
+  return { refund, where };
+}
+
+export async function allowEvidenceUpload(req: Request, _res: Response, next: NextFunction) {
+  await editableRefund(req);
+  next();
+}
+
+export async function saveEvidence(req: Request, res: Response) {
+  const { refund, where } = await editableRefund(req);
+  const note = typeof req.body?.note === 'string' ? req.body.note.trim() : undefined;
+  if (note !== undefined && note.length > 3000) throw new HttpError(400, 'Refund notes are limited to 3000 characters.');
+  if (note === undefined && !req.file) throw new HttpError(400, 'Enter a note or attach a document.');
+  await prisma.$transaction(async (tx) => {
+    const changed = await tx.refundRequest.updateMany({ where, data: { reviewNote: note, ...(req.file ? { evidenceFile: req.file.filename } : {}) } });
+    if (!changed.count) throw new HttpError(404, 'Refund request not found.');
+    await logAudit(req.user, 'refund.review_details_saved', refund.id, req.file ? 'Document attached' : 'Note updated', tx);
+  });
+  res.json({ message: 'Refund details saved.' });
+}
+
+export async function downloadEvidence(req: Request, res: Response) {
+  const { refund } = await editableRefund(req);
+  if (!refund.evidenceFile) throw new HttpError(404, 'Document not found.');
+  const filename = path.basename(refund.evidenceFile);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.download(path.join(env.mediaRoot, 'refunds', filename), filename);
+}
+
 export async function listRefunds(req: Request, res: Response): Promise<void> {
   const docIds = await managedDoctorIds(req.user!);
   const filters: Prisma.RefundRequestWhereInput[] = [];
   if (docIds !== null) {
     filters.push({ appointment: { slot: { doctorId: { in: docIds } } } });
+    filters.push({ status: { in: ['approved', 'processing', 'completed'] } });
   }
 
   const status = String(req.query.status || '').trim();
@@ -65,9 +106,18 @@ export async function listRefunds(req: Request, res: Response): Promise<void> {
   else if (sort === 'amount_high') orderBy = [{ amount: 'desc' }, { id: 'asc' }];
   else if (sort === 'amount_low') orderBy = [{ amount: 'asc' }, { id: 'asc' }];
   else orderBy = [{ createdAt: 'desc' }, { id: 'asc' }];
+  const [field, direction] = sort.split('.');
+  if (direction === 'asc' || direction === 'desc') {
+    const columns: Record<string, Prisma.RefundRequestOrderByWithRelationInput> = {
+      reference: { appointment: { reference: direction } }, patient: { appointment: { guestName: direction } },
+      doctor: { appointment: { slot: { doctor: { user: { firstName: direction } } } } },
+      amount: { amount: direction }, status: { status: direction }, date: { createdAt: direction },
+    };
+    if (Object.hasOwn(columns, field)) orderBy = [columns[field], { id: 'asc' }];
+  }
 
   const page = Math.max(1, Number(req.query.page || 1) || 1);
-  const limit = 25;
+  const limit = Math.min(100, Math.max(1, Math.trunc(Number(req.query.limit) || 25)));
   const where: Prisma.RefundRequestWhereInput = filters.length ? { AND: filters } : {};
 
   const [total, items] = await Promise.all([
@@ -82,7 +132,9 @@ export async function listRefunds(req: Request, res: Response): Promise<void> {
   ]);
 
   res.json({
-    refunds: items.map(serializeRefundRequest),
+    refunds: items.map((item) => ({ ...serializeRefundRequest(item), review_note: item.reviewNote,
+      evidence_url: item.evidenceFile ? `/refunds/${item.id}/evidence` : null, evidence_name: item.evidenceFile,
+    })),
     total,
     page,
     total_pages: Math.max(1, Math.ceil(total / limit)),
@@ -140,7 +192,9 @@ export async function approve(req: Request, res: Response): Promise<void> {
 
 export async function cashPayout(req: Request, res: Response): Promise<void> {
   const id = BigInt(req.params.id);
-  const updated = await finalizeCashRefund(id, req.user!);
+  const reference = String(req.body?.transaction_reference || '').trim();
+  if (!reference || reference.length > 90) throw new HttpError(400, 'Enter a valid refund transaction reference.');
+  const updated = await finalizeCashRefund(id, req.user!, reference);
   const full = await prisma.refundRequest.findUniqueOrThrow({
     where: { id: updated.id },
     include: refundInclude,

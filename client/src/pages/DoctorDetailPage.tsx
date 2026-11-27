@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import api from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
 import { AppLayout, PublicLayout } from '../components/Layout.tsx';
 import { LoadingScreen, formatLongDate } from '../components/UI.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
-import type { Doctor, WeeklyAvailability } from '../types/index.ts';
+import { ProfessionalDetails } from '../components/DoctorCard.tsx';
+import type { AppointmentSlot, Doctor, WeeklyAvailability } from '../types/index.ts';
 
 export default function DoctorDetailPage() {
   const { identifier } = useParams<{ identifier: string }>();
+  const { hash } = useLocation();
   const { user } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const [slots, setSlots] = useState<AppointmentSlot[]>([]);
+  const selectedDate = params.get('date') || '';
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [weeklySchedules, setWeeklySchedules] = useState<WeeklyAvailability[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,16 +24,23 @@ export default function DoctorDetailPage() {
     setLoading(true);
     setNotFound(false);
     api
-      .get<{ doctor: Doctor; weekly_schedules: WeeklyAvailability[] }>(
+      .get<{ doctor: Doctor; weekly_schedules: WeeklyAvailability[]; upcoming_slots: AppointmentSlot[] }>(
         `/catalog/doctors/${identifier}`
       )
       .then((res) => {
         setDoctor(res.data.doctor);
+        setSlots(res.data.upcoming_slots.filter((slot) => slot.booking_open));
         setWeeklySchedules(res.data.weekly_schedules || []);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [identifier]);
+
+  useEffect(() => {
+    if (loading || (hash !== '#weekly-schedule' && hash !== '#booking')) return;
+    const frame = requestAnimationFrame(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }));
+    return () => cancelAnimationFrame(frame);
+  }, [hash, loading]);
 
   const Wrapper = user ? AppLayout : PublicLayout;
 
@@ -83,32 +95,13 @@ export default function DoctorDetailPage() {
             </div>
 
             <div className="doctor-profile-meta">
+              <h1 className="doctor-profile-title">{doctor.full_doctor_title}</h1>
               <div className="doctor-badge-row">
                 <span className="dept-pill-tag">{doctor.department?.name || 'General Consultation'}</span>
-                <span className="bmdc-pill-tag">{doctor.bmdc_display}</span>
+                {doctor.bmdc_display && <span className="bmdc-pill-tag">{doctor.bmdc_display}</span>}
               </div>
-
-              <h1 className="doctor-profile-title">{doctor.full_doctor_title}</h1>
-              <p className="doctor-profile-designation">
-                {doctor.designation}
-                {doctor.institute ? ` · ${doctor.institute}` : ''}
-              </p>
-
-              <div className="doctor-qualifications-inline">
-                {doctor.qualifications_list.length ? (
-                  doctor.qualifications_list.map((line, i) => (
-                    <div key={i} className="qual-line-item">
-                      <span className="qual-dot">•</span>
-                      <span className="qual-text">{line}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="qual-line-item">
-                    <span className="qual-dot">•</span>
-                    <span className="qual-text">MBBS, Specialist Consultant</span>
-                  </div>
-                )}
-              </div>
+              <p className="doctor-profile-designation">{doctor.designation}</p>
+              <ProfessionalDetails doctor={doctor} />
             </div>
           </div>
 
@@ -133,10 +126,10 @@ export default function DoctorDetailPage() {
               </span>
               <b className="meta-bar-value">
                 <a
-                  href={`tel:${doctor.active_contact || '+88096100016211'}`}
+                  href={`tel:${doctor.assigned_receptionist_phone || doctor.active_contact}`}
                   className="helpline-link"
                 >
-                  {doctor.active_contact || '+88096100016211'}
+                  {doctor.assigned_receptionist_phone || doctor.active_contact}
                 </a>
               </b>
             </div>
@@ -148,7 +141,7 @@ export default function DoctorDetailPage() {
             </span>
             <div className="fees-strip-pills">
               <div className="fee-pill-card">
-                <span className="fee-pill-type">1st Visit:</span>
+                <span className="fee-pill-type">First Visit</span>
                 <b className="fee-pill-amount">Tk. {Math.round(doctor.initial_fee)}</b>
               </div>
               <div className="fee-pill-card">
@@ -158,105 +151,43 @@ export default function DoctorDetailPage() {
                 <b className="fee-pill-amount">Tk. {Math.round(doctor.followup_fee)}</b>
               </div>
               <div className="fee-pill-card">
-                <span className="fee-pill-type">Report Review:</span>
+                <span className="fee-pill-type">Report Checking</span>
                 <b className="fee-pill-amount">Tk. {Math.round(doctor.report_fee)}</b>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="panel doctor-schedule-panel" id="weekly-schedule">
-          <div className="schedule-panel-header">
-            <div className="schedule-header-title">
-              <span className="schedule-badge">APPOINTMENT SCHEDULE</span>
-              <h2>Weekly Available Schedule</h2>
-              <p>
-                Select a consultation session below to book your appointment and receive your
-                sequential serial number:
-              </p>
-            </div>
-          </div>
-
-          <div className="schedule-sessions-list">
-            {weeklySchedules.length ? (
-              weeklySchedules.map((sched) => (
-                <div key={sched.id} className="schedule-session-row">
-                  <div className="session-day-block">
-                    <span className="session-weekday-pill">
-                      {sched.weekday_short.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="session-info-block">
-                    <div className="session-date-line">
-                      {sched.upcoming_date ? formatLongDate(sched.upcoming_date) : sched.weekday_name}
-                    </div>
-                    <div className="session-time-line">
-                      <Icon id="ic-clock" className="icon icon-xs" /> {sched.start_time_12h} –{' '}
-                      {sched.end_time_12h}
-                    </div>
-                    {doctor.active_room && (
-                      <div className="session-room-line">
-                        <Icon id="ic-building" className="icon icon-xs" /> {doctor.active_room}
-                      </div>
-                    )}
-                  </div>
-                  <div className="session-action-block">
-                    {sched.slot ? (
-                      user ? (
-                        <Link
-                          to={`/book/${sched.slot.id}`}
-                          className="button button-primary slot-book-button"
-                        >
-                          Book Appointment <Icon id="ic-arrow" />
-                        </Link>
-                      ) : (
-                        <Link
-                          to={`/login/patient?next=${encodeURIComponent(`/book/${sched.slot.id}`)}`}
-                          className="button button-primary slot-book-button"
-                        >
-                          Book Appointment <Icon id="ic-arrow" />
-                        </Link>
-                      )
-                    ) : (
-                      <span className="slot-opening-soon-pill">Opening Soon</span>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="empty-state">
-                <span className="empty-icon">
-                  <Icon id="ic-calendar" />
-                </span>
-                <h3>No Consultation Sessions Currently Published</h3>
-                <p>
-                  Consultation sessions are being scheduled. For advance bookings, please contact
-                  Green Hospital helpline at <b>{doctor.active_contact || '+88096100016211'}</b>.
-                </p>
+        <section className="panel doctor-schedule-panel" id="weekly-schedule">
+          <h2>Consultation times</h2>
+          {weeklySchedules.length ? (
+            <ul className="consultation-periods">
+              {[...weeklySchedules].sort((a, b) => (a.weekday + 2) % 7 - (b.weekday + 2) % 7).map((period) => (
+                <li key={period.id}><strong>{period.weekday_name}</strong> {period.start_time_12h}–{period.end_time_12h}</li>
+              ))}
+            </ul>
+          ) : <p>No recurring consultation times have been published.</p>}
+          <h2 id="booking">Book appointment</h2>
+          {slots.length ? (
+            <>
+              <label className="form-group">
+                Available date
+                <select className="field-control" value={selectedDate}
+                  onChange={(e) => setParams({ date: e.target.value }, { replace: true })}>
+                  <option value="">Choose a date</option>
+                  {[...new Set(slots.map((slot) => slot.date))].map((day) => <option key={day} value={day}>{formatLongDate(day)}</option>)}
+                </select>
+              </label>
+              <div className="consultation-times">
+                {slots.filter((slot) => slot.date === selectedDate).map((slot) => (
+                  <Link key={slot.id} className="button button-outline" to={user ? `/book/${slot.id}` : `/login/patient?next=${encodeURIComponent(`/book/${slot.id}`)}`}>
+                    {slot.start_time_12h}–{slot.end_time_12h}
+                  </Link>
+                ))}
               </div>
-            )}
-          </div>
-
-          <div className="schedule-footer-strip">
-            <div className="footer-strip-item">
-              <Icon id="ic-check" />
-              <span>
-                Sequential serial numbers are allocated automatically upon booking. Payment can be
-                completed at hospital reception desk or online.
-              </span>
-            </div>
-            <div className="footer-strip-item helpline-strip-item">
-              <Icon id="ic-phone" />
-              <span>
-                Need phone booking or emergency serial? Call Green Hospital 24/7 hotline at{' '}
-                <a href="tel:+88096100016211">
-                  <b>+88096100016211</b>
-                </a>
-                .
-              </span>
-            </div>
-          </div>
-        </div>
+            </>
+          ) : <p>No appointments are currently open for booking.</p>}
+        </section>
       </div>
     </Wrapper>
   );

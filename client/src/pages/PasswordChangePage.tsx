@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { AppLayout } from '../components/Layout.tsx';
 import { useToast } from '../context/ToastContext.tsx';
+import { useAuth } from '../context/AuthContext.tsx';
 
 export default function PasswordChangePage() {
   const { showToast } = useToast();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -21,10 +24,8 @@ export default function PasswordChangePage() {
         new_password: newPassword,
         confirm_password: confirmPassword,
       });
-      showToast(res.data.message, 'success');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      showToast(`${res.data.message} Sign in with your new password.`, 'success');
+      navigate(`/login/${logout()}`, { replace: true });
     } catch (err) {
       showToast(getApiErrorMessage(err, 'Could not change password.'), 'error');
     } finally {

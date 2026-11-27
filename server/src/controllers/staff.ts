@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { HttpError } from '../middleware/error.js';
 import { doctorAllowed } from '../services/access.js';
@@ -15,9 +15,19 @@ import {
 } from '../services/serialize.js';
 import { localTodayDate, parseIsoDate, parseTimeStr, timeToHm } from '../utils/dateTime.js';
 import { hashPassword, validatePasswordStrength } from '../utils/password.js';
+import { normalizePhone, PHONE_REGEX } from '../utils/phone.js';
+import { toRelativeMediaPath } from '../utils/upload.js';
 
-const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function staffPayload(req: Request): Record<string, unknown> {
+  if (typeof req.body?.staff !== 'string') return req.body ?? {};
+  try {
+    const body: unknown = JSON.parse(req.body.staff);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Invalid staff payload');
+    return body as Record<string, unknown>;
+  } catch { throw new HttpError(400, 'Invalid staff profile fields.'); }
+}
 
 const staffDoctorInclude = {
   department: true,
@@ -69,6 +79,9 @@ function parseScheduleInputs(body: Record<string, unknown>): ParsedScheduleInput
       if (!Number.isInteger(wd) || wd < 0 || wd > 6 || !st || !et || timeToHm(et) <= timeToHm(st)) {
         throw new HttpError(400, 'Each weekly schedule rule must specify a valid weekday and start < end time.');
       }
+      if (rules.some((rule) => rule.weekday === wd && st < rule.endTime && et > rule.startTime)) {
+        throw new HttpError(400, 'Consultation sessions on the same day cannot overlap.');
+      }
       rules.push({ weekday: wd, startTime: st, endTime: et, durationMinutes: dur, capacity: cap });
     }
     const dayNums = Array.from(new Set(rules.map((r) => r.weekday))).sort((a, b) => a - b);
@@ -106,6 +119,17 @@ function parseScheduleInputs(body: Record<string, unknown>): ParsedScheduleInput
   return { provided: false, rules: [], dayNums: [] };
 }
 
+function parseCommission(body: Record<string, unknown>, reportFee: number, followupFee: number, initialFee: number) {
+  if (body.hospital_share_mode === undefined && body.hospital_share_value === undefined) return undefined;
+  const mode = String(body.hospital_share_mode);
+  const value = Number(body.hospital_share_value);
+  const maximum = mode === 'percent' ? 100 : mode === 'fixed' ? Math.min(reportFee, followupFee, initialFee) : 9_999_999.99;
+  if (!['percent', 'fixed', 'monthly'].includes(mode) || !Number.isFinite(value) || body.hospital_share_value === '' || value < 0 || value > maximum) {
+    throw new HttpError(400, mode === 'fixed' ? 'The commission per appointment cannot exceed the lowest consultation fee.' : 'Enter a valid commission type and amount.');
+  }
+  return { hospitalShareMode: mode, hospitalShareValue: value };
+}
+
 export async function listStaff(req: Request, res: Response): Promise<void> {
   const [allCount, doctorCount, recepCount, adminCount] = await Promise.all([
     prisma.user.count({ where: { role: { not: 'patient' } } }),
@@ -119,13 +143,14 @@ export async function listStaff(req: Request, res: Response): Promise<void> {
   if (['admin', 'doctor', 'receptionist'].includes(roleFilter)) {
     filters.push({ role: roleFilter });
   }
+  if (roleFilter === 'staff') filters.push({ role: { in: ['admin', 'receptionist'] } });
 
   const q = String(req.query.q || '').trim();
   if (q) {
     filters.push({
       OR: [
         { username: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
+        ...(req.user?.role === 'admin' ? [{ email: { contains: q, mode: 'insensitive' as const } }] : []),
         { phone: { contains: q, mode: 'insensitive' } },
         { firstName: { contains: q, mode: 'insensitive' } },
         { lastName: { contains: q, mode: 'insensitive' } },
@@ -145,10 +170,21 @@ export async function listStaff(req: Request, res: Response): Promise<void> {
   if (sort === 'username') orderBy = [{ username: 'asc' }, { id: 'asc' }];
   else if (sort === 'role') orderBy = [{ role: 'asc' }, { firstName: 'asc' }, { id: 'asc' }];
   else if (sort === 'recent') orderBy = [{ dateJoined: 'desc' }, { id: 'asc' }];
+  else if (sort === 'oldest') orderBy = [{ dateJoined: 'asc' }, { id: 'asc' }];
   else orderBy = [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }];
+  const [field, direction] = sort.split('.');
+  if (direction === 'asc' || direction === 'desc') {
+    const columns: Record<string, Prisma.UserOrderByWithRelationInput[]> = {
+      name: [{ firstName: direction }, { lastName: direction }], room: [{ chamber: { roomNumber: direction } }],
+      role: [{ role: direction }], contact: [{ phone: direction }],
+      department: [{ doctorProfile: { department: { name: direction } } }],
+      active: [{ isActive: direction }], login: [{ loginAllowed: direction }],
+    };
+    if (Object.hasOwn(columns, field)) orderBy = [...columns[field], { id: 'asc' }];
+  }
 
   const page = Math.max(1, Number(req.query.page || 1) || 1);
-  const limit = 50;
+  const limit = Math.min(100, Math.max(1, Math.trunc(Number(req.query.limit) || 50)));
   const where: Prisma.UserWhereInput = { AND: filters };
 
   const [total, users] = await Promise.all([
@@ -171,6 +207,17 @@ export async function listStaff(req: Request, res: Response): Promise<void> {
       ? serializeDoctor({ ...u.doctorProfile, user: u })
       : null;
     const baseUser = serializeUser(u);
+    if (req.user?.role !== 'admin') {
+      return {
+        id: baseUser.id, role: baseUser.role, role_display: baseUser.role_display,
+        display_name: baseUser.display_name, username: baseUser.username, avatar: baseUser.avatar,
+        phone: baseUser.phone, room_number: baseUser.room_number || docSer?.active_room || '',
+        doctor_profile: docSer ? {
+          id: docSer.id, designation: docSer.designation, department: docSer.department,
+          assigned_receptionist_name: docSer.assigned_receptionist_name, active_room: docSer.active_room,
+        } : null,
+      };
+    }
     return {
       ...baseUser,
       chamber_id: baseUser.chamber_id ?? docSer?.chamber_id ?? null,
@@ -195,7 +242,7 @@ export async function listStaff(req: Request, res: Response): Promise<void> {
 }
 
 export async function getStaffMeta(_req: Request, res: Response): Promise<void> {
-  const [departments, chambers, receptionists] = await Promise.all([
+  const [departments, chambers, receptionists, policy] = await Promise.all([
     prisma.department.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
     prisma.chamber.findMany({
       where: { isActive: true },
@@ -210,12 +257,14 @@ export async function getStaffMeta(_req: Request, res: Response): Promise<void> 
       where: { role: 'receptionist', isActive: true },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     }),
+    prisma.hospitalPolicy.findUnique({ where: { id: 1 } }),
   ]);
 
   res.json({
     departments: departments.map(serializeDepartment),
     chambers: chambers.map(serializeChamber),
     receptionists: receptionists.map(serializeUser),
+    default_commission: { mode: policy?.defaultHospitalMode ?? 'percent', value: Number(policy?.defaultHospitalValue ?? 10) },
   });
 }
 
@@ -265,17 +314,18 @@ async function resolveChamberId(body: Record<string, unknown>, fallback?: bigint
 }
 
 export async function createStaff(req: Request, res: Response): Promise<void> {
-  const body = req.body as Record<string, unknown>;
+  const body = staffPayload(req);
   const role = String(body.role || '').trim();
   const { firstName, lastName } = resolveNameFields(body);
   const username = String(body.username || '').trim();
   const email = String(body.email || '').trim().toLowerCase();
-  const phoneRaw = String(body.phone || '').trim();
+  const phoneRaw = normalizePhone(String(body.phone || ''));
   const dobRaw = body.dob ? String(body.dob).trim() : '';
   const nid = String(body.nid || '').trim();
   const address = String(body.address || '').trim();
   const isActive = body.is_active !== undefined ? Boolean(body.is_active) : true;
   const newPassword = String(body.new_password ?? body.password ?? '');
+  const registrationNumber = String(body.registration_number ?? '').trim();
 
   if (!['doctor', 'receptionist', 'admin'].includes(role)) {
     throw new HttpError(400, 'Role must be doctor, receptionist, or admin.');
@@ -297,7 +347,10 @@ export async function createStaff(req: Request, res: Response): Promise<void> {
   let dobDate: Date | null = null;
   if (dobRaw) {
     dobDate = parseIsoDate(dobRaw);
-    if (!dobDate) throw new HttpError(400, 'Invalid date of birth.');
+    if (!dobDate || dobDate > new Date()) throw new HttpError(400, 'Invalid date of birth.');
+  }
+  if (role === 'doctor' && (!dobDate || !registrationNumber)) {
+    throw new HttpError(400, 'Date of birth and BMDC registration number are required for doctors.');
   }
 
   const usernameConflict = await prisma.user.findFirst({
@@ -341,8 +394,11 @@ export async function createStaff(req: Request, res: Response): Promise<void> {
         dob: dobDate,
         nid,
         address,
+        gender: ['male', 'female', 'other'].includes(String(body.gender)) ? String(body.gender) : null,
+        ...(req.file ? { avatar: toRelativeMediaPath('profiles', req.file.filename) } : {}),
         chamberId: chamber ? chamber.id : null,
         isActive,
+        loginAllowed: isActive && body.login_allowed !== false,
         isStaff: role === 'admin',
         isSuperuser: role === 'admin',
         password: pwHash,
@@ -388,6 +444,8 @@ export async function createStaff(req: Request, res: Response): Promise<void> {
           gender,
           designation: String(body.designation || 'Consultant').trim() || 'Consultant',
           qualifications: String(body.qualifications || '').trim(),
+          professionalExperience: String(body.professional_experience || '').trim(),
+          registrationNumber,
           roomNumber: chamber ? chamber.roomNumber : '',
           chamberAddress: chamber ? chamber.address : 'Mirpur, Dhaka',
           contactNumber: chamber ? chamber.contactNumber : '+88096100016211',
@@ -398,11 +456,14 @@ export async function createStaff(req: Request, res: Response): Promise<void> {
           cancelFeeValue: pol.defaultCancelValue,
           hospitalShareMode: pol.defaultHospitalMode,
           hospitalShareValue: pol.defaultHospitalValue,
-          isAvailable: isActive,
+          ...parseCommission(body, 500, 800, 1000),
+          isAvailable: true,
         },
       });
 
       if (recepId) {
+        const receptionist = await tx.user.findFirst({ where: { id: recepId, role: 'receptionist', isActive: true } });
+        if (!receptionist) throw new HttpError(400, 'Select an active receptionist.');
         await tx.doctorReceptionist.create({
           data: { doctorProfileId: doctorProfile.id, userId: recepId },
         });
@@ -450,7 +511,7 @@ export async function updateStaff(req: Request, res: Response): Promise<void> {
     throw new HttpError(404, 'Staff member not found.');
   }
 
-  const body = req.body as Record<string, unknown>;
+  const body = staffPayload(req);
   const role = body.role !== undefined ? String(body.role).trim() : member.role;
   if (role !== member.role) {
     throw new HttpError(400, 'For audit integrity, create a new account for a different staff role.');
@@ -470,8 +531,7 @@ export async function updateStaff(req: Request, res: Response): Promise<void> {
   });
   const username = String(body.username ?? member.username).trim();
   const email = String(body.email ?? member.email).trim().toLowerCase();
-  const phoneRaw =
-    body.phone !== undefined ? String(body.phone || '').trim() : (member.phone ?? '').trim();
+  const phoneRaw = normalizePhone(String(body.phone ?? member.phone ?? ''));
   const nid = String(body.nid ?? member.nid).trim();
   const address = String(body.address ?? member.address).trim();
   const dobRaw = body.dob !== undefined ? String(body.dob || '').trim() : undefined;
@@ -490,7 +550,8 @@ export async function updateStaff(req: Request, res: Response): Promise<void> {
   let dobDate = member.dob;
   if (dobRaw !== undefined) {
     dobDate = dobRaw ? parseIsoDate(dobRaw) : null;
-    if (dobRaw && !dobDate) throw new HttpError(400, 'Invalid date of birth.');
+    if (dobRaw && (!dobDate || dobDate > new Date())) throw new HttpError(400, 'Invalid date of birth.');
+    if (role === 'doctor' && member.dob && !dobDate) throw new HttpError(400, 'Date of birth is required for doctors.');
   }
 
   const usernameConflict = await prisma.user.findFirst({
@@ -546,17 +607,22 @@ export async function updateStaff(req: Request, res: Response): Promise<void> {
         dob: dobDate,
         nid,
         address,
+        ...(body.gender !== undefined && ['male', 'female', 'other'].includes(String(body.gender)) ? { gender: String(body.gender) } : {}),
+        ...(req.file ? { avatar: toRelativeMediaPath('profiles', req.file.filename) } : {}),
         ...(chamberRes.provided ? { chamberId: chamberRes.chamber?.id ?? null } : {}),
         isActive,
+        ...(isActive !== member.isActive ? { loginAllowed: isActive } : {}),
         isStaff: role === 'admin',
         isSuperuser: role === 'admin',
         ...(passwordHash ? { password: passwordHash } : {}),
+        ...(passwordHash || (member.isActive && !isActive) ? { sessionVersion: { increment: 1 } } : {}),
       },
       include: { chamber: true },
     });
 
     if (user.role === 'doctor' && member.doctorProfile) {
-      const doc = member.doctorProfile;
+      await tx.$queryRaw`SELECT id FROM hospital_doctorprofile WHERE id = ${member.doctorProfile.id} FOR UPDATE`;
+      const doc = await tx.doctorProfile.findUniqueOrThrow({ where: { id: member.doctorProfile.id }, include: { weekly: true } });
       const targetChamberId = chamberRes.provided ? chamberRes.chamber?.id ?? null : doc.chamberId;
 
       const windowsToCheck: WeeklyWindow[] = parsedSched.provided
@@ -576,8 +642,14 @@ export async function updateStaff(req: Request, res: Response): Promise<void> {
       }
 
       const docUpdate: Prisma.DoctorProfileUpdateInput = {
-        isAvailable: isActive,
+        ...parseCommission(body, Number(doc.reportFee), Number(doc.followupFee), Number(doc.initialFee)),
+        ...(body.professional_experience !== undefined ? { professionalExperience: String(body.professional_experience).trim() } : {}),
       };
+      if (body.registration_number !== undefined) {
+        const value = String(body.registration_number).trim();
+        if (!value) throw new HttpError(400, 'BMDC registration number is required for doctors.');
+        docUpdate.registrationNumber = value;
+      }
 
       if ('department_id' in body || 'department' in body) {
         const dRaw = body.department_id ?? body.department;
@@ -622,6 +694,8 @@ export async function updateStaff(req: Request, res: Response): Promise<void> {
         const rawRec = body.assigned_receptionist_id ?? body.assigned_receptionist;
         await tx.doctorReceptionist.deleteMany({ where: { doctorProfileId: doc.id } });
         if (rawRec && /^\d+$/.test(String(rawRec))) {
+          const receptionist = await tx.user.findFirst({ where: { id: BigInt(String(rawRec)), role: 'receptionist', isActive: true } });
+          if (!receptionist) throw new HttpError(400, 'Select an active receptionist.');
           await tx.doctorReceptionist.create({
             data: { doctorProfileId: doc.id, userId: BigInt(String(rawRec)) },
           });
@@ -629,23 +703,21 @@ export async function updateStaff(req: Request, res: Response): Promise<void> {
       }
 
       if (parsedSched.provided) {
-        const today = localTodayDate();
-        const futureOpenEmpty = await tx.appointmentSlot.findMany({
-          where: { doctorId: doc.id, date: { gte: today }, isOpen: true },
-          include: {
-            appointments: {
-              where: { status: { notIn: ['cancelled', 'expired'] } },
-              select: { id: true },
-            },
-          },
-        });
-        for (const s of futureOpenEmpty) {
-          if (s.appointments.length === 0) {
-            await tx.appointmentSlot.delete({ where: { id: s.id } });
-          }
+        const key = (r: WeeklyWindow) => `${r.weekday}/${timeToHm(r.startTime)}/${timeToHm(r.endTime)}`;
+        const requested = new Set(parsedSched.rules.map(key));
+        const existing = doc.weekly.filter((r) => r.active);
+        const preserved = new Set(existing.filter((r) => requested.has(key(r))).map(key));
+        const removed = existing.filter((r) => !requested.has(key(r))).map((r) => r.id);
+        if (removed.length) {
+          const today = localTodayDate();
+          await tx.$queryRaw`SELECT id FROM hospital_appointmentslot WHERE template_id IN (${Prisma.join(removed)}) AND date >= ${today}::date FOR UPDATE`;
+          const affected = { templateId: { in: removed }, date: { gte: today } };
+          await tx.appointmentSlot.deleteMany({ where: { ...affected, appointments: { none: {} } } });
+          await tx.appointmentSlot.updateMany({ where: affected, data: { isOpen: false } });
+          await tx.weeklyAvailability.updateMany({ where: { id: { in: removed } }, data: { active: false } });
         }
-        await tx.weeklyAvailability.deleteMany({ where: { doctorId: doc.id } });
         for (const r of parsedSched.rules) {
+          if (preserved.has(key(r))) continue;
           await tx.weeklyAvailability.create({
             data: {
               doctorId: doc.id,
@@ -680,9 +752,7 @@ export async function toggleStaffActive(req: Request, res: Response): Promise<vo
     where: { id },
     include: { chamber: true, doctorProfile: true },
   });
-  if (!member || member.role === 'patient') {
-    throw new HttpError(404, 'Staff member not found.');
-  }
+  if (!member) throw new HttpError(404, 'Account not found.');
   if (member.id === req.user!.id) {
     throw new HttpError(400, 'You cannot deactivate your own administrator account.');
   }
@@ -691,14 +761,12 @@ export async function toggleStaffActive(req: Request, res: Response): Promise<vo
   const updated = await prisma.$transaction(async (tx) => {
     const u = await tx.user.update({
       where: { id },
-      data: { isActive: nextActive },
+      data: { isActive: nextActive, ...(member.role !== 'patient' ? { loginAllowed: nextActive, ...(!nextActive ? { sessionVersion: { increment: 1 } } : {}) } : {}) },
       include: { chamber: true },
     });
-    if (member.doctorProfile) {
-      await tx.doctorProfile.update({
-        where: { id: member.doctorProfile.id },
-        data: { isAvailable: nextActive },
-      });
+    if (nextActive && member.doctorProfile?.chamberId) {
+      const rules = await tx.weeklyAvailability.findMany({ where: { doctorId: member.doctorProfile.id, active: true } });
+      await assertNoRoomWeeklyConflict(tx, { chamberId: member.doctorProfile.chamberId, excludeDoctorId: member.doctorProfile.id, rules });
     }
     await logAudit(
       req.user,
@@ -714,6 +782,25 @@ export async function toggleStaffActive(req: Request, res: Response): Promise<vo
     user: serializeUser(updated),
     message: `${userDisplayName(updated)} has been ${nextActive ? 'activated' : 'deactivated'}.`,
   });
+}
+
+export async function setLoginPermission(req: Request, res: Response): Promise<void> {
+  const id = BigInt(req.params.id);
+  const allowed = req.body?.login_allowed;
+  if (typeof allowed !== 'boolean') throw new HttpError(400, 'Select a login permission.');
+  if (id === req.user!.id && !allowed) throw new HttpError(400, 'You cannot block your own administrator account.');
+  const updated = await prisma.$transaction(async (tx) => {
+    const account = await tx.user.findUnique({ where: { id }, select: { role: true, isActive: true } });
+    if (!account) throw new HttpError(404, 'Account not found.');
+    if (allowed && !account.isActive && account.role !== 'patient') throw new HttpError(400, 'Activate this staff account before allowing login.');
+    const member = await tx.user.update({ where: { id }, data: {
+      loginAllowed: allowed,
+      ...(!allowed ? { sessionVersion: { increment: 1 } } : {}),
+    } });
+    await logAudit(req.user, allowed ? 'account.login_allowed' : 'account.login_blocked', Number(id), member.username, tx);
+    return member;
+  });
+  res.json({ user: serializeUser(updated), message: allowed ? 'Login allowed.' : 'Login blocked.' });
 }
 
 export async function getDoctorRules(req: Request, res: Response): Promise<void> {
@@ -781,6 +868,19 @@ export async function updateDoctorRules(req: Request, res: Response): Promise<vo
   if (hospMode === 'percent' && hospVal > 100) {
     throw new HttpError(400, 'Percentage cannot exceed 100.');
   }
+  const fees = [Number(body.initial_fee ?? doctor.initialFee), Number(body.followup_fee ?? doctor.followupFee), Number(body.report_fee ?? doctor.reportFee)];
+  if (fees.some((value) => !Number.isFinite(value) || value < 0 || value > 9_999_999.99)) throw new HttpError(400, 'Enter valid consultation fees.');
+  if (!['percent', 'fixed', 'monthly'].includes(hospMode) || !Number.isFinite(hospVal) || hospVal < 0 || hospVal > 9_999_999.99 || (hospMode === 'fixed' && hospVal > Math.min(...fees))) throw new HttpError(400, 'Enter a valid hospital commission.');
+  if (!['percent', 'fixed'].includes(cancelMode) || !Number.isFinite(cancelVal) || cancelVal < 0 || cancelVal > 9_999_999.99) throw new HttpError(400, 'Enter a valid cancellation policy.');
+  const window = body.booking_window_hours === undefined ? doctor.bookingWindowHours : Number(body.booking_window_hours);
+  const deadline = Number(body.payment_deadline_hours ?? doctor.paymentDeadlineHours);
+  const reportDays = Number(body.report_within_days ?? doctor.reportWithinDays);
+  const followupDays = Number(body.followup_within_days ?? doctor.followupWithinDays);
+  const paymentPolicy = String(body.payment_policy ?? doctor.paymentPolicy);
+  if (![deadline, reportDays, followupDays].every((n) => Number.isInteger(n) && n > 0 && n <= 4320) || !['on_day', 'within'].includes(paymentPolicy)) throw new HttpError(400, 'Select valid payment and visit deadlines.');
+  if (window !== null && (!Number.isInteger(window) || window < 1 || window > 4320 || (paymentPolicy === 'within' && deadline >= window))) throw new HttpError(400, 'The booking window must be longer than the advance payment deadline.');
+  const methods = body.accepted_payment_methods === undefined ? doctor.acceptedPaymentMethods.split(',') : body.accepted_payment_methods;
+  if (!Array.isArray(methods) || !methods.length || methods.some((method) => method !== 'cash' && method !== 'online')) throw new HttpError(400, 'Select at least one accepted payment method.');
 
   const data: Prisma.DoctorProfileUpdateInput = {
     designation: body.designation !== undefined ? String(body.designation) : doctor.designation,
@@ -796,6 +896,9 @@ export async function updateDoctorRules(req: Request, res: Response): Promise<vo
         ? Math.max(1, Number(body.followup_within_days))
         : doctor.followupWithinDays,
     reportFee: body.report_fee !== undefined ? Number(body.report_fee) : doctor.reportFee,
+    reportWithinDays: reportDays,
+    bookingWindowHours: window,
+    acceptedPaymentMethods: [...new Set(methods)].join(','),
     bookingNoticeHours:
       body.booking_notice_hours !== undefined
         ? Math.max(0, Number(body.booking_notice_hours))
@@ -812,8 +915,7 @@ export async function updateDoctorRules(req: Request, res: Response): Promise<vo
         : doctor.paymentDeadlineHours,
     cancelFeeMode: cancelMode,
     cancelFeeValue: cancelVal,
-    isAvailable:
-      body.is_available !== undefined ? Boolean(body.is_available) : doctor.isAvailable,
+    ...(isAdmin && body.is_available !== undefined ? { isAvailable: body.is_available === true } : {}),
   };
 
   let syncUserChamberId: bigint | null | undefined = undefined;
@@ -886,7 +988,9 @@ export async function updateDoctorRules(req: Request, res: Response): Promise<vo
       }
     }
 
-    await logAudit(req.user, 'doctor.rules_updated', Number(id), '', tx);
+    const before = { fees: [doctor.initialFee, doctor.followupFee, doctor.reportFee], commission: [doctor.hospitalShareMode, doctor.hospitalShareValue], booking: [doctor.bookingWindowHours, doctor.paymentDeadlineHours], methods: doctor.acceptedPaymentMethods };
+    const after = { fees: [doc.initialFee, doc.followupFee, doc.reportFee], commission: [doc.hospitalShareMode, doc.hospitalShareValue], booking: [doc.bookingWindowHours, doc.paymentDeadlineHours], methods: doc.acceptedPaymentMethods };
+    await logAudit(req.user, 'doctor.rules_updated', Number(id), JSON.stringify({ before, after }), tx);
     return tx.doctorProfile.findUniqueOrThrow({
       where: { id },
       include: { user: true, ...staffDoctorInclude },

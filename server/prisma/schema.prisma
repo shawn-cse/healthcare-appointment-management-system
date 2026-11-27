@@ -18,6 +18,10 @@ model User {
   email       String    @default("") @db.VarChar(254)
   isStaff     Boolean   @default(false) @map("is_staff")
   isActive    Boolean   @default(true) @map("is_active")
+  loginAllowed Boolean  @default(true) @map("login_allowed")
+  sessionVersion Int    @default(0) @map("session_version")
+  gender      String?   @db.VarChar(10)
+  phoneVerifiedAt DateTime? @map("phone_verified_at") @db.Timestamptz(6)
   dateJoined  DateTime  @default(now()) @map("date_joined") @db.Timestamptz(6)
   role        String    @default("patient") @db.VarChar(16)
   phone       String?   @db.VarChar(16)
@@ -39,11 +43,25 @@ model User {
   reviewedRefunds         RefundRequest[]      @relation("ReviewedRefunds")
   complaints              Complaint[]          @relation("PatientComplaints")
   handledComplaints       Complaint[]          @relation("UpdatedComplaints")
+  assignedComplaints      Complaint[]          @relation("AssignedComplaints")
   complaintMessages       ComplaintMessage[]
   auditEvents             AuditEvent[]
+  phoneChallenge          PhoneChallenge?
 
   @@index([role])
   @@map("hospital_user")
+}
+
+model PhoneChallenge {
+  userId    BigInt   @id @map("user_id")
+  phone     String   @db.VarChar(16)
+  codeHash  String   @map("code_hash") @db.VarChar(64)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  sentAt    DateTime @map("sent_at") @db.Timestamptz(6)
+  attempts  Int      @default(0)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("hospital_phonechallenge")
 }
 
 model Department {
@@ -107,10 +125,14 @@ model DoctorProfile {
   registrationNumber    String   @default("") @map("registration_number") @db.VarChar(100)
   experienceYears       Int      @default(0) @map("experience_years") @db.SmallInt
   biography             String   @default("") @db.Text
+  professionalExperience String  @default("") @map("professional_experience") @db.Text
   initialFee            Decimal  @default(1000.00) @map("initial_fee") @db.Decimal(9, 2)
   followupFee           Decimal  @default(800.00) @map("followup_fee") @db.Decimal(9, 2)
   followupWithinDays    Int      @default(30) @map("followup_within_days")
   reportFee             Decimal  @default(500.00) @map("report_fee") @db.Decimal(9, 2)
+  reportWithinDays      Int      @default(30) @map("report_within_days")
+  acceptedPaymentMethods String  @default("cash,online") @map("accepted_payment_methods") @db.VarChar(20)
+  bookingWindowHours    Int?     @map("booking_window_hours")
   maxPatientsPerSession Int      @default(30) @map("max_patients_per_session") @db.SmallInt
   hospitalShareMode     String   @default("percent") @map("hospital_share_mode") @db.VarChar(10)
   hospitalShareValue    Decimal  @default(10.00) @map("hospital_share_value") @db.Decimal(9, 2)
@@ -201,6 +223,12 @@ model Appointment {
   guestName           String    @map("guest_name") @db.VarChar(150)
   guestPhone          String    @map("guest_phone") @db.VarChar(16)
   guestDob            DateTime? @map("guest_dob") @db.Date
+  guestAge            Int?      @map("guest_age") @db.SmallInt
+  guestGender         String?   @map("guest_gender") @db.VarChar(10)
+  acceptedPaymentMethods String @default("cash,online") @map("accepted_payment_methods") @db.VarChar(20)
+  commissionMode      String?   @map("commission_mode") @db.VarChar(10)
+  commissionValue     Decimal?  @map("commission_value") @db.Decimal(9, 2)
+  paymentDeadlineHours Int?     @map("payment_deadline_hours")
   visitType           String    @default("first") @map("visit_type") @db.VarChar(10)
   status              String    @default("confirmed") @db.VarChar(14)
   paymentStatus       String    @default("unpaid") @map("payment_status") @db.VarChar(20)
@@ -243,6 +271,8 @@ model PaymentTransaction {
   status            String    @default("initiated") @db.VarChar(14)
   amount            Decimal   @db.Decimal(9, 2)
   externalId        String?   @unique @map("external_id") @db.VarChar(40)
+  checkoutUrl       String?   @map("checkout_url") @db.Text
+  gatewaySessionKey String?   @map("gateway_session_key") @db.VarChar(90)
   validationId      String    @default("") @map("validation_id") @db.VarChar(90)
   bankTransactionId String    @default("") @map("bank_transaction_id") @db.VarChar(90)
   refundReference   String    @default("") @map("refund_reference") @db.VarChar(90)
@@ -269,6 +299,8 @@ model RefundRequest {
   reviewedById  BigInt?   @map("reviewed_by_id")
   reason        String    @default("") @db.Text
   internalNote  String    @default("") @map("internal_note") @db.Text
+  reviewNote    String    @default("") @map("review_note") @db.Text
+  evidenceFile  String?   @map("evidence_file") @db.VarChar(100)
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   reviewedAt    DateTime? @map("reviewed_at") @db.Timestamptz(6)
   completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
@@ -287,6 +319,7 @@ model Complaint {
   ticketCode      String   @default("") @map("ticket_code") @db.VarChar(12)
   patientId       BigInt   @map("patient_id")
   appointmentId   BigInt?  @map("appointment_id")
+  recipientId     BigInt?  @map("recipient_id")
   subject         String   @db.VarChar(150)
   category        String   @default("support") @db.VarChar(20)
   message         String   @db.Text
@@ -301,12 +334,14 @@ model Complaint {
   patient     User               @relation("PatientComplaints", fields: [patientId], references: [id], onDelete: Restrict)
   appointment Appointment?       @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   updatedBy   User?              @relation("UpdatedComplaints", fields: [updatedById], references: [id], onDelete: SetNull)
+  recipient   User?              @relation("AssignedComplaints", fields: [recipientId], references: [id], onDelete: SetNull)
   messages    ComplaintMessage[]
 
   @@index([ticketCode])
   @@index([patientId])
   @@index([appointmentId])
   @@index([updatedById])
+  @@index([recipientId])
   @@map("hospital_complaint")
 }
 

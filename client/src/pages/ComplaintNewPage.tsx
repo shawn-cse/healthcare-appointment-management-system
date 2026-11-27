@@ -12,9 +12,10 @@ export default function ComplaintNewPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  const issueMode = searchParams.get('issue') === '1';
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [ticketType, setTicketType] = useState<'support' | 'complaint'>('support');
-  const [category, setCategory] = useState('support');
+  const [category, setCategory] = useState(issueMode ? 'other_issue' : 'support');
   const [appointmentId, setAppointmentId] = useState(searchParams.get('appointment') || '');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -22,6 +23,11 @@ export default function ComplaintNewPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const isPatient = user?.role === 'patient';
+  const [recipients, setRecipients] = useState<Array<{ id: number; name: string; role: string }>>([]);
+  const [recipient, setRecipient] = useState('');
+  useEffect(() => {
+    if (!isPatient) api.get<{ recipients: typeof recipients }>('/complaints/recipients').then(({ data }) => setRecipients(data.recipients)).catch(() => {});
+  }, [isPatient]);
 
   useEffect(() => {
     if (!isPatient) return;
@@ -44,6 +50,7 @@ export default function ComplaintNewPage() {
       formData.append('subject', subject.trim());
       formData.append('category', category);
       formData.append('message', message.trim());
+      if (recipient) formData.append('recipient_id', recipient);
       if (isPatient && appointmentId) {
         formData.append('appointment_id', appointmentId);
       }
@@ -66,7 +73,7 @@ export default function ComplaintNewPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">HOSPITAL SUPPORT &amp; ESCALATIONS</p>
-          <h1>Submit Support Request or Complaint</h1>
+          <h1>{issueMode ? 'Report Issue' : isPatient ? 'Submit Complaint' : 'New Support Request'}</h1>
           <p>
             Select general support or file a formal clinical/billing complaint for review by
             administration.
@@ -80,7 +87,7 @@ export default function ComplaintNewPage() {
       </div>
 
       <div className="panel" style={{ maxWidth: 740, padding: 24 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+        {!issueMode && isPatient && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
           <button
             type="button"
             className={`button ${ticketType === 'support' ? 'button-primary' : 'button-outline'}`}
@@ -95,10 +102,10 @@ export default function ComplaintNewPage() {
           >
             Formal Complaint
           </button>
-        </div>
+        </div>}
 
         <form onSubmit={handleSubmit} className="form-grid">
-          {ticketType === 'complaint' && (
+          {(issueMode || !isPatient || ticketType === 'complaint') && (
             <div className="form-group">
               <label htmlFor="cn-cat">Complaint Category</label>
               <select
@@ -107,20 +114,43 @@ export default function ComplaintNewPage() {
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
               >
+                {issueMode ? <>
+                  <option value="cancel_appointment">Cancel Appointment</option>
+                  <option value="reschedule">Adjust Date &amp; Time</option>
+                  <option value="adjust_visit">Adjust Consultation Fee or Visit Type</option>
+                  <option value="payment_issue">Payment Issue</option>
+                  <option value="refund_request">Refund Request</option>
+                  <option value="other_issue">Other Issue</option>
+                </> : !isPatient ? <>
+                  <option value="support">General Support</option>
+                  <option value="assistance">Assistance Request</option>
+                  <option value="internal_complaint">Internal Complaint</option>
+                  <option value="admin_request">Administrative Request</option>
+                  <option value="technical">Technical Issue</option>
+                  <option value="important_message">Important Message</option>
+                </> : <>
                 <option value="doctor">Doctor consultation / attitude</option>
                 <option value="hospital">Hospital cleanliness / facility</option>
                 <option value="staff">Reception or support staff</option>
                 <option value="billing">Billing or refund issue</option>
                 <option value="other">Other matter</option>
+                </>}
               </select>
             </div>
           )}
 
+          {!isPatient && <label className="form-group">Recipient
+            <select className="field-control" value={recipient} onChange={(e) => setRecipient(e.target.value)}>
+              <option value="">Hospital administration</option>{recipients.map((person) => <option key={person.id} value={person.id}>{person.name} ({person.role})</option>)}
+            </select>
+          </label>}
           {isPatient && (
             <div className="form-group">
               <label htmlFor="cn-appt">Related Appointment (Optional)</label>
               <select
                 id="cn-appt"
+                required={issueMode}
+                disabled={issueMode && !!appointmentId}
                 className="field-control"
                 value={appointmentId}
                 onChange={(e) => setAppointmentId(e.target.value)}
