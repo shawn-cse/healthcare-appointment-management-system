@@ -11,7 +11,10 @@ export function gatewayEnabled(): boolean {
 }
 
 export function gatewayHttpsReady(): boolean {
-  return gatewayEnabled() && env.publicBaseUrl.startsWith('https://');
+  if (!gatewayEnabled()) return false;
+  return env.sslcommerzLive
+    ? env.publicBaseUrl.startsWith('https://')
+    : /^https?:\/\//i.test(env.publicBaseUrl);
 }
 
 function gatewayBaseUrl(): string {
@@ -46,8 +49,15 @@ export async function initializeGatewayPayment(appointmentId: bigint): Promise<s
     if (fee < 10 || fee > 500000) throw new HttpError(400, 'Online checkout only supports fees between BDT 10 and BDT 500,000.');
     const existing = await tx.paymentTransaction.findFirst({ where: { appointmentId, kind: 'charge', status: 'initiated' } });
     if (existing) {
-      if (existing.checkoutUrl) return { appt, txn: existing };
-      throw new HttpError(409, 'An online checkout is already being prepared.');
+      const ageMs = Date.now() - existing.createdAt.getTime();
+      if (existing.checkoutUrl && ageMs < 15 * 60_000) return { appt, txn: existing };
+      if (ageMs < 60_000 && !existing.checkoutUrl) {
+        throw new HttpError(409, 'An online checkout is already being prepared.');
+      }
+      await tx.paymentTransaction.update({
+        where: { id: existing.id },
+        data: { status: 'failed', processedAt: new Date(), note: 'Previous checkout session expired.' },
+      });
     }
     const txn = await tx.paymentTransaction.create({ data: { appointmentId, kind: 'charge', method: 'online', status: 'initiated', amount: appt.fee, externalId: txnId } });
     return { appt, txn };
@@ -69,13 +79,14 @@ export async function initializeGatewayPayment(appointmentId: bigint): Promise<s
     shipping_method: 'NO',
     product_name: 'Medical consultation',
     product_category: 'healthcare',
-    product_profile: 'non-physical-goods',
+    product_profile: 'general',
     cus_name: patientName,
     cus_email: patientEmail,
-    cus_add1: 'Dhaka',
+    cus_add1: appt.patient?.address?.trim() || 'Dhaka',
     cus_city: 'Dhaka',
+    cus_postcode: '1000',
     cus_country: 'Bangladesh',
-    cus_phone: appt.guestPhone,
+    cus_phone: appt.guestPhone || '01711111111',
   });
 
   try {

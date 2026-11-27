@@ -17,6 +17,7 @@ import { localTodayDate, parseIsoDate, parseTimeStr, timeToHm } from '../utils/d
 import { hashPassword, validatePasswordStrength } from '../utils/password.js';
 import { normalizePhone, PHONE_REGEX } from '../utils/phone.js';
 import { toRelativeMediaPath } from '../utils/upload.js';
+import { validateUsernameFormat } from '../utils/username.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -183,8 +184,10 @@ export async function listStaff(req: Request, res: Response): Promise<void> {
     if (Object.hasOwn(columns, field)) orderBy = [...columns[field], { id: 'asc' }];
   }
 
-  const page = Math.max(1, Number(req.query.page || 1) || 1);
-  const limit = Math.min(100, Math.max(1, Math.trunc(Number(req.query.limit) || 50)));
+  const rawLimit = String(req.query.limit || '').trim().toLowerCase();
+  const showAll = rawLimit === 'all';
+  const page = showAll ? 1 : Math.max(1, Number(req.query.page || 1) || 1);
+  const limit = showAll ? undefined : Math.min(100, Math.max(1, Math.trunc(Number(rawLimit) || 50)));
   const where: Prisma.UserWhereInput = { AND: filters };
 
   const [total, users] = await Promise.all([
@@ -197,8 +200,7 @@ export async function listStaff(req: Request, res: Response): Promise<void> {
         assignedDoctors: true,
       },
       orderBy,
-      skip: (page - 1) * limit,
-      take: limit,
+      ...(limit ? { skip: (page - 1) * limit, take: limit } : {}),
     }),
   ]);
 
@@ -237,7 +239,7 @@ export async function listStaff(req: Request, res: Response): Promise<void> {
     },
     total,
     page,
-    total_pages: Math.max(1, Math.ceil(total / limit)),
+    total_pages: limit ? Math.max(1, Math.ceil(total / limit)) : 1,
   });
 }
 
@@ -333,6 +335,8 @@ export async function createStaff(req: Request, res: Response): Promise<void> {
   if (!firstName || !username || !email) {
     throw new HttpError(400, 'Role, name, username, and email address are required.');
   }
+  const usernameErr = validateUsernameFormat(username);
+  if (usernameErr) throw new HttpError(400, usernameErr);
   if (!EMAIL_REGEX.test(email)) {
     throw new HttpError(400, 'Enter a valid email address.');
   }
@@ -539,6 +543,8 @@ export async function updateStaff(req: Request, res: Response): Promise<void> {
   if (!firstName || !username || !email) {
     throw new HttpError(400, 'Name, username, and email address are required.');
   }
+  const usernameErr = validateUsernameFormat(username);
+  if (usernameErr) throw new HttpError(400, usernameErr);
   if (!EMAIL_REGEX.test(email)) {
     throw new HttpError(400, 'Enter a valid email address.');
   }

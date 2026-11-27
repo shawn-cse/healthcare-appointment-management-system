@@ -106,7 +106,7 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
 
     doctorUser = await prisma.user.create({
       data: {
-        username: 'doctor_one',
+        username: 'doctor.one',
         password: pwDoc,
         firstName: 'Karim',
         lastName: 'Doctor',
@@ -131,7 +131,7 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
 
     otherDoctorUser = await prisma.user.create({
       data: {
-        username: 'doctor_two',
+        username: 'doctor.two',
         password: pwDoc,
         firstName: 'Tariq',
         lastName: 'Second',
@@ -150,7 +150,7 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
 
     receptionUser = await prisma.user.create({
       data: {
-        username: 'reception_one',
+        username: 'reception.one',
         password: pwRec,
         firstName: 'Shirin',
         lastName: 'Reception',
@@ -454,16 +454,24 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
       email: '',
     });
     expect(autoReg.status).toBe(201);
-    expect(autoReg.body.user.username).toMatch(/^testuser_[0-9a-f]{6}$/);
+    expect(autoReg.body.user.username).toMatch(/^testuser\.[0-9a-f]{6}$/);
 
-    const reg = await request(app).post('/api/auth/register').send({ ...payload, username: 'test-unique' });
+    await request(app)
+      .post('/api/auth/register')
+      .send({ ...payload, username: 'bad_username', phone: '01644444444', email: 'bad@example.com' })
+      .expect(400);
+
+    const reg = await request(app).post('/api/auth/register').send({ ...payload, username: 'test.unique' });
     expect(reg.status).toBe(201);
     const equivalentPhone = await request(app).post('/api/auth/register').send({ ...payload, username: 'second', email: '', phone: '+880 1633-333333' });
     expect(equivalentPhone.status).toBe(400);
-    expect(reg.body.user.username).toBe('test-unique');
+    expect(reg.body.user.username).toBe('test.unique');
 
     const emptyCheck = await request(app).get('/api/auth/check-username?username=');
     expect(emptyCheck.body.status).toBe('empty');
+
+    const badCharCheck = await request(app).get('/api/auth/check-username?username=dr_invalid');
+    expect(badCharCheck.body.status).toBe('invalid');
 
     const conflictCheck = await request(app).get(
       `/api/auth/check-username?username=${doctorUser.username}`
@@ -475,7 +483,7 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
     );
     expect(selfCheck.body.status).toBe('available');
 
-    const okCheck = await request(app).get('/api/auth/check-username?username=dr_unique_999');
+    const okCheck = await request(app).get('/api/auth/check-username?username=dr.unique.999');
     expect(okCheck.body.status).toBe('available');
   });
 
@@ -633,6 +641,12 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
       'Orthopedics Empty'
     );
 
+    const publicDeptRes = await request(app).get('/api/catalog/departments');
+    expect(publicDeptRes.status).toBe(200);
+    expect(publicDeptRes.body.departments.map((d: { name: string }) => d.name)).not.toContain(
+      'Orthopedics Empty'
+    );
+
     const allDeptRes = await request(app)
       .get('/api/catalog/departments')
       .set('Authorization', `Bearer ${adminToken}`);
@@ -703,7 +717,7 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
         role: 'doctor',
         first_name: 'New',
         last_name: 'Doctor',
-        username: 'new_doctor',
+        username: 'new.doctor',
         dob: '1984-10-19',
         registration_number: 'A-182371',
         email: 'new.doctor@example.org',
@@ -725,7 +739,7 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
     expect(delRoom.status).toBe(200);
 
     const docAfter = await prisma.doctorProfile.findFirstOrThrow({
-      where: { user: { username: 'new_doctor' } },
+      where: { user: { username: 'new.doctor' } },
     });
     expect(docAfter.chamberId).toBeNull();
     expect(docAfter.roomNumber).toBe('');
@@ -742,16 +756,16 @@ describe('Green Hospital TypeScript + PostgreSQL Integration Suite', () => {
     const saved = await prisma.appointment.findUniqueOrThrow({ where: { id: guestId } });
     expect(saved).toMatchObject({ patientId: null, guestAge: age, guestDob: null });
     const registration = await request(app).post('/api/auth/register').send({
-      full_name: 'Guest Example', username: 'guest-verify', phone, dob: '2000-01-01', gender: 'female', password1: 'StrongGuest123!', password2: 'StrongGuest123!',
+      full_name: 'Guest Example', username: 'guest.verify', phone, dob: '2000-01-01', gender: 'female', password1: 'StrongGuest123!', password2: 'StrongGuest123!',
     }).expect(201);
     const account = BigInt(registration.body.user.id);
     const authorization = `Bearer ${registration.body.token}`;
-    await request(app).get(`/api/appointments/${guestId}`).set('Authorization', authorization).expect(404);
+    await request(app).get(`/api/appointments/${guestId}`).set('Authorization', authorization).expect(200);
     const code = '123456';
     await prisma.phoneChallenge.create({ data: { userId: account, phone, codeHash: crypto.createHmac('sha256', env.jwtSecret).update(`${account}:${phone}:${code}`).digest('hex'), sentAt: new Date(), expiresAt: new Date(Date.now() + 60_000) } });
     await request(app).post('/api/auth/phone/verify').set('Authorization', authorization).send({ code: '999999' }).expect(400);
     const verification = await request(app).post('/api/auth/phone/verify').set('Authorization', authorization).send({ code }).expect(200);
-    expect(verification.body.linked).toBe(1);
+    expect(verification.body.linked).toBe(0);
     await request(app).get(`/api/appointments/${guestId}`).set('Authorization', authorization).expect(200);
     await request(app).get(`/api/appointments/${guestId}`).set('Authorization', `Bearer ${otherPatientToken}`).expect(404);
     const ticket = await request(app).post('/api/complaints').set('Authorization', `Bearer ${receptionToken}`).send({ subject: 'Schedule assistance', message: 'Please check the morning schedule.', category: 'assistance', recipient_id: Number(doctorUser.id) }).expect(201);

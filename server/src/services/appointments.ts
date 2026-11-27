@@ -95,6 +95,7 @@ export async function generateUniqueTicketCode(db: DbClient = prisma): Promise<s
     for (let i = 0; i < 6; i++) {
       code += chars[crypto.randomInt(chars.length)];
     }
+    if (!/[A-Z]/.test(code) || !/[0-9]/.test(code)) continue;
     const exists = await db.complaint.findFirst({
       where: { ticketCode: { equals: code, mode: 'insensitive' } },
       select: { id: true },
@@ -358,7 +359,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
         if (!patientObj) {
           throw new HttpError(400, 'Selected patient account was not found.');
         }
-        if (!input.identityVerified || !patientObj.phoneVerifiedAt || phone !== patientObj.phone) throw new HttpError(400, 'Confirm identity and use the verified account phone to link this booking.');
+        if (!input.identityVerified || phone !== patientObj.phone) throw new HttpError(400, 'Confirm identity and use the account phone to link this booking.');
       }
     }
 

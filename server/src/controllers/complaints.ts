@@ -35,6 +35,8 @@ const complaintInclude = {
   },
 };
 
+const FORMAL_COMPLAINT_CATEGORIES = ['formal_complaint', 'doctor', 'hospital', 'staff', 'billing', 'other'];
+
 async function buildQueueScope(user: NonNullable<Request['user']>, userType: string) {
   if (userType === 'support') return { patient: { role: { not: 'patient' } } };
   if (user.role === 'admin') {
@@ -48,6 +50,7 @@ async function buildQueueScope(user: NonNullable<Request['user']>, userType: str
   if (user.role === 'doctor') {
     return {
       appointmentId: { not: null },
+      category: { notIn: FORMAL_COMPLAINT_CATEGORIES },
       appointment: { slot: { doctor: { userId: user.id } } },
     };
   }
@@ -113,7 +116,11 @@ export async function listComplaints(req: Request, res: Response): Promise<void>
 
     const baseWhere: Prisma.ComplaintWhereInput =
       user.role === 'doctor'
-        ? { appointmentId: { not: null }, appointment: { slot: { doctor: { userId: user.id } } } }
+        ? {
+            appointmentId: { not: null },
+            category: { notIn: FORMAL_COMPLAINT_CATEGORIES },
+            appointment: { slot: { doctor: { userId: user.id } } },
+          }
         : user.role === 'receptionist'
           ? {
               appointmentId: { not: null },
@@ -209,7 +216,7 @@ export async function createComplaint(req: Request, res: Response): Promise<void
   const rawCategory = String(req.body?.category || 'support').trim();
   const issueCategories = ['cancel_appointment', 'reschedule', 'adjust_visit', 'payment_issue', 'refund_request', 'other_issue'];
   const internalCategories = ['assistance', 'internal_complaint', 'admin_request', 'technical', 'important_message'];
-  const category = ['doctor', 'hospital', 'staff', 'billing', 'other', ...issueCategories, ...(user.role !== 'patient' ? internalCategories : [])].includes(rawCategory)
+  const category = ['formal_complaint', 'doctor', 'hospital', 'staff', 'billing', 'other', ...issueCategories, ...(user.role !== 'patient' ? internalCategories : [])].includes(rawCategory)
     ? rawCategory
     : 'support';
 
@@ -284,7 +291,9 @@ export async function createComplaint(req: Request, res: Response): Promise<void
     complaint: serialized,
     message: ['doctor', 'receptionist'].includes(user.role)
       ? `Your support request ${serialized.display_code} has been submitted to hospital administration.`
-      : `Your request/complaint ${serialized.display_code} has been generated. Updates will appear in your portal.`,
+      : FORMAL_COMPLAINT_CATEGORIES.includes(category) || !appointmentId
+        ? `Your submission ${serialized.display_code} has been sent to Hospital Administration.`
+        : `Your support inquiry ${serialized.display_code} has been sent to your appointment doctor.`,
   });
 }
 
@@ -299,7 +308,7 @@ async function visibleComplaint(user: NonNullable<Request['user']>, id: bigint) 
   }
   if (user.role === 'doctor') {
     const isOwner = c.patientId === user.id;
-    const isDocAppt = c.appointment?.slot.doctor.userId === user.id;
+    const isDocAppt = c.appointment?.slot.doctor.userId === user.id && !FORMAL_COMPLAINT_CATEGORIES.includes(c.category);
     if (!isOwner && !internalRecipient && !isDocAppt) throw new HttpError(403, 'Not authorized.');
   }
   if (user.role === 'receptionist') {
@@ -358,7 +367,13 @@ export async function updateComplaint(req: Request, res: Response): Promise<void
   const id = BigInt(req.params.id);
   const scopeWhere: Prisma.ComplaintWhereInput =
     user.role === 'doctor'
-      ? { id, OR: [{ appointment: { slot: { doctor: { userId: user.id } } } }, { recipientId: user.id, patient: { role: { not: 'patient' } } }] }
+      ? {
+          id,
+          OR: [
+            { category: { notIn: FORMAL_COMPLAINT_CATEGORIES }, appointment: { slot: { doctor: { userId: user.id } } } },
+            { recipientId: user.id, patient: { role: { not: 'patient' } } },
+          ],
+        }
       : user.role === 'receptionist'
         ? {
             id,

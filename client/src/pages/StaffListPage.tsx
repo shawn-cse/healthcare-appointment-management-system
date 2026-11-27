@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { GreenDatePicker, GreenTimePicker } from '../components/DateTimePickers.tsx';
 import { Icon } from '../components/Icons.tsx';
-import { PageSizeControl, SortableColumn } from '../components/ManagementTable.tsx';
+import { SortableColumn } from '../components/ManagementTable.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen } from '../components/UI.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -52,8 +53,6 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
   const roleFilter = searchParams.get('role') || 'doctor';
   const q = searchParams.get('q') || '';
   const sort = searchParams.get('sort') || 'name';
-  const page = Number(searchParams.get('page') || 1) || 1;
-  const size = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
 
   const [searchInput, setSearchInput] = useState(q);
   const [data, setData] = useState<StaffListResponse | null>(null);
@@ -73,7 +72,6 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
   const [email, setEmail] = useState('');
   const [avatar, setAvatar] = useState<File | null>(null);
   const [registrationNumber, setRegistrationNumber] = useState('');
-  const [professionalExperience, setProfessionalExperience] = useState('');
   const [phone, setPhone] = useState('');
   const [dob, setDob] = useState('');
   const [nid, setNid] = useState('');
@@ -115,20 +113,30 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     if (roleFilter) params.set('role', roleFilter);
     if (q) params.set('q', q);
     if (sort) params.set('sort', sort);
-    params.set('page', String(page));
-    params.set('limit', String(size));
+    params.set('limit', 'all');
 
     api
       .get<StaffListResponse>(`/staff?${params.toString()}`)
       .then((res) => setData(res.data))
       .catch((err) => showToast(getApiErrorMessage(err, 'Failed to load staff roster.'), 'error'))
       .finally(() => setLoading(false));
-  }, [roleFilter, q, sort, page, size, showToast]);
+  }, [roleFilter, q, sort, showToast]);
 
   useEffect(() => {
     loadStaff();
     loadMeta();
   }, [loadStaff, loadMeta]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      if (!editorOpen) {
+        loadStaff();
+        void loadMeta();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [editorOpen, loadStaff, loadMeta]);
 
   const openCreateModal = useCallback((initialRole: 'doctor' | 'receptionist' = 'doctor') => {
     loadMeta();
@@ -140,7 +148,6 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     setPhone('');
     setAvatar(null);
     setRegistrationNumber('');
-    setProfessionalExperience('');
     setDob('');
     setNid('');
     setAddress('');
@@ -172,7 +179,6 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
       setPhone(m.phone || '');
       setAvatar(null);
       setRegistrationNumber(m.doctor_profile?.registration_number || '');
-      setProfessionalExperience(m.doctor_profile?.professional_experience || '');
       setDob(m.dob || '');
       setNid(m.nid || '');
       setAddress(m.address || '');
@@ -181,14 +187,20 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
       const resolvedChamber = m.doctor_profile?.chamber_id ?? m.chamber_id ?? null;
       setChamberId(resolvedChamber ? String(resolvedChamber) : '');
       setDepartmentId(m.doctor_profile?.department_id ? String(m.doctor_profile.department_id) : '');
-      setGender(m.doctor_profile?.gender || 'male');
+      setGender((m.doctor_profile?.gender || m.gender || 'male') as 'male' | 'female' | 'other');
       setReceptionistId(
         m.doctor_profile?.assigned_receptionist_id
           ? String(m.doctor_profile.assigned_receptionist_id)
           : ''
       );
       setDesignation(m.doctor_profile?.designation || 'Consultant');
-      setQualifications(m.doctor_profile?.qualifications || '');
+      const combinedCreds = [
+        m.doctor_profile?.qualifications?.trim(),
+        m.doctor_profile?.professional_experience?.trim(),
+      ]
+        .filter((v, idx, arr) => Boolean(v) && arr.indexOf(v) === idx)
+        .join('\n');
+      setQualifications(combinedCreds);
 
       setSessions((m.doctor_profile?.weekly || []).filter((w) => w.active).map((w) => ({
         weekday: w.weekday, start_time: w.start_time.slice(0, 5), end_time: w.end_time.slice(0, 5),
@@ -226,6 +238,13 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
       setUsernameCheck(null);
       return;
     }
+    if (!/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/.test(clean)) {
+      setUsernameCheck({
+        valid: false,
+        message: 'Letters, numbers, and dots (.) only — no underscores (_).',
+      });
+      return;
+    }
     const timer = window.setTimeout(() => {
       api
         .get<{ valid: boolean; message: string }>(
@@ -261,15 +280,6 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
     if (initialCreate || routeEditId) {
       navigate('/staff', { replace: true });
     }
-  };
-
-  const changeLoginPermission = async (member: StaffRow) => {
-    if (!await confirm({ title: member.login_allowed ? 'Block login' : 'Allow login', message: `Change login permission for ${member.display_name}?`, confirmText: 'Confirm', type: 'warning' })) return;
-    try {
-      const { data } = await api.put<{ message: string }>(`/staff/${member.id}/login-permission`, { login_allowed: !member.login_allowed });
-      showToast(data.message, 'success');
-      await loadStaff();
-    } catch (err) { showToast(getApiErrorMessage(err, 'Could not change login permission.'), 'error'); }
   };
 
   const handleToggleActive = async (m: StaffRow) => {
@@ -321,6 +331,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
         email: email.trim(),
         phone: phone.trim(),
         dob: dob || '',
+        gender,
         nid: nid.trim(),
         address: address.trim(),
         is_active: isActive,
@@ -332,7 +343,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
         payload.department_id = departmentId || null;
         payload.gender = gender;
         if (registrationNumber.trim()) payload.registration_number = registrationNumber.trim();
-        payload.professional_experience = professionalExperience;
+        payload.professional_experience = '';
         payload.assigned_receptionist_id = receptionistId || null;
         payload.designation = designation.trim();
         payload.qualifications = qualifications.trim();
@@ -372,7 +383,8 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
         if (v) next.set(k, v);
         else next.delete(k);
       }
-      if (!('page' in updates)) next.set('page', '1');
+      next.delete('page');
+      next.delete('limit');
       setSearchParams(next, { replace: true });
     },
     [searchParams, setSearchParams]
@@ -457,19 +469,6 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                     <strong>{data?.total ?? 0}</strong> accounts
                   </span>
                 </div>
-                <select
-                  className="field-control"
-                  style={{ width: 'auto', paddingTop: 7, paddingBottom: 7 }}
-                  value={sort}
-                  onChange={(e) => setParam({ sort: e.target.value })}
-                  aria-label="Sort staff list"
-                >
-                  <option value="name">Sort: Name</option>
-                  <option value="username">Sort: Username</option>
-                  <option value="role">Sort: Role</option>
-                  <option value="recent">Newest first</option>
-                  <option value="oldest">Oldest first</option>
-                </select>
               </div>
             </div>
           </div>
@@ -492,7 +491,6 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                     <SortableColumn name="contact" sort={sort} onChange={(sort) => setParam({ sort })}>Contact</SortableColumn>
                     <SortableColumn name="department" sort={sort} onChange={(sort) => setParam({ sort })}>Clinical Assignment</SortableColumn>
                     {isAdmin && <SortableColumn name="active" sort={sort} onChange={(sort) => setParam({ sort })}>Account Status</SortableColumn>}
-                    {isAdmin && <SortableColumn name="login" sort={sort} onChange={(sort) => setParam({ sort })}>Login Permission</SortableColumn>}
                     {isAdmin && <th>Actions</th>}
                   </tr>
                 </thead>
@@ -514,7 +512,7 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                           {roomLabel ? (
                             <span className="room-chip role-pill-badge">{roomLabel}</span>
                           ) : (
-                            <span className="muted">—</span>
+                            <span className="muted">Not assigned</span>
                           )}
                         </td>
                         <td>
@@ -545,32 +543,23 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                           )}
                         </td>
                         {isAdmin && (<td>
-                          {isAdmin ? (
-                            <button
-                              type="button"
-                              className={`sm-status-toggle ${m.is_active ? 'active' : 'inactive'}`}
-                              disabled={m.id === user?.id || togglingId === m.id}
-                              title={
-                                m.id === user?.id
-                                  ? 'Cannot deactivate your own account'
-                                  : m.is_active
-                                    ? 'Click to deactivate'
-                                    : 'Click to activate'
-                              }
-                              onClick={() => handleToggleActive(m)}
-                            >
-                              <span>{m.is_active ? '●' : '○'}</span>
-                              <span>{m.is_active ? 'Active' : 'Deactivated'}</span>
-                            </button>
-                          ) : (
-                            <span className={`sm-status-toggle ${m.is_active ? 'active' : 'inactive'}`}>
-                              {m.is_active ? 'Active' : 'Deactivated'}
-                            </span>
-                          )}
+                          <button
+                            type="button"
+                            className={`sm-status-toggle ${m.is_active ? 'active' : 'inactive'}`}
+                            disabled={m.id === user?.id || togglingId === m.id}
+                            title={
+                              m.id === user?.id
+                                ? 'Cannot deactivate your own account'
+                                : m.is_active
+                                  ? 'Click to deactivate'
+                                  : 'Click to activate'
+                            }
+                            onClick={() => handleToggleActive(m)}
+                          >
+                            <span>{m.is_active ? '●' : '○'}</span>
+                            <span>{m.is_active ? 'Active' : 'Deactivated'}</span>
+                          </button>
                         </td>)}
-                        {isAdmin && <td><button type="button" className={`sm-status-toggle ${m.login_allowed ? 'active' : 'inactive'}`} disabled={m.id === user?.id || !m.is_active} onClick={() => void changeLoginPermission(m)}>
-                          {m.login_allowed ? 'Allowed' : 'Blocked'}
-                        </button></td>}
                         {isAdmin && <td>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             {isAdmin && (
@@ -591,47 +580,11 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
               </table>
             </div>
           )}
-
-          {data && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px 16px',
-                borderTop: '1px solid #e2e8f0',
-                background: '#f8fafc',
-              }}
-            >
-              <PageSizeControl size={size} onChange={(next) => setParam({ limit: String(next) })} />
-              <span className="muted">
-                Page {data.page} of {data.total_pages} ({data.total} staff)
-              </span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className="button button-small button-outline"
-                  disabled={data.page <= 1}
-                  onClick={() => setParam({ page: String(data.page - 1) })}
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  className="button button-small button-outline"
-                  disabled={data.page >= data.total_pages}
-                  onClick={() => setParam({ page: String(data.page + 1) })}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Unified Onboard / Edit Modal Workspace (Same Page) */}
-      {editorOpen && isAdmin && (
+      {editorOpen && isAdmin && createPortal(
         <div
           className="sm-modal-backdrop"
           onClick={(e) => {
@@ -651,12 +604,12 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
             </div>
 
             <div className="sm-modal-body">
-              {!editUserId && <label className="form-group">Account role
-                <select className="field-control" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
-                  <option value="doctor">Doctor</option><option value="receptionist">Receptionist</option><option value="admin">Administrator</option>
-                </select>
-              </label>}
               <div className="form-grid two-col">
+                {!editUserId && <label className="form-group full">Account role
+                  <select className="field-control" value={role} onChange={(e) => setRole(e.target.value as typeof role)}>
+                    <option value="doctor">Doctor</option><option value="receptionist">Receptionist</option><option value="admin">Administrator</option>
+                  </select>
+                </label>}
                 <label className="form-group">Name<input className="field-control" required value={name} onChange={(e) => setName(e.target.value)} /></label>
                 <label className="form-group">Username<input className="field-control" required value={username} onChange={(e) => { setUsername(e.target.value); setUsernameCheck(null); }} />
                   {usernameCheck && <small aria-live="polite">{usernameCheck.message}</small>}
@@ -668,23 +621,23 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                 <div className="form-group"><label htmlFor="sm-dob">Date of birth</label>
                   <GreenDatePicker id="sm-dob" value={dob} onChange={setDob} isDob maxToday required={role === 'doctor' && !editUserId} />
                 </div>
+                <label className="form-group">Gender
+                  <select className="field-control" value={gender} onChange={(e) => setGender(e.target.value as typeof gender)}>
+                    <option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
+                  </select>
+                </label>
                 <label className="form-group">NID<input className="field-control" maxLength={30} value={nid} onChange={(e) => setNid(e.target.value)} /></label>
+                <label className="form-group">Profile picture<input className="field-control" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setAvatar(e.target.files?.[0] || null)} /></label>
                 <label className="form-group full">Address<textarea className="field-control" rows={2} value={address} onChange={(e) => setAddress(e.target.value)} /></label>
                 {role === 'doctor' && <>
-                  <label className="form-group">Gender
-                    <select className="field-control" value={gender} onChange={(e) => setGender(e.target.value as typeof gender)}>
-                      <option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
-                    </select>
-                  </label>
                   <label className="form-group">Designation<input className="field-control" value={designation} onChange={(e) => setDesignation(e.target.value)} /></label>
                   <label className="form-group">BMDC registration number<input className="field-control" required={!editUserId} value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} /></label>
+                  <label className="form-group">Department
+                    <select className="field-control" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+                      <option value="">Unassigned</option>{meta?.departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </select>
+                  </label>
                 </>}
-                <label className="form-group">Profile picture<input className="field-control" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setAvatar(e.target.files?.[0] || null)} /></label>
-                {role === 'doctor' && <label className="form-group">Department
-                  <select className="field-control" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-                    <option value="">Unassigned</option>{meta?.departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>}
                 <label className="form-group">Room number
                   <select className="field-control" value={chamberId} onChange={(e) => setChamberId(e.target.value)}>
                     <option value="">Unassigned</option>{meta?.chambers.map((item) => <option key={item.id} value={item.id}>{item.room_number}</option>)}
@@ -696,8 +649,9 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
                       <option value="">Unassigned</option>{meta?.receptionists.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}
                     </select>
                   </label>
-                  <label className="form-group full">Education and qualifications<textarea className="field-control" rows={3} value={qualifications} onChange={(e) => setQualifications(e.target.value)} /></label>
-                  <label className="form-group full">Professional experience<textarea className="field-control" rows={3} value={professionalExperience} onChange={(e) => setProfessionalExperience(e.target.value)} /></label>
+                  <label className="form-group full">Education, Qualifications &amp; Professional Experience
+                    <textarea className="field-control" rows={4} value={qualifications} onChange={(e) => setQualifications(e.target.value)} />
+                  </label>
                   <fieldset className="form-group full staff-sessions">
                     <legend>Weekly consultation sessions</legend>
                     {sessions.map((session, i) => <div className="staff-session-row" key={i}>
@@ -750,7 +704,8 @@ export default function StaffListPage({ initialCreate = false }: { initialCreate
               </button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
     </AppLayout>
   );

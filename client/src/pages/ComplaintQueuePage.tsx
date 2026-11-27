@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { ManagementTable } from '../components/ManagementTable.tsx';
@@ -36,15 +37,6 @@ export default function ComplaintQueuePage({ support = false }: { support?: bool
   // Read & Update modal state
   const [activeTicket, setActiveTicket] = useState<Complaint | null>(null);
   const [editStatus, setEditStatus] = useState<Complaint['status']>('reviewing');
-  const [recipients, setRecipients] = useState<Array<{ id: number; name: string; role: string }>>([]);
-  const [recipient, setRecipient] = useState('');
-  useEffect(() => {
-    if (user?.role === 'admin' || user?.role === 'doctor') {
-      api.get<{ recipients: typeof recipients }>('/complaints/recipients')
-        .then(({ data }) => setRecipients(user.role === 'doctor' ? data.recipients.filter((person) => person.role === 'admin') : data.recipients))
-        .catch(() => {});
-    }
-  }, [user?.role]);
   const [editResponse, setEditResponse] = useState('');
   const [adminFile, setAdminFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -80,9 +72,12 @@ export default function ComplaintQueuePage({ support = false }: { support?: bool
 
   const openModal = (c: Complaint) => {
     setActiveTicket(c);
-    setEditStatus(c.status);
+    setEditStatus(
+      c.status === 'submitted' || c.status === 'reviewing' || c.status === 'resolved'
+        ? c.status
+        : 'reviewing'
+    );
     setEditResponse('');
-    setRecipient(c.recipient_id ? String(c.recipient_id) : '');
     setAdminFile(null);
   };
 
@@ -94,7 +89,6 @@ export default function ComplaintQueuePage({ support = false }: { support?: bool
       const formData = new FormData();
       formData.append('status', editStatus);
       formData.append('response', editResponse);
-      if ((user?.role === 'admin' || (user?.role === 'doctor' && recipient)) && recipient !== String(activeTicket.recipient_id || '')) formData.append('recipient_id', recipient);
       if (adminFile) {
         formData.append('admin_attachment', adminFile);
       }
@@ -170,8 +164,7 @@ export default function ComplaintQueuePage({ support = false }: { support?: bool
 
       {loading ? <LoadingScreen /> : <ManagementTable rows={complaints} rowKey={(ticket) => ticket.id} dateColumn={5}
         filters={<select className="field-control" aria-label="Request status" value={status} onChange={(e) => setParam({ status: e.target.value || null })}>
-          <option value="">All statuses</option><option value="submitted">Pending</option><option value="reviewing">In progress</option>
-          <option value="approved">Approved</option><option value="rejected">Rejected</option><option value="resolved">Resolved</option>
+          <option value="">All statuses</option><option value="submitted">Generated</option><option value="reviewing">Under Review</option><option value="resolved">Resolved</option>
         </select>} columns={[
           { heading: 'Complaint ID', value: (ticket) => ticket.display_code, cell: (ticket) => <button type="button" className="text-link" onClick={() => openModal(ticket)}>{ticket.display_code}</button> },
           { heading: 'Appointment ID', value: (ticket) => ticket.appointment?.reference || '' },
@@ -182,18 +175,9 @@ export default function ComplaintQueuePage({ support = false }: { support?: bool
           { heading: 'Actions', value: () => '', cell: (ticket) => <button type="button" className="button button-small button-outline" onClick={() => openModal(ticket)}>Review</button> },
         ]} />}
 
-      {activeTicket && (
+      {activeTicket && createPortal(
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: 16,
-          }}
+          className="sm-modal-backdrop"
           onClick={(e) => {
             if (e.target === e.currentTarget) setActiveTicket(null);
           }}
@@ -258,19 +242,24 @@ export default function ComplaintQueuePage({ support = false }: { support?: bool
                     setEditStatus(e.target.value as Complaint['status'])
                   }
                 >
-                  <option value="submitted">1. Generated</option>
-                  <option value="reviewing">2. Under Review &amp; Inquiring</option>
+                  <option value="submitted">Generated</option>
+                  <option value="reviewing">Under Review</option>
                   <option value="resolved">Resolved</option>
-                  {user?.role === 'admin' && <><option value="approved">Approved</option><option value="rejected">Rejected</option></>}
                 </select>
               </div>
 
-              {(user?.role === 'admin' || user?.role === 'doctor') && <label className="form-group">{user.role === 'doctor' ? 'Forward to administration' : 'Assigned recipient'}
-                <select className="field-control" value={recipient} onChange={(e) => setRecipient(e.target.value)}>
-                  <option value="">{user.role === 'doctor' ? 'Select administrator' : 'Hospital administration'}</option>{recipients.map((person) => <option key={person.id} value={person.id}>{person.name} ({person.role})</option>)}
-                </select>
-              </label>}
               <div className="form-group">
+                <label htmlFor="cq-file">Attach Official Response Document</label>
+                <input
+                  id="cq-file"
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  className="field-control"
+                  onChange={(e) => setAdminFile(e.target.files?.[0] || null)}
+                />
+              </div>
+
+              <div className="form-group full">
                 <label htmlFor="cq-resp">Official Resolution Note</label>
                 <textarea
                   id="cq-resp"
@@ -282,18 +271,7 @@ export default function ComplaintQueuePage({ support = false }: { support?: bool
                 />
               </div>
 
-              <div className="form-group">
-                <label htmlFor="cq-file">Attach Official Response Document (Optional)</label>
-                <input
-                  id="cq-file"
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,.webp"
-                  className="field-control"
-                  onChange={(e) => setAdminFile(e.target.files?.[0] || null)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div className="form-group full" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
                 <button
                   type="button"
                   className="button button-outline"
@@ -307,7 +285,8 @@ export default function ComplaintQueuePage({ support = false }: { support?: bool
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </AppLayout>
   );

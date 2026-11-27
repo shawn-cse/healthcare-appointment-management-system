@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen, StatusPill, formatLongDate, formatDateTime } from '../components/UI.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
+import { useToast } from '../context/ToastContext.tsx';
 import type { Appointment, Doctor } from '../types/index.ts';
 
 interface DashboardResponse {
@@ -90,8 +91,19 @@ function TodayQueue({ date, todayAppointments }: { date: string; todayAppointmen
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { showToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('payment_error') === '1') {
+      showToast('Online payment verification failed or was cancelled. Please retry from your appointments.', 'error');
+      const next = new URLSearchParams(searchParams);
+      next.delete('payment_error');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams, showToast]);
 
   useEffect(() => {
     api
@@ -111,7 +123,7 @@ export default function DashboardPage() {
   }
 
   if (user.role === 'patient') {
-    const upcoming = data.upcoming || [];
+    const upcoming = (data.upcoming || []).slice(0, 4);
     return (
       <AppLayout>
         <div className="dashboard-page patient-dashboard">
@@ -131,54 +143,18 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <Updates items={data.notifications} />
-          {!!data.unpaid_appointments?.length && <section className="panel padded-panel">
+          {!!data.unpaid_appointments?.length && <section className="panel padded-panel" style={{ marginBottom: 20 }}>
             <h2>Unpaid appointments</h2><ul>{data.unpaid_appointments.map((appt) => <li key={appt.id}>
-              <Link to={`/appointments/${appt.id}`}>{appt.reference} - {appt.doctor.name}</Link> BDT {appt.fee.toFixed(2)}
+              <Link to={`/appointments/${appt.id}`}>{appt.reference} - {appt.doctor.name}</Link> Tk. {appt.fee.toFixed(2)}
             </li>)}</ul>
           </section>}
 
-          <div className="metric-grid three-metrics">
-            <div className="metric-card">
-              <div className="metric-top">
-                <span>Upcoming Consultations</span>
-                <span className="metric-icon green">
-                  <Icon id="ic-calendar" />
-                </span>
-              </div>
-              <strong>{data.counts.upcoming ?? 0}</strong>
-              <small>Scheduled appointments</small>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-top">
-                <span>Completed Visits</span>
-                <span className="metric-icon blue">
-                  <Icon id="ic-check" />
-                </span>
-              </div>
-              <strong>{data.counts.completed ?? 0}</strong>
-              <small>Consultation history</small>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-top">
-                <span>Active Support Tickets</span>
-                <span className="metric-icon amber">
-                  <Icon id="ic-help" />
-                </span>
-              </div>
-              <strong>{data.counts.complaints ?? 0}</strong>
-              <small>In review or inquiry</small>
-            </div>
-          </div>
-
-          <div className="content-columns">
+          <div className="content-columns" style={{ marginBottom: 22 }}>
             <div className="panel">
               <div className="panel-header">
                 <div>
                   <h2>Upcoming Appointments</h2>
-                  <p>Your next confirmed specialist visits and room locations</p>
+                  <p>Your next scheduled visits and room locations</p>
                 </div>
                 <Link className="text-link" to="/appointments">
                   View all appointments <Icon id="ic-arrow" />
@@ -198,12 +174,12 @@ export default function DashboardPage() {
                           <small>{month}</small>
                         </div>
                         <div className="appointment-main">
-                          <strong>Dr. {a.doctor.name}</strong>
+                          <strong>{a.doctor.full_doctor_title || `Dr. ${a.doctor.name}`}</strong>
                           <span>
                             {a.doctor.department?.name || 'General Consultation'} · {a.slot.start_time_12h}
                           </span>
                           <small>
-                            Ref: {a.reference} · Room: {a.doctor.active_room || 'OPD Room'}
+                            Ref: {a.reference} · Room: {a.doctor.active_room || 'Not assigned'}
                           </small>
                         </div>
                         <StatusPill status={a.status} label={a.status_display} />
@@ -249,7 +225,7 @@ export default function DashboardPage() {
                   <Icon id="ic-help" />
                 </span>
                 <div>
-                  <h3>Complaints &amp; Support</h3>
+                  <h3>Complaint &amp; Support</h3>
                   <p>
                     Need help with your visit, reports, or wish to file a concern? Our patient team
                     responds within 24 hours.
@@ -259,6 +235,41 @@ export default function DashboardPage() {
                   </Link>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="metric-grid three-metrics">
+            <div className="metric-card">
+              <div className="metric-top">
+                <span>Completed Visits</span>
+                <span className="metric-icon blue">
+                  <Icon id="ic-check" />
+                </span>
+              </div>
+              <strong>{data.counts.completed ?? 0}</strong>
+              <small>Consultation history</small>
+            </div>
+
+            <div className="metric-card">
+              <div className="metric-top">
+                <span>Upcoming Consultations</span>
+                <span className="metric-icon green">
+                  <Icon id="ic-calendar" />
+                </span>
+              </div>
+              <strong>{data.counts.upcoming ?? 0}</strong>
+              <small>Scheduled appointments</small>
+            </div>
+
+            <div className="metric-card">
+              <div className="metric-top">
+                <span>Active Support Tickets</span>
+                <span className="metric-icon amber">
+                  <Icon id="ic-help" />
+                </span>
+              </div>
+              <strong>{data.counts.complaints ?? 0}</strong>
+              <small>In review or inquiry</small>
             </div>
           </div>
         </div>

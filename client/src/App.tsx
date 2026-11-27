@@ -20,10 +20,8 @@ import HospitalInfoPage from './pages/HospitalInfoPage.tsx';
 import LoginChoicePage from './pages/LoginChoicePage.tsx';
 import LoginPage from './pages/LoginPage.tsx';
 import NotFoundPage from './pages/NotFoundPage.tsx';
-import PasswordChangePage from './pages/PasswordChangePage.tsx';
 import PaymentsPage from './pages/PaymentsPage.tsx';
 import CommissionPage from './pages/CommissionPage.tsx';
-import SystemSettingsPage from './pages/SystemSettingsPage.tsx';
 import ProfilePage from './pages/ProfilePage.tsx';
 import RefundsPage from './pages/RefundsPage.tsx';
 import RegisterPage from './pages/RegisterPage.tsx';
@@ -186,9 +184,6 @@ export default function App() {
         path="/finance/commission" element={<RequireRole roles={['admin']}><CommissionPage /></RequireRole>}
       />
       <Route
-        path="/system/settings" element={<RequireRole roles={['admin']}><SystemSettingsPage /></RequireRole>}
-      />
-      <Route
         path="/service/support" element={<RequireRole roles={['admin']}><ComplaintQueuePage support /></RequireRole>}
       />
       <Route
@@ -255,14 +250,7 @@ export default function App() {
           </RequireAuth>
         }
       />
-      <Route
-        path="/profile/password"
-        element={
-          <RequireAuth>
-            <PasswordChangePage />
-          </RequireAuth>
-        }
-      />
+      <Route path="/profile/password" element={<Navigate to="/profile" replace />} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

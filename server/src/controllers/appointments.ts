@@ -171,8 +171,9 @@ export async function listAppointments(req: Request, res: Response): Promise<voi
     if (Object.hasOwn(columns, field)) orderBy = [...columns[field], { id: 'asc' }];
   }
 
-  const page = Math.max(1, Number(req.query.page || 1) || 1);
-  const limit = Math.min(100, Math.max(1, Number(req.query.limit || 25) || 25));
+  const showAll = String(req.query.limit || '').toLowerCase() === 'all';
+  const page = showAll ? 1 : Math.max(1, Number(req.query.page || 1) || 1);
+  const limit = showAll ? 0 : Math.min(100, Math.max(1, Number(req.query.limit || 25) || 25));
   const where: Prisma.AppointmentWhereInput = { AND: filters };
 
   const [total, items, doctorOptions] = await Promise.all([
@@ -181,8 +182,7 @@ export async function listAppointments(req: Request, res: Response): Promise<voi
       where,
       include: appointmentInclude,
       orderBy,
-      skip: (page - 1) * limit,
-      take: limit,
+      ...(limit ? { skip: (page - 1) * limit, take: limit } : {}),
     }),
     user.role !== 'patient'
       ? prisma.doctorProfile.findMany({
@@ -197,8 +197,8 @@ export async function listAppointments(req: Request, res: Response): Promise<voi
     appointments: items.map(serializeAppointment),
     total,
     page,
-    limit,
-    total_pages: Math.max(1, Math.ceil(total / limit)),
+    limit: limit || total,
+    total_pages: limit ? Math.max(1, Math.ceil(total / limit)) : 1,
     active_sort: sort,
     doctor_options: doctorOptions.map(serializeDoctor),
   });
@@ -605,14 +605,31 @@ export async function patientLookup(req: Request, res: Response): Promise<void> 
     return;
   }
   const account = await prisma.user.findFirst({
-    where: { role: 'patient', phone, isActive: true, phoneVerifiedAt: { not: null } },
-    select: { id: true, firstName: true, lastName: true, username: true },
+    where: { role: 'patient', phone, isActive: true },
+    select: { id: true, firstName: true, lastName: true, username: true, dob: true, gender: true, phoneVerifiedAt: true },
   });
   if (!account) {
     res.json({ patient: null });
     return;
   }
-  res.json({ patient: { id: Number(account.id), name: userDisplayName(account) } });
+  let age: number | null = null;
+  if (account.dob) {
+    const today = localTodayDate();
+    const birthday = account.dob.toISOString().slice(5, 10);
+    const todayMd = today.toISOString().slice(5, 10);
+    const computed = today.getUTCFullYear() - account.dob.getUTCFullYear() - Number(todayMd < birthday);
+    if (computed >= 0) age = computed;
+  }
+  res.json({
+    patient: {
+      id: Number(account.id),
+      name: userDisplayName(account),
+      username: account.username,
+      age,
+      gender: account.gender || '',
+      phone_verified: Boolean(account.phoneVerifiedAt),
+    },
+  });
 }
 
 export async function startPayment(req: Request, res: Response): Promise<void> {
@@ -658,21 +675,22 @@ export async function paymentCallback(req: Request, res: Response): Promise<void
     res.status(405).send('Method not allowed');
     return;
   }
+  const tranId = String(req.body?.tran_id ?? req.query?.tran_id ?? '');
   if (result === 'fail' || result === 'cancel') {
-    try { await reconcileGatewayCheckout(String(req.body?.tran_id || '')); }
+    try { await reconcileGatewayCheckout(tranId); }
     catch { /* Keep the checkout active when the provider cannot verify its final state. */ }
     res.redirect('/appointments?payment=cancelled');
     return;
   }
 
   try {
-    const valId = String(req.body?.val_id || '');
+    const valId = String(req.body?.val_id ?? req.query?.val_id ?? '');
     const appt = await verifyGatewayCallback(valId);
     if (result === 'ipn') {
       res.status(200).send('OK');
       return;
     }
-    res.redirect(`/appointments/${appt.id}`);
+    res.redirect(`/appointments/${appt.id}?payment=success`);
   } catch {
     if (result === 'ipn') {
       res.status(503).send('Gateway verification unavailable.');

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { GreenDatePicker } from '../components/DateTimePickers.tsx';
 import { Icon } from '../components/Icons.tsx';
-import { PageSizeControl, SortableColumn } from '../components/ManagementTable.tsx';
+import { SortableColumn } from '../components/ManagementTable.tsx';
 import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen, formatDateTime } from '../components/UI.tsx';
 import { useToast } from '../context/ToastContext.tsx';
@@ -54,8 +54,6 @@ export default function AuditLogPage() {
   const fromDate = searchParams.get('from') || '';
   const toDate = searchParams.get('to') || '';
   const sort = searchParams.get('sort') || 'date.desc';
-  const page = Number(searchParams.get('page') || 1) || 1;
-  const size = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 30));
 
   const [searchInput, setSearchInput] = useState(q);
   const [data, setData] = useState<AuditResponse | null>(null);
@@ -73,8 +71,7 @@ export default function AuditLogPage() {
       if (fromDate) params.set('from', fromDate);
       if (toDate) params.set('to', toDate);
     }
-    params.set('page', String(page));
-    params.set('limit', String(size));
+    params.set('limit', 'all');
     params.set('sort', sort);
 
     api
@@ -82,7 +79,7 @@ export default function AuditLogPage() {
       .then((res) => setData(res.data))
       .catch((err) => showToast(getApiErrorMessage(err, 'Failed to load activity log.'), 'error'))
       .finally(() => setLoading(false));
-  }, [q, category, actor, date, fromDate, toDate, page, size, sort, showToast]);
+  }, [q, category, actor, date, fromDate, toDate, sort, showToast]);
 
   useEffect(() => {
     loadAudit();
@@ -95,7 +92,8 @@ export default function AuditLogPage() {
         if (v && v !== 'all') next.set(k, v);
         else next.delete(k);
       }
-      if (!('page' in updates)) next.set('page', '1');
+      next.delete('page');
+      next.delete('limit');
       setSearchParams(next, { replace: true });
     },
     [searchParams, setSearchParams]
@@ -338,43 +336,6 @@ export default function AuditLogPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-
-          {data && (
-            <div
-              className="no-print"
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px 16px',
-                borderTop: '1px solid #e2e8f0',
-                background: '#f8fafc',
-              }}
-            >
-              <PageSizeControl size={size} onChange={(next) => setParam({ limit: String(next) })} />
-              <span className="muted">
-                Page {data.page} of {data.total_pages} ({data.total} matching events)
-              </span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className="button button-small button-outline"
-                  disabled={data.page <= 1}
-                  onClick={() => setParam({ page: String(data.page - 1) })}
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  className="button button-small button-outline"
-                  disabled={data.page >= data.total_pages}
-                  onClick={() => setParam({ page: String(data.page + 1) })}
-                >
-                  Next
-                </button>
-              </div>
             </div>
           )}
         </div>

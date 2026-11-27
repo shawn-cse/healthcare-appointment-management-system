@@ -21,7 +21,12 @@ export default function SchedulePage() {
     try { setSchedule((await api.get<Schedule>('/catalog/schedules', { params: { doctor: doctorId } })).data); setError(''); }
     catch (err) { setError(getApiErrorMessage(err, 'Could not load consultation times.')); }
   }, [doctorId]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    const onFocus = () => { void load(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [load]);
 
   async function remove(period: WeeklyAvailability) {
     if (!await confirm({ title: 'Remove consultation period', message: 'Existing appointments will keep their scheduled times.', confirmText: 'Remove', type: 'warning' })) return;

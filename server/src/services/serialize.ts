@@ -90,7 +90,8 @@ const REFUND_STATUS_DISPLAY: Record<string, string> = {
 };
 
 const COMPLAINT_CATEGORY_DISPLAY: Record<string, string> = {
-  support: 'General Support & Help',
+  support: 'Support & General Inquiry',
+  formal_complaint: 'Formal Complaint',
   doctor: 'Doctor & Consultation',
   hospital: 'Hospital Facilities',
   staff: 'Staff & Reception',
@@ -539,9 +540,11 @@ export function serializeComplaint(
     messages?: Array<ComplaintMessage & { author: User }>;
   }
 ) {
-  const displayCode = c.ticketCode
-    ? c.ticketCode.replace(/TK-/g, '').replace(/-/g, '').toUpperCase()
-    : String(c.id).padStart(6, '0');
+  const cleaned = (c.ticketCode || '').replace(/TK-/gi, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  const displayCode =
+    cleaned.length === 6 && /[A-Z]/.test(cleaned) && /[0-9]/.test(cleaned)
+      ? cleaned
+      : (`GH${cleaned}${String(c.id)}`.replace(/[^A-Z0-9]/g, '') + '000000').slice(0, 6);
   const isSupport = c.category === 'support';
   const statusStep = c.status === 'resolved' ? 3 : c.status === 'reviewing' ? 2 : 1;
   let stepLabel = COMPLAINT_STATUS_DISPLAY[c.status] || c.status;

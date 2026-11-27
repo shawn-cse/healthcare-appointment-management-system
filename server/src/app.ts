@@ -53,9 +53,9 @@ app.get(
   })
 );
 
-// Direct SSLCOMMERZ callback compatibility
-app.post('/payments/callback/:result', asyncHandler(appointments.paymentCallback));
-app.post('/payments/callback/:result/', asyncHandler(appointments.paymentCallback));
+// Direct SSLCOMMERZ callback compatibility (GET & POST redirects/IPN)
+app.all('/payments/callback/:result', asyncHandler(appointments.paymentCallback));
+app.all('/payments/callback/:result/', asyncHandler(appointments.paymentCallback));
 
 app.use('/api', routes);
 

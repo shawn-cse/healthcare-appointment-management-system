@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { GreenDatePicker } from '../components/DateTimePickers.tsx';
 import { Icon } from '../components/Icons.tsx';
 import { PageSizeControl, SortableColumn } from '../components/ManagementTable.tsx';
 import { AppLayout } from '../components/Layout.tsx';
-import { LoadingScreen, StatusPill, formatDisplayDate } from '../components/UI.tsx';
+import { LoadingScreen, StatusPill, formatDateTime, formatDisplayDate } from '../components/UI.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
 import { useConfirm } from '../context/ConfirmContext.tsx';
 import { useToast } from '../context/ToastContext.tsx';
@@ -73,8 +74,12 @@ export default function AppointmentsPage() {
     if (dateTo) params.set('date_to', dateTo);
     if (doctor) params.set('doctor', doctor);
     if (sort) params.set('sort', sort);
-    params.set('page', String(page));
-    params.set('limit', String(size));
+    if (isPatient) {
+      params.set('limit', 'all');
+    } else {
+      params.set('page', String(page));
+      params.set('limit', String(size));
+    }
 
     api
       .get<ApptsResponse>(`/appointments?${params.toString()}`)
@@ -84,7 +89,7 @@ export default function AppointmentsPage() {
       })
       .catch((err) => showToast(getApiErrorMessage(err, 'Failed to load appointments.'), 'error'))
       .finally(() => setLoading(false));
-  }, [status, payment, paymentMethod, visitType, q, datePreset, dateFrom, dateTo, doctor, sort, page, size, showToast]);
+  }, [status, payment, paymentMethod, visitType, q, datePreset, dateFrom, dateTo, doctor, sort, page, size, isPatient, showToast]);
 
   useEffect(() => {
     fetchList();
@@ -236,15 +241,6 @@ export default function AppointmentsPage() {
           </p>
         </div>
         <div className="heading-actions no-print">
-          {!isPatient && (
-            <button
-              type="button"
-              className="button button-outline"
-              onClick={() => window.print()}
-            >
-              Print List
-            </button>
-          )}
           <Link
             className="button button-primary"
             to={isPatient ? '/doctors' : user?.role === 'doctor' ? '/schedules' : '/reception/book'}
@@ -289,12 +285,31 @@ export default function AppointmentsPage() {
               )}
             </div>
 
-            <div className="sheet-indicator" style={{ marginLeft: 'auto' }}>
-              <span className="live-dot-pulse" />
-              <span>
-                Showing <strong>{appts.length}</strong> of <strong>{data?.total ?? 0}</strong>{' '}
-                bookings
-              </span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                marginLeft: 'auto',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div className="sheet-indicator">
+                <span className="live-dot-pulse" />
+                <span>
+                  Showing <strong>{appts.length}</strong> of <strong>{data?.total ?? 0}</strong>{' '}
+                  bookings
+                </span>
+              </div>
+              {!isPatient && (
+                <button
+                  type="button"
+                  className="button button-small button-outline"
+                  onClick={() => window.print()}
+                >
+                  Print List
+                </button>
+              )}
             </div>
           </div>
 
@@ -489,6 +504,7 @@ export default function AppointmentsPage() {
                   <SortableColumn name="visit" sort={sort} onChange={(sort) => setParam({ sort })}>Visit Type</SortableColumn>
                   <SortableColumn name="payment" sort={sort} onChange={(sort) => setParam({ sort })}>Payment</SortableColumn>
                   <SortableColumn name="status" sort={sort} onChange={(sort) => setParam({ sort })}>Appointment Status</SortableColumn>
+                  {user?.role === 'admin' && <th>Details</th>}
                   <th className="no-print">{isPatient ? 'Report Issue' : 'Actions'}</th>
                 </tr>
               </thead>
@@ -518,6 +534,11 @@ export default function AppointmentsPage() {
                       <div className="muted" style={{ fontSize: '0.78rem' }}>
                         Serial #{ap.serial_number} · {ap.source_display}
                       </div>
+                      {user?.role === 'admin' && ap.created_by_name && (
+                        <div className="muted" style={{ fontSize: '0.76rem' }}>
+                          By {ap.created_by_name}
+                        </div>
+                      )}
                     </td>
                     {!isPatient && (
                       <td>
@@ -526,6 +547,16 @@ export default function AppointmentsPage() {
                           {ap.guest_phone}
                           {ap.patient_username ? ` · @${ap.patient_username}` : ' · Walk-in/Guest'}
                         </div>
+                        {user?.role === 'admin' && (ap.guest_age !== null || ap.guest_gender) && (
+                          <div className="muted" style={{ fontSize: '0.78rem' }}>
+                            {[
+                              ap.guest_age !== null ? `Age ${ap.guest_age}` : '',
+                              ap.guest_gender ? ap.guest_gender : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </div>
+                        )}
                       </td>
                     )}
                     {user?.role !== 'doctor' && <td>
@@ -546,21 +577,57 @@ export default function AppointmentsPage() {
                       <strong>BDT {ap.fee.toFixed(2)}</strong>
                       <div className="muted">{ap.payment_method_display}</div>
                       <StatusPill status={ap.payment_status} label={ap.payment_status_display} />
+                      {user?.role === 'admin' && (
+                        <div className="muted" style={{ fontSize: '0.76rem', marginTop: 4 }}>
+                          Dr: {ap.doctor_cut.toFixed(0)} · Hosp: {ap.hospital_cut.toFixed(0)}
+                          {ap.refund_request ? ` · Refund BDT ${ap.refund_request.amount.toFixed(0)} (${ap.refund_request.status_display})` : ''}
+                        </div>
+                      )}
                     </td>
-                    <td><StatusPill status={ap.status} label={ap.status_display} /></td>
+                    <td>
+                      <StatusPill status={ap.status} label={ap.status_display} />
+                      {user?.role === 'admin' && ap.cancellation_reason && (
+                        <div className="muted" style={{ fontSize: '0.78rem', marginTop: 4 }}>
+                          Reason: {ap.cancellation_reason}
+                        </div>
+                      )}
+                    </td>
+                    {user?.role === 'admin' && (
+                      <td style={{ maxWidth: 230, fontSize: '0.82rem' }}>
+                        {ap.notes && <div><strong>Note:</strong> {ap.notes}</div>}
+                        {ap.refund_request?.reason && (
+                          <div className="muted">Refund: {ap.refund_request.reason}</div>
+                        )}
+                        <div className="muted" style={{ fontSize: '0.76rem' }}>
+                          Booked {formatDateTime(ap.created_at)}
+                        </div>
+                      </td>
+                    )}
                     <td className="no-print">
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {!isPatient && (
+                        {user?.role === 'admin' ? (
                           <button
                             type="button"
                             className="button button-small button-outline"
                             onClick={() => openQuickModal(ap)}
                           >
-                            Quick Edit
+                            Edit
                           </button>
+                        ) : (
+                          <>
+                            {!isPatient && (
+                              <button
+                                type="button"
+                                className="button button-small button-outline"
+                                onClick={() => openQuickModal(ap)}
+                              >
+                                Quick Edit
+                              </button>
+                            )}
+                            {isPatient && <Link className="button button-small button-outline" to={`/complaints/new?appointment=${ap.id}&issue=1`}>Report Issue</Link>}
+                            {!isPatient && <Link className="button button-small button-outline" to={`/appointments/${ap.id}`}>Details</Link>}
+                          </>
                         )}
-                        {isPatient && <Link className="button button-small button-outline" to={`/complaints/new?appointment=${ap.id}&issue=1`}>Report Issue</Link>}
-                        {!isPatient && <Link className="button button-small button-outline" to={`/appointments/${ap.id}`}>Details</Link>}
                       </div>
                     </td>
                   </tr>
@@ -571,7 +638,7 @@ export default function AppointmentsPage() {
         )}
 
         {/* Pagination */}
-        {data && (
+        {data && !isPatient && (
           <div
             className="no-print"
             style={{
@@ -609,26 +676,16 @@ export default function AppointmentsPage() {
       </div>
 
       {/* Staff Quick Update Modal */}
-      {quickTarget && (
+      {quickTarget && createPortal(
         <div
-          className="modal-backdrop"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: 16,
-          }}
+          className="sm-modal-backdrop"
           onClick={(e) => {
             if (e.target === e.currentTarget) setQuickTarget(null);
           }}
         >
           <div className="panel" style={{ width: '100%', maxWidth: 520, padding: 24 }}>
             <div style={{ marginBottom: 14 }}>
-              <h2 style={{ margin: 0 }}>Quick Update — {quickTarget.reference}</h2>
+              <h2 style={{ margin: 0 }}>{user?.role === 'admin' ? 'Edit Appointment' : 'Quick Update'} — {quickTarget.reference}</h2>
               <p className="muted" style={{ margin: '4px 0 0' }}>
                 {quickTarget.patient_name} · {quickTarget.doctor.name}
               </p>
@@ -737,7 +794,8 @@ export default function AppointmentsPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Patient Cancel Modal */}

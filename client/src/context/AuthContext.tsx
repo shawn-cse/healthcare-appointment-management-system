@@ -56,8 +56,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const onUnauth = () => {
       setUser(null);
     };
+    const onFocus = () => {
+      if (localStorage.getItem('gh_token')) {
+        void refreshMe();
+      }
+    };
     window.addEventListener('gh:unauthorized', onUnauth);
-    return () => window.removeEventListener('gh:unauthorized', onUnauth);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('gh:unauthorized', onUnauth);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [refreshMe]);
 
   const login = async (

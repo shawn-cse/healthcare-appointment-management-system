@@ -16,12 +16,16 @@ export default function ComplaintsPage() {
   const [category, setCategory] = useState('');
   useEffect(() => { api.get<{ complaints: Complaint[] }>('/complaints').then(({ data }) => setTickets(data.complaints)).catch((err) => setError(getApiErrorMessage(err, 'Could not load complaints.'))); }, []);
   return <AppLayout>
-    <div className="page-heading"><h1>{user?.role === 'patient' ? 'My Complaints' : 'Support'}</h1>
-      {user?.role !== 'admin' && <Link to="/complaints/new" className="button button-primary">{user?.role === 'patient' ? 'New complaint' : 'New request'}</Link>}
+    <div className="page-heading"><h1>{user?.role === 'patient' ? 'Complaint & Support' : 'Support'}</h1>
+      {user?.role !== 'admin' && <Link to="/complaints/new" className="button button-primary">{user?.role === 'patient' ? 'Complaint & Support' : 'New request'}</Link>}
     </div>
     {error ? <p role="alert">{error}</p> : !tickets ? <LoadingScreen /> : <ManagementTable
-      rows={tickets.filter((item) => (!status || item.status === status) && (!category || item.category === category))} rowKey={(item) => item.id} dateColumn={4}
-      filters={<><select className="field-control" aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}><option value="">All statuses</option>
+      rows={user?.role === 'patient' ? tickets : tickets.filter((item) => (!status || item.status === status) && (!category || item.category === category))}
+      rowKey={(item) => item.id}
+      dateColumn={4}
+      showSortSelect={user?.role !== 'patient'}
+      paginate={user?.role !== 'patient'}
+      filters={user?.role === 'patient' ? undefined : <><select className="field-control" aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}><option value="">All statuses</option>
         {[...new Map(tickets.map((item) => [item.status, item.status_display]))].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select><select className="field-control" aria-label="Category" value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All categories</option>
         {[...new Map(tickets.map((item) => [item.category, item.category_display]))].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -51,7 +55,7 @@ export function ComplaintDetailPage() {
     } catch (err) { setError(getApiErrorMessage(err, 'Could not send the reply.')); }
     finally { setSaving(false); }
   }
-  return <AppLayout><div className="page-heading"><h1>{ticket?.subject || 'Complaint details'}</h1><Link to="/complaints" className="button button-outline">Back to complaints</Link></div>
+  return <AppLayout><div className="page-heading"><h1>{ticket?.subject || 'Complaint details'}</h1><Link to="/complaints" className="button button-outline">{user?.role === 'patient' ? 'Back to Complaint & Support' : 'Back to complaints'}</Link></div>
     {error && <p role="alert">{error}</p>}
     {!ticket ? !error && <LoadingScreen /> : <section className="panel padded-panel">
       <p>{ticket.display_code} · {ticket.category_display} · {formatDateTime(ticket.created_at)} <StatusPill status={ticket.status} label={ticket.status_display} /></p>

@@ -518,10 +518,12 @@ export function GreenTimePicker({
     document.addEventListener('click', onDocClick);
     document.addEventListener('keydown', onKey);
     window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
     return () => {
       document.removeEventListener('click', onDocClick);
       document.removeEventListener('keydown', onKey);
       window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
     };
   }, [open]);
 

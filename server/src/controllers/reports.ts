@@ -619,8 +619,10 @@ function buildAuditFilter(req: Request): Prisma.AuditEventWhereInput {
 
 export async function auditLog(req: Request, res: Response): Promise<void> {
   const where = buildAuditFilter(req);
-  const page = Math.max(1, Number(req.query.page || 1) || 1);
-  const limit = Math.min(100, Math.max(1, Math.trunc(Number(req.query.limit) || 30)));
+  const rawLimit = String(req.query.limit || 'all').trim().toLowerCase();
+  const showAll = rawLimit === 'all' || rawLimit === '';
+  const page = showAll ? 1 : Math.max(1, Number(req.query.page || 1) || 1);
+  const limit = showAll ? undefined : Math.min(100, Math.max(1, Math.trunc(Number(rawLimit) || 30)));
   const [field, rawDirection] = String(req.query.sort || 'date.desc').split('.');
   const direction = rawDirection === 'asc' ? 'asc' as const : 'desc' as const;
   const order: Record<string, Prisma.AuditEventOrderByWithRelationInput> = {
@@ -635,8 +637,7 @@ export async function auditLog(req: Request, res: Response): Promise<void> {
       where,
       include: { actor: true },
       orderBy: [Object.hasOwn(order, field) ? order[field] : order.date, { id: 'desc' }],
-      skip: (page - 1) * limit,
-      take: limit,
+      ...(limit ? { skip: (page - 1) * limit, take: limit } : {}),
     }),
     prisma.auditEvent.count(),
     prisma.auditEvent.count({ where: { action: { startsWith: 'appointment', mode: 'insensitive' } } }),
@@ -655,7 +656,7 @@ export async function auditLog(req: Request, res: Response): Promise<void> {
     events: items.map(serializeAuditEvent),
     total: totalFiltered,
     page,
-    total_pages: Math.max(1, Math.ceil(totalFiltered / limit)),
+    total_pages: limit ? Math.max(1, Math.ceil(totalFiltered / limit)) : 1,
     stats: {
       total: totalAll,
       today: todayCount,

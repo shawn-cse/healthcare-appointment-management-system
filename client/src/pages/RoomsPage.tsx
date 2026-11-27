@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
 import { ManagementTable } from '../components/ManagementTable.tsx';
@@ -6,17 +7,14 @@ import { AppLayout } from '../components/Layout.tsx';
 import { LoadingScreen } from '../components/UI.tsx';
 import { useConfirm } from '../context/ConfirmContext.tsx';
 import { useToast } from '../context/ToastContext.tsx';
-import type { Chamber, Department } from '../types/index.ts';
+import type { Chamber } from '../types/index.ts';
 
 export default function RoomsPage() {
   const { showToast } = useToast();
   const { confirm } = useConfirm();
 
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [department, setDepartment] = useState('');
   const [chambers, setChambers] = useState<Chamber[]>([]);
   const [loading, setLoading] = useState(true);
-  const [occupancyFilter, setOccupancyFilter] = useState<'all' | 'occupied' | 'empty'>('all');
 
   // Add / Edit Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -37,12 +35,10 @@ export default function RoomsPage() {
 
   useEffect(() => {
     loadRooms();
-    api.get<{ departments: Department[] }>('/catalog/departments').then(({ data }) => setDepartments(data.departments)).catch((err) => showToast(getApiErrorMessage(err, 'Could not load departments.'), 'error'));
-  }, [loadRooms, showToast]);
+  }, [loadRooms]);
 
   const openNew = () => {
     setEditing(null);
-    setDepartment('');
     setRoomNumber('');
     setDescription('');
     setModalOpen(true);
@@ -50,7 +46,6 @@ export default function RoomsPage() {
 
   const openEdit = (c: Chamber) => {
     setEditing(c);
-    setDepartment(c.department_id ? String(c.department_id) : '');
     setRoomNumber(c.room_number);
     setDescription(c.description || '');
     setModalOpen(true);
@@ -63,7 +58,6 @@ export default function RoomsPage() {
       const payload = {
         room_number: roomNumber.trim(),
         description: description.trim(),
-        department_id: department || null,
       };
       const res = editing
         ? await api.put<{ message: string }>(`/catalog/chambers/${editing.id}`, payload)
@@ -80,17 +74,25 @@ export default function RoomsPage() {
 
   const handleDeleteInModal = async () => {
     if (!editing) return;
-    const action = editing.is_active ? 'Deactivate' : 'Activate';
-    const ok = await confirm({ title: `${action} room`, message: `${action} ${editing.room_number}?`, confirmText: action, type: 'warning' });
+    const assignedCount = editing.doctors?.length || 0;
+    const warningNote = assignedCount
+      ? ` ${assignedCount} assigned doctor${assignedCount === 1 ? '' : 's'} will have their room set to not assigned.`
+      : '';
+    const ok = await confirm({
+      title: 'Delete room',
+      message: `Are you sure you want to permanently delete ${editing.room_number}?${warningNote} This action cannot be undone.`,
+      confirmText: 'Delete room',
+      type: 'danger',
+    });
     if (!ok) return;
     setDeleting(true);
     try {
-      const res = await api.put<{ message: string }>(`/catalog/chambers/${editing.id}`, { is_active: !editing.is_active });
+      const res = await api.delete<{ message: string }>(`/catalog/chambers/${editing.id}`);
       showToast(res.data.message, 'success');
       setModalOpen(false);
       loadRooms();
     } catch (err) {
-      showToast(getApiErrorMessage(err, 'Could not change room status.'), 'error');
+      showToast(getApiErrorMessage(err, 'Could not delete room.'), 'error');
     } finally {
       setDeleting(false);
     }
@@ -112,25 +114,17 @@ export default function RoomsPage() {
           </div>
         </div>
 
-        {loading ? <LoadingScreen /> : <ManagementTable rows={chambers.filter((room) => {
-          const occupied = !!room.doctors?.length || !!room.staff_users?.length;
-          return occupancyFilter === 'all' || occupied === (occupancyFilter === 'occupied');
-        })} rowKey={(room) => room.id}
-          filters={<select className="field-control" aria-label="Room occupancy" value={occupancyFilter} onChange={(e) => setOccupancyFilter(e.target.value as typeof occupancyFilter)}>
-            <option value="all">All rooms</option><option value="occupied">Assigned rooms</option><option value="empty">Unassigned rooms</option>
-          </select>} columns={[
+        {loading ? <LoadingScreen /> : <ManagementTable rows={chambers} rowKey={(room) => room.id} showSortSelect={false} paginate={false} columns={[
             { heading: 'Room number', value: (room) => `${room.room_number} ${room.description}`, cell: (room) => <button className="text-link" type="button" onClick={() => openEdit(room)}>{room.room_number}</button> },
-            { heading: 'Department', value: (room) => room.department?.name || 'Unassigned' },
             { heading: 'Assigned doctors', value: (room) => room.doctors?.map((doctor) => doctor.name).join(', ') || 'Unassigned',
               cell: (room) => room.doctors?.length ? <details><summary>{room.doctors.map((doctor) => doctor.name).join(', ')}</summary>
                 {room.doctors.map((doctor) => <p key={doctor.id}><strong>{doctor.name}</strong> {(doctor.schedules ?? []).map((period) => `${period.weekday_short} ${period.start_time_12h}`).join(', ')}</p>)}
               </details> : 'Unassigned' },
-            { heading: 'Status', value: (room) => room.is_active ? 'Active' : 'Inactive' },
             { heading: 'Actions', value: () => '', cell: (room) => <button className="button button-small button-outline" type="button" onClick={() => openEdit(room)}>Edit room</button> },
           ]} />}
       </div>
 
-      {modalOpen && (
+      {modalOpen && createPortal(
         <div
           className="sm-modal-backdrop"
           onClick={(e) => {
@@ -164,11 +158,6 @@ export default function RoomsPage() {
                   />
                 </div>
 
-                <label className="form-group">Department
-                  <select className="field-control" value={department} onChange={(e) => setDepartment(e.target.value)}>
-                    <option value="">Unassigned</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label htmlFor="rm-desc">Description (Optional)</label>
                   <textarea
@@ -197,7 +186,7 @@ export default function RoomsPage() {
                   disabled={deleting || saving}
                   onClick={handleDeleteInModal}
                 >
-                  {deleting ? 'Saving...' : editing.is_active ? 'Deactivate room' : 'Activate room'}
+                  {deleting ? 'Deleting...' : 'Delete room'}
                 </button>
               )}
               <div style={{ display: 'flex', gap: 10 }}>
@@ -218,7 +207,8 @@ export default function RoomsPage() {
               </div>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
     </AppLayout>
   );

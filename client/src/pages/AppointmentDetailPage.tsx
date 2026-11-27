@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
 import { AppLayout } from '../components/Layout.tsx';
@@ -19,9 +19,19 @@ interface DetailResponse {
 
 export default function AppointmentDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+
+  useEffect(() => {
+    if (searchParams.get('payment') === 'success') {
+      showToast('Online payment verified and appointment confirmed.', 'success');
+      const next = new URLSearchParams(searchParams);
+      next.delete('payment');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams, showToast]);
 
   const [data, setData] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +91,7 @@ export default function AppointmentDetailPage() {
   const handleCollectCash = async () => {
     const ok = await confirm({
       title: 'Record Cash Payment',
-      message: `Confirm cash collection of BDT ${ap.fee.toFixed(0)} for ${ap.reference}?`,
+      message: `Confirm cash collection of Tk. ${ap.fee.toFixed(0)} for ${ap.reference}?`,
       confirmText: 'Record Cash & Confirm',
       type: 'info',
     });
@@ -204,10 +214,10 @@ export default function AppointmentDetailPage() {
           <div className="metric-top">
             <span>Consultation Fee</span>
           </div>
-          <strong>BDT {ap.fee.toFixed(0)}</strong>
+          <strong>Tk. {ap.fee.toFixed(0)}</strong>
           <small>
             {isStaff
-              ? `Hospital: BDT ${ap.hospital_cut.toFixed(0)} · Doctor: BDT ${ap.doctor_cut.toFixed(0)}`
+              ? `Hospital: Tk. ${ap.hospital_cut.toFixed(0)} · Doctor: Tk. ${ap.doctor_cut.toFixed(0)}`
               : ap.payment_method_display}
           </small>
         </div>
@@ -229,62 +239,106 @@ export default function AppointmentDetailPage() {
 
       <div className="content-columns">
         {/* Left column: Consultation & Patient details */}
-        <div className="panel" style={{ padding: 24 }}>
-          <h2 style={{ marginTop: 0 }}>Consultation &amp; Patient Record</h2>
-          <div className="summary-list">
-            <div className="summary-row">
-              <span>Specialist Doctor</span>
-              <strong>
-                <Link to={`/doctors/${ap.doctor.profile_slug}`}>{ap.doctor.name}</Link>
-              </strong>
-            </div>
-            <div className="summary-row">
-              <span>Department</span>
-              <strong>{ap.doctor.department?.name || 'General Consultation'}</strong>
-            </div>
-            <div className="summary-row">
-              <span>Room No</span>
-              <strong>{ap.doctor.active_room || 'Unassigned'}</strong>
-            </div>
-            <div className="summary-row">
-              <span>Patient Name</span>
-              <strong>{ap.patient_name}</strong>
-            </div>
-            <div className="summary-row">
-              <span>Contact Phone</span>
-              <strong>{ap.guest_phone}</strong>
-            </div>
-            {ap.guest_dob && (
-              <div className="summary-row">
-                <span>Date of Birth</span>
-                <strong>{ap.guest_dob}</strong>
-              </div>
-            )}
-            <div className="summary-row">
-              <span>Portal Link</span>
-              <strong>
-                {ap.patient_username ? `@${ap.patient_username}` : 'Unlinked Guest / Walk-in'}
-              </strong>
-            </div>
-            {ap.notes && (
-              <div className="summary-row">
-                <span>Notes</span>
-                <span>{ap.notes}</span>
-              </div>
-            )}
-            {ap.cancellation_reason && (
-              <div className="summary-row">
-                <span>Cancellation Reason</span>
-                <strong style={{ color: 'var(--red)' }}>{ap.cancellation_reason}</strong>
-              </div>
-            )}
+        <div className="panel appt-record-card">
+          <div className="appt-record-header">
+            <h2>Consultation &amp; Patient Record</h2>
+            <span className="appt-serial-chip">Serial #{ap.serial_number}</span>
           </div>
 
+          <div className="appt-record-sections">
+            <div className="appt-record-section">
+              <div className="appt-record-section-title">Consultation Details</div>
+              <div className="summary-list">
+                <div className="summary-row">
+                  <span>Specialist Doctor</span>
+                  <strong>
+                    <Link to={`/doctors/${ap.doctor.profile_slug}`} className="appt-doc-link">
+                      {ap.doctor.name}
+                    </Link>
+                  </strong>
+                </div>
+                <div className="summary-row">
+                  <span>Department</span>
+                  <strong>{ap.doctor.department?.name || 'General Consultation'}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Room No</span>
+                  <strong>{ap.doctor.active_room || 'Unassigned'}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="appt-record-section">
+              <div className="appt-record-section-title">Patient Information</div>
+              <div className="summary-list">
+                <div className="summary-row">
+                  <span>Patient Name</span>
+                  <strong>{ap.patient_name}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Contact Phone</span>
+                  <strong>
+                    <a href={`tel:${ap.guest_phone}`} className="appt-phone-link">
+                      {ap.guest_phone}
+                    </a>
+                  </strong>
+                </div>
+                {ap.guest_dob && (
+                  <div className="summary-row">
+                    <span>Date of Birth</span>
+                    <strong>{formatLongDate(ap.guest_dob)}</strong>
+                  </div>
+                )}
+                <div className="summary-row">
+                  <span>Portal Link</span>
+                  <strong>
+                    {ap.patient_username ? (
+                      <span className="appt-portal-handle">@{ap.patient_username}</span>
+                    ) : (
+                      <span className="muted">Unlinked Guest / Walk-in</span>
+                    )}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {(ap.notes || ap.cancellation_reason) && (
+            <div className="appt-record-extra">
+              {ap.notes && (
+                <div className="appt-note-box">
+                  <span className="appt-note-label">Notes</span>
+                  <p>{ap.notes}</p>
+                </div>
+              )}
+              {ap.cancellation_reason && (
+                <div className="appt-cancel-reason-box">
+                  <span className="appt-note-label">Cancellation Reason</span>
+                  <p>{ap.cancellation_reason}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {ap.refund_request && (
-            <div className="notice notice-info" style={{ marginTop: 18 }}>
-              <strong>Refund Request ({ap.refund_request.status_display}):</strong> BDT{' '}
-              {ap.refund_request.amount.toFixed(0)} via {ap.refund_request.mode_display}.{' '}
-              {ap.refund_request.reason}
+            <div className="appt-refund-card">
+              <div className="appt-refund-card-head">
+                <div className="appt-refund-card-title">
+                  <Icon id="ic-wallet" />
+                  <strong>Refund Request</strong>
+                </div>
+                <StatusPill
+                  status={ap.refund_request.status}
+                  label={ap.refund_request.status_display}
+                />
+              </div>
+              <div className="appt-refund-card-meta">
+                <strong>Tk. {ap.refund_request.amount.toFixed(0)}</strong>
+                <span>via {ap.refund_request.mode_display}</span>
+              </div>
+              {ap.refund_request.reason && (
+                <p className="appt-refund-card-reason">{ap.refund_request.reason}</p>
+              )}
             </div>
           )}
 
@@ -338,7 +392,7 @@ export default function AppointmentDetailPage() {
                   disabled={busy}
                   onClick={handlePayOnline}
                 >
-                  <Icon id="ic-wallet" /> Pay Online Now (BDT {ap.fee.toFixed(0)})
+                  <Icon id="ic-wallet" /> Pay Online Now (Tk. {ap.fee.toFixed(0)})
                 </button>
               )}
 
@@ -349,7 +403,7 @@ export default function AppointmentDetailPage() {
                 disabled={busy}
                 onClick={handleCollectCash}
               >
-                <Icon id="ic-wallet" /> Collect Cash Now (BDT {ap.fee.toFixed(0)})
+                <Icon id="ic-wallet" /> Collect Cash Now (Tk. {ap.fee.toFixed(0)})
               </button>
             )}
 
@@ -419,21 +473,17 @@ export default function AppointmentDetailPage() {
                 try { await api.post(`/staff/${ap.patient_id}/toggle-active`); loadDetail(); }
                 catch (err) { showToast(getApiErrorMessage(err, 'Account status could not be updated.'), 'error'); }
               }}>{data.patient_access.is_active ? 'Deactivate account' : 'Activate account'}</button>
-              <button type="button" className="button button-outline" onClick={async () => {
-                try { await api.put(`/staff/${ap.patient_id}/login-permission`, { login_allowed: !data.patient_access?.login_allowed }); loadDetail(); }
-                catch (err) { showToast(getApiErrorMessage(err, 'Login permission could not be updated.'), 'error'); }
-              }}>{data.patient_access.login_allowed ? 'Block login' : 'Allow login'}</button>
             </>}
           </div>
         </div>
       </div>
 
-      {!!data.operational_requests?.length && <section className="panel padded-panel">
+      {!!data.operational_requests?.length && <section className="panel padded-panel" style={{ marginTop: 20 }}>
         <h2>Appointment requests</h2><ul>{data.operational_requests.map((request) => <li key={request.id}>
           <Link to={`/complaints/${request.id}`}>{request.subject}</Link> <StatusPill status={request.status} />
         </li>)}</ul>
       </section>}
-      {!!data.patient_history?.length && <section className="panel padded-panel">
+      {!!data.patient_history?.length && <section className="panel padded-panel" style={{ marginTop: 20 }}>
         <h2>Patient appointment history</h2><ul>{data.patient_history.map((visit) => <li key={visit.id}>
           <Link to={`/appointments/${visit.id}`}>{visit.reference}</Link> {formatLongDate(visit.date)} <StatusPill status={visit.status} />
         </li>)}</ul>

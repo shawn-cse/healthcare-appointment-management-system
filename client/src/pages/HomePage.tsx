@@ -141,69 +141,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      <section className="home-section home-info-summary" id="about-contact">
-        <div className="container">
-          <div className="hospital-section-head">
-            <div>
-              <span className="hospital-section-eyebrow">HOSPITAL INFORMATION</span>
-              <h2>About Us, Hospital Policy &amp; Contact</h2>
-            </div>
-            <Link to="/hospital-info" className="button button-outline button-sm">
-              View All Hospital Info <Icon id="ic-arrow" />
-            </Link>
-          </div>
-
-          <div className="home-info-cards">
-            <article className="panel home-info-card">
-              <span className="home-info-card-icon">
-                <Icon id="ic-building" />
-              </span>
-              <h3>About Us</h3>
-              <p>
-                Green Hospital Medical Center &amp; Diagnostic provides verified multi-specialty
-                consultations, dedicated chamber receptionists, and instant appointment confirmation in{' '}
-                {address}.
-              </p>
-              <Link to="/hospital-info#about-us" className="text-link">
-                Read About Green Hospital ›
-              </Link>
-            </article>
-
-            <article className="panel home-info-card">
-              <span className="home-info-card-icon">
-                <Icon id="ic-clipboard" />
-              </span>
-              <h3>Hospital Policy</h3>
-              <p>
-                Transparent first-visit, follow-up, and report-review fees, online and reception
-                payment deadlines, and clear cancellation &amp; refund guidelines.
-              </p>
-              <Link to="/hospital-info#hospital-policy" className="text-link">
-                Review Hospital Policies ›
-              </Link>
-            </article>
-
-            <article className="panel home-info-card">
-              <span className="home-info-card-icon">
-                <Icon id="ic-phone" />
-              </span>
-              <h3>Contact Us</h3>
-              <p>
-                Outpatient clinics run <strong>8:00 AM – 10:00 PM</strong> daily and Emergency care
-                is open <strong>24/7</strong>. Call{' '}
-                <a href={`tel:${phone}`}>
-                  <strong>{phone}</strong>
-                </a>
-                .
-              </p>
-              <Link to="/hospital-info#contact-us" className="text-link">
-                Get Contact &amp; Support Details ›
-              </Link>
-            </article>
-          </div>
-        </div>
-      </section>
     </PublicLayout>
   );
 }

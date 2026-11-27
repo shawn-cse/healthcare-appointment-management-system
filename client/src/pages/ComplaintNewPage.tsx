@@ -14,7 +14,6 @@ export default function ComplaintNewPage() {
 
   const issueMode = searchParams.get('issue') === '1';
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [ticketType, setTicketType] = useState<'support' | 'complaint'>('support');
   const [category, setCategory] = useState(issueMode ? 'other_issue' : 'support');
   const [appointmentId, setAppointmentId] = useState(searchParams.get('appointment') || '');
   const [subject, setSubject] = useState('');
@@ -36,11 +35,6 @@ export default function ComplaintNewPage() {
       .then((res) => setAppointments(res.data.patient_appointments || []))
       .catch(() => {});
   }, [isPatient]);
-
-  const handleTypeChange = (type: 'support' | 'complaint') => {
-    setTicketType(type);
-    setCategory(type === 'support' ? 'support' : 'hospital');
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,80 +67,31 @@ export default function ComplaintNewPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">HOSPITAL SUPPORT &amp; ESCALATIONS</p>
-          <h1>{issueMode ? 'Report Issue' : isPatient ? 'Submit Complaint' : 'New Support Request'}</h1>
+          <h1>{issueMode ? 'Report Issue' : isPatient ? 'Complaint & Support' : 'New Support Request'}</h1>
           <p>
-            Select general support or file a formal clinical/billing complaint for review by
-            administration.
+            {isPatient
+              ? 'Support inquiries linked to an appointment go to your doctor; formal complaints and unlinked inquiries go to hospital administration.'
+              : 'Select general support or file an administrative request.'}
           </p>
         </div>
         <div className="heading-actions">
           <Link className="button button-outline" to="/complaints">
-            ← Back to Tickets
+            ← Back to {isPatient ? 'Complaint & Support' : 'Tickets'}
           </Link>
         </div>
       </div>
 
-      <div className="panel" style={{ maxWidth: 740, padding: 24 }}>
-        {!issueMode && isPatient && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-          <button
-            type="button"
-            className={`button ${ticketType === 'support' ? 'button-primary' : 'button-outline'}`}
-            onClick={() => handleTypeChange('support')}
-          >
-            Support &amp; General Inquiry
-          </button>
-          <button
-            type="button"
-            className={`button ${ticketType === 'complaint' ? 'button-primary' : 'button-outline'}`}
-            onClick={() => handleTypeChange('complaint')}
-          >
-            Formal Complaint
-          </button>
-        </div>}
-
-        <form onSubmit={handleSubmit} className="form-grid">
-          {(issueMode || !isPatient || ticketType === 'complaint') && (
-            <div className="form-group">
-              <label htmlFor="cn-cat">Complaint Category</label>
-              <select
-                id="cn-cat"
-                className="field-control"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                {issueMode ? <>
-                  <option value="cancel_appointment">Cancel Appointment</option>
-                  <option value="reschedule">Adjust Date &amp; Time</option>
-                  <option value="adjust_visit">Adjust Consultation Fee or Visit Type</option>
-                  <option value="payment_issue">Payment Issue</option>
-                  <option value="refund_request">Refund Request</option>
-                  <option value="other_issue">Other Issue</option>
-                </> : !isPatient ? <>
-                  <option value="support">General Support</option>
-                  <option value="assistance">Assistance Request</option>
-                  <option value="internal_complaint">Internal Complaint</option>
-                  <option value="admin_request">Administrative Request</option>
-                  <option value="technical">Technical Issue</option>
-                  <option value="important_message">Important Message</option>
-                </> : <>
-                <option value="doctor">Doctor consultation / attitude</option>
-                <option value="hospital">Hospital cleanliness / facility</option>
-                <option value="staff">Reception or support staff</option>
-                <option value="billing">Billing or refund issue</option>
-                <option value="other">Other matter</option>
-                </>}
-              </select>
-            </div>
-          )}
-
+      <div className="panel" style={{ padding: 24 }}>
+        <form onSubmit={handleSubmit} className="form-grid" style={{ gap: '16px 20px' }}>
           {!isPatient && <label className="form-group">Recipient
             <select className="field-control" value={recipient} onChange={(e) => setRecipient(e.target.value)}>
               <option value="">Hospital administration</option>{recipients.map((person) => <option key={person.id} value={person.id}>{person.name} ({person.role})</option>)}
             </select>
           </label>}
+
           {isPatient && (
             <div className="form-group">
-              <label htmlFor="cn-appt">Related Appointment (Optional)</label>
+              <label htmlFor="cn-appt">Related Appointment</label>
               <select
                 id="cn-appt"
                 required={issueMode}
@@ -155,7 +100,7 @@ export default function ComplaintNewPage() {
                 value={appointmentId}
                 onChange={(e) => setAppointmentId(e.target.value)}
               >
-                <option value="">General Inquiry / Not Linked to a Booking</option>
+                <option value="">Not linked to an appointment</option>
                 {appointments.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.reference} — {a.doctor.name} ({a.slot.date})
@@ -166,7 +111,45 @@ export default function ComplaintNewPage() {
           )}
 
           <div className="form-group">
-            <label htmlFor="cn-subj">Subject (Max 150 chars)</label>
+            <label htmlFor="cn-cat">Category</label>
+            <select
+              id="cn-cat"
+              className="field-control"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {issueMode ? <>
+                <option value="cancel_appointment">Cancel Appointment</option>
+                <option value="reschedule">Adjust Date &amp; Time</option>
+                <option value="adjust_visit">Adjust Consultation Fee or Visit Type</option>
+                <option value="payment_issue">Payment Issue</option>
+                <option value="refund_request">Refund Request</option>
+                <option value="other_issue">Other Issue</option>
+              </> : !isPatient ? <>
+                <option value="support">General Support</option>
+                <option value="assistance">Assistance Request</option>
+                <option value="internal_complaint">Internal Complaint</option>
+                <option value="admin_request">Administrative Request</option>
+                <option value="technical">Technical Issue</option>
+                <option value="important_message">Important Message</option>
+              </> : <>
+                <option value="support">Support &amp; General Inquiry</option>
+                <option value="formal_complaint">Formal Complaint</option>
+              </>}
+            </select>
+            {isPatient && !issueMode && (
+              <p className="muted" style={{ marginTop: 4, marginBottom: 0, fontSize: '0.84rem' }}>
+                {category === 'formal_complaint'
+                  ? 'Formal Complaint goes directly to the Hospital Administration section.'
+                  : appointmentId
+                    ? "Support & General Inquiry linked to an appointment goes to the appointment's doctor."
+                    : 'Support & General Inquiry linked to an appointment goes to the doctor; without a linked appointment, it goes to Hospital Administration.'}
+              </p>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="cn-subj">Subject *</label>
             <input
               id="cn-subj"
               type="text"
@@ -180,20 +163,7 @@ export default function ComplaintNewPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="cn-msg">Detailed Description</label>
-            <textarea
-              id="cn-msg"
-              rows={5}
-              className="field-control"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Describe what happened, relevant dates, or how administration can help..."
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="cn-file">Supporting Document / Screenshot (Optional)</label>
+            <label htmlFor="cn-file">Supporting Document / Screenshot</label>
             <input
               id="cn-file"
               type="file"
@@ -203,12 +173,25 @@ export default function ComplaintNewPage() {
             />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <div className="form-group full">
+            <label htmlFor="cn-msg">Description *</label>
+            <textarea
+              id="cn-msg"
+              rows={3}
+              className="field-control"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Describe what happened, relevant dates, or how we can help..."
+              required
+            />
+          </div>
+
+          <div className="form-group full" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
             <Link className="button button-outline" to="/complaints">
               Cancel
             </Link>
             <button type="submit" className="button button-primary" disabled={submitting}>
-              {submitting ? 'Submitting...' : 'Submit Ticket'}
+              {submitting ? 'Submitting...' : 'Submit'}
             </button>
           </div>
         </form>

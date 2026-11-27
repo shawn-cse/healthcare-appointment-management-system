@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import api from '../api/api.ts';
 import { useAuth } from '../context/AuthContext.tsx';
 import { useToast } from '../context/ToastContext.tsx';
+import type { Department } from '../types/index.ts';
 import { Icon } from './Icons.tsx';
 
 interface NavItem {
@@ -90,7 +92,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const complaints = { to: '/service/complaints', label: 'Complaint Management', icon: 'ic-alert' };
   const directory = { to: '/staff', label: 'Staff and Doctor List', icon: 'ic-users' };
   const support = { to: '/complaints', label: 'Support', icon: 'ic-help' };
-  const personalComplaints = { ...support, label: 'My Complaints' };
+  const personalComplaints = { ...support, label: 'Complaint & Support' };
   const groups: { label?: string; items: NavItem[] }[] = [];
   if (!user.is_active) {
     groups.push({ items: [user.role === 'patient' ? personalComplaints : support] });
@@ -113,7 +115,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       { to: '/rooms', label: 'Room Management', icon: 'ic-building' },
       { to: '/departments', label: 'Department Management', icon: 'ic-building' },
       payments, refunds, { ...complaints, label: 'Complaints & Support' },
-      { to: '/system/settings', label: 'System Settings', icon: 'ic-settings' },
       { to: '/reports', label: 'Reports & Analytics', icon: 'ic-chart' },
       { to: '/activity-log', label: 'Activity Log', icon: 'ic-clipboard' },
     ] });
@@ -302,10 +303,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="dropdown-divider" />
                 {user.is_active && <div className="dropdown-links-list">
                   <Link to="/profile" className="dropdown-link-item" role="menuitem">
-                    <Icon id="ic-user" />
-                    <span>My Profile</span>
-                  </Link>
-                  <Link to="/profile/password" className="dropdown-link-item" role="menuitem">
                     <Icon id="ic-settings" />
                     <span>Profile Settings</span>
                   </Link>
@@ -350,12 +347,24 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const location = useLocation();
   const [navExpanded, setNavExpanded] = useState(false);
-  const [infoMenuOpen, setInfoMenuOpen] = useState(false);
-  const infoMenuRef = useRef<HTMLDivElement | null>(null);
+  const [footerDepartments, setFooterDepartments] = useState<Department[]>([]);
+
+  useEffect(() => {
+    if (user) return;
+    let active = true;
+    api
+      .get<{ departments: Department[] }>('/catalog/departments')
+      .then((res) => {
+        if (active) setFooterDepartments((res.data.departments || []).slice(0, 6));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   useEffect(() => {
     setNavExpanded(false);
-    setInfoMenuOpen(false);
   }, [location.pathname, location.search, location.hash]);
 
   useEffect(() => {
@@ -365,23 +374,13 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   }, [location.pathname]);
 
   useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      if (infoMenuRef.current && !infoMenuRef.current.contains(e.target as Node)) {
-        setInfoMenuOpen(false);
-      }
-    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setInfoMenuOpen(false);
         setNavExpanded(false);
       }
     };
-    document.addEventListener('click', onDocClick);
     document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('click', onDocClick);
-      document.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, []);
 
   useEffect(() => {
@@ -451,93 +450,9 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             <Link to="/#care" onClick={() => setNavExpanded(false)}>
               Departments
             </Link>
-
-            <div
-              className={`public-nav-dropdown ${infoMenuOpen ? 'is-open' : ''}`}
-              ref={infoMenuRef}
-            >
-              <button
-                type="button"
-                className={`public-nav-trigger ${location.pathname === '/hospital-info' ? 'is-nav-active' : ''}`}
-                aria-expanded={infoMenuOpen}
-                aria-haspopup="true"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setInfoMenuOpen((prev) => !prev);
-                }}
-              >
-                <span>Hospital Info</span>
-                <svg className="icon public-nav-chevron" viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="m6 9 6 6 6-6"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-
-              <div className="public-nav-menu" role="menu">
-                <Link
-                  to="/hospital-info#about-us"
-                  className="public-nav-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setInfoMenuOpen(false);
-                    setNavExpanded(false);
-                  }}
-                >
-                  <Icon id="ic-building" />
-                  <div>
-                    <strong>About Us</strong>
-                    <small>Clinical overview, departments &amp; care</small>
-                  </div>
-                </Link>
-                <Link
-                  to="/hospital-info#hospital-policy"
-                  className="public-nav-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setInfoMenuOpen(false);
-                    setNavExpanded(false);
-                  }}
-                >
-                  <Icon id="ic-clipboard" />
-                  <div>
-                    <strong>Hospital Policy</strong>
-                    <small>Booking rules, fees, payments &amp; refunds</small>
-                  </div>
-                </Link>
-                <Link
-                  to="/hospital-info#contact-us"
-                  className="public-nav-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setInfoMenuOpen(false);
-                    setNavExpanded(false);
-                  }}
-                >
-                  <Icon id="ic-phone" />
-                  <div>
-                    <strong>Contact Us</strong>
-                    <small>24/7 hotline, location &amp; support</small>
-                  </div>
-                </Link>
-                <div className="public-nav-menu-footer">
-                  <Link
-                    to="/hospital-info"
-                    onClick={() => {
-                      setInfoMenuOpen(false);
-                      setNavExpanded(false);
-                    }}
-                  >
-                    View All Hospital Information <Icon id="ic-arrow" />
-                  </Link>
-                </div>
-              </div>
-            </div>
+            <NavLink to="/hospital-info" className={({ isActive }) => (isActive ? 'is-nav-active' : '')} onClick={() => setNavExpanded(false)}>
+              Hospital Info
+            </NavLink>
           </nav>
 
           <div className="public-header-actions">
@@ -600,13 +515,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                   <Link to="/#care">Medical Departments</Link>
                 </li>
                 <li>
-                  <Link to="/hospital-info#about-us">About Us</Link>
-                </li>
-                <li>
-                  <Link to="/hospital-info#hospital-policy">Hospital Policy</Link>
-                </li>
-                <li>
-                  <Link to="/hospital-info#contact-us">Contact Us</Link>
+                  <Link to="/hospital-info">Hospital Info &amp; Policies</Link>
                 </li>
                 <li>
                   <Link to="/login/patient">Patient Portal Sign In</Link>
@@ -623,24 +532,17 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             <div className="footer-col">
               <h4 className="footer-heading">Key Specialties</h4>
               <ul className="footer-link-list">
-                <li>
-                  <Link to="/doctors">Gynaecological Oncology</Link>
-                </li>
-                <li>
-                  <Link to="/doctors">Cardiology &amp; Vascular Care</Link>
-                </li>
-                <li>
-                  <Link to="/doctors">Neurology &amp; Brain Sciences</Link>
-                </li>
-                <li>
-                  <Link to="/doctors">Orthopedics &amp; Joint Care</Link>
-                </li>
-                <li>
-                  <Link to="/doctors">Pediatrics &amp; Neonatology</Link>
-                </li>
-                <li>
-                  <Link to="/doctors">General &amp; Internal Medicine</Link>
-                </li>
+                {footerDepartments.length ? (
+                  footerDepartments.map((dep) => (
+                    <li key={dep.id}>
+                      <Link to={`/doctors?department=${dep.id}`}>{dep.name}</Link>
+                    </li>
+                  ))
+                ) : (
+                  <li>
+                    <Link to="/doctors">Browse Specialist Doctors</Link>
+                  </li>
+                )}
               </ul>
             </div>
 

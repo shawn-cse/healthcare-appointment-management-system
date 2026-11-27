@@ -11,6 +11,7 @@ import { parseIsoDate } from '../utils/dateTime.js';
 import { hashPassword, validatePasswordStrength, verifyPassword } from '../utils/password.js';
 import { toRelativeMediaPath } from '../utils/upload.js';
 import { normalizePhone, PHONE_REGEX } from '../utils/phone.js';
+import { validateUsernameFormat } from '../utils/username.js';
 
 const profileInclude = { chamber: true, department: true, receptionists: { include: { user: true } } } as const;
 
@@ -81,6 +82,13 @@ export async function register(req: Request, res: Response): Promise<void> {
 
   let finalUsername = parsed.username;
   if (finalUsername) {
+    const fmtErr = validateUsernameFormat(finalUsername);
+    if (fmtErr) {
+      throw new HttpError(400, fmtErr);
+    }
+    if (finalUsername.length < 5) {
+      throw new HttpError(400, 'Username must be at least 5 characters.');
+    }
     const conflict = await prisma.user.findFirst({
       where: {
         OR: [
@@ -100,7 +108,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       .replace(/[^a-z0-9]+/g, '')
       .slice(0, 12) || 'patient';
     for (;;) {
-      const candidate = `${slug}_${crypto.randomBytes(3).toString('hex')}`;
+      const candidate = `${slug}.${crypto.randomBytes(3).toString('hex')}`;
       const conflict = await prisma.user.findFirst({
         where: {
           OR: [
@@ -119,25 +127,57 @@ export async function register(req: Request, res: Response): Promise<void> {
   }
 
   const passwordHash = await hashPassword(pw1);
-  const user = await prisma.user.create({
-    data: {
-      username: finalUsername,
-      email: cleanEmail,
-      password: passwordHash,
-      role: 'patient',
-      firstName: parsed.full_name,
-      gender: parsed.gender,
-      phone: parsed.phone,
-      dob: dobDate,
-      nid: parsed.nid,
-      address: parsed.address,
-      isActive: true,
-      isStaff: false,
-      isSuperuser: false,
-    },
-  });
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({
+      data: {
+        username: finalUsername,
+        email: cleanEmail,
+        password: passwordHash,
+        role: 'patient',
+        firstName: parsed.full_name,
+        gender: parsed.gender,
+        phone: parsed.phone,
+        dob: dobDate,
+        nid: parsed.nid,
+        address: parsed.address,
+        isActive: true,
+        isStaff: false,
+        isSuperuser: false,
+      },
+    });
 
-  await logAudit(user, 'patient.registered', Number(user.id));
+    const equivalentPhones = [
+      parsed.phone,
+      `+${parsed.phone}`,
+      ...(/^01\d{9}$/.test(parsed.phone) ? [`88${parsed.phone}`, `+88${parsed.phone}`] : []),
+    ];
+    const priorGuestBookings = await tx.appointment.findMany({
+      where: {
+        patientId: null,
+        guestPhone: { in: equivalentPhones },
+        source: { in: ['desk', 'phone'] },
+      },
+      select: { id: true, guestPhone: true },
+    });
+    const matchingIds = priorGuestBookings
+      .filter((item) => normalizePhone(item.guestPhone) === parsed.phone)
+      .map((item) => item.id);
+    if (matchingIds.length > 0) {
+      await tx.appointment.updateMany({
+        where: { id: { in: matchingIds }, patientId: null },
+        data: { patientId: created.id },
+      });
+    }
+
+    await logAudit(
+      created,
+      'patient.registered',
+      Number(created.id),
+      matchingIds.length ? `${matchingIds.length} prior desk/phone booking(s) linked` : '',
+      tx
+    );
+    return created;
+  });
   res.status(201).json({
     token: signToken(user),
     user: serializeUser(user),
@@ -241,6 +281,25 @@ export async function checkUsername(req: Request, res: Response): Promise<void> 
       valid: false,
       status: 'empty',
       message: 'Username must be unique.',
+    });
+    return;
+  }
+
+  const fmtErr = validateUsernameFormat(username);
+  if (fmtErr) {
+    res.json({
+      valid: false,
+      status: 'invalid',
+      message: fmtErr,
+    });
+    return;
+  }
+
+  if (username.length < 5) {
+    res.json({
+      valid: false,
+      status: 'invalid',
+      message: 'Username must be at least 5 characters.',
     });
     return;
   }
@@ -362,6 +421,8 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
 
   if (!firstName || firstName.length > 150 || lastName.length > 150) throw new HttpError(400, 'Enter a name up to 150 characters.');
   if (!username) throw new HttpError(400, 'Username cannot be empty.');
+  const usernameErr = validateUsernameFormat(username);
+  if (usernameErr) throw new HttpError(400, usernameErr);
   if (user.role === 'patient') {
     if (!phoneRaw || !PHONE_REGEX.test(phoneRaw)) {
       throw new HttpError(400, 'Enter a valid phone number (10–15 digits).');

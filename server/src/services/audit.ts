@@ -143,7 +143,7 @@ export function formatAuditEventMeta(action: string, target: string, detail: str
       : 'Patient cancellation';
     cleanDetail = reasonPart ? `${by} (${reasonPart})` : by;
   } else if (cleanDetail.includes(' BDT')) {
-    cleanDetail = cleanDetail.replace(/ BDT/g, ' ৳');
+    cleanDetail = cleanDetail.replace(/(\d+(?:\.\d+)?)\s*BDT/g, 'Tk. $1').replace(/ BDT/g, ' Tk.');
   }
 
   return {

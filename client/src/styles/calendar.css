@@ -98,7 +98,7 @@ input[type="time"] {
 
 .green-cal-popover {
   position: absolute;
-  z-index: 1000;
+  z-index: 20000;
   width: 320px;
   background: #ffffff;
   border: 1.5px solid #cbe4d5;
@@ -451,7 +451,7 @@ input[type="time"] {
 
 .green-time-popover {
   position: absolute;
-  z-index: 1000;
+  z-index: 20000;
   width: 330px;
   background: #ffffff;
   border: 1.5px solid #cbe4d5;

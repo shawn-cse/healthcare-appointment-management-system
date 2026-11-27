@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
 import { AppLayout, PublicLayout } from '../components/Layout.tsx';
 import { LoadingScreen } from '../components/UI.tsx';
 import { useAuth } from '../context/AuthContext.tsx';
-import DoctorCard from '../components/DoctorCard.tsx';
 import type { Department, Doctor } from '../types/index.ts';
 
 export default function DoctorsPage() {
@@ -26,7 +25,7 @@ export default function DoctorsPage() {
   const [genderFemale, setGenderFemale] = useState(() => searchParams.get('gender') === 'female');
   const lastSyncedSearchRef = useRef(searchParams.toString());
 
-  useEffect(() => {
+  const loadDirectory = useCallback((initial = false) => {
     api
       .get<{ doctors: Doctor[]; departments: Department[]; total_doctors_count: number }>(
         '/catalog/doctors'
@@ -36,8 +35,17 @@ export default function DoctorsPage() {
         setDepartments(res.data.departments || []);
         setTotalCount(res.data.total_doctors_count || 0);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (initial) setLoading(false);
+      });
   }, []);
+
+  useEffect(() => {
+    loadDirectory(true);
+    const onFocus = () => loadDirectory(false);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [loadDirectory]);
 
   useEffect(() => {
     const incoming = searchParams.toString();
@@ -299,7 +307,150 @@ export default function DoctorsPage() {
             ) : (
               <div className="directory-cards-grid">
                 {filteredDoctors.length ? (
-                  filteredDoctors.map((doctor) => <DoctorCard key={doctor.id} doctor={doctor} />)
+                  filteredDoctors.map((d) => (
+                    <article key={d.id} className="doctor-card panel">
+                      <div className="doctor-card-top">
+                        <div className="doctor-avatar-wrapper">
+                          {d.avatar ? (
+                            <img
+                              src={d.avatar}
+                              alt={d.full_doctor_title}
+                              className="doctor-avatar-img"
+                            />
+                          ) : (
+                            <div className="doctor-avatar-circle">
+                              <svg className="doctor-vector-avatar" viewBox="0 0 64 64">
+                                <use href={`#${d.default_avatar}`} />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="doctor-primary-meta">
+                          <div className="doctor-badge-row">
+                            <span className="dept-tag">{d.department?.name || 'General Consultation'}</span>
+                            <span className="bmdc-tag">{d.bmdc_display}</span>
+                          </div>
+                          <h2 className="doctor-name-heading">
+                            <Link to={`/doctors/${d.profile_slug}`}>{d.full_doctor_title}</Link>
+                          </h2>
+                          <p className="doctor-designation-text">{d.designation}</p>
+                        </div>
+                      </div>
+
+                      <div className="doctor-card-middle">
+                        <div className="doctor-qual-block">
+                          <div className="qual-label">
+                            <Icon id="ic-stethoscope" />
+                            <span>Degrees &amp; Qualifications</span>
+                          </div>
+                          <div className="qual-list">
+                            {d.qualifications_list.length ? (
+                              d.qualifications_list.map((line, i) => (
+                                <div key={i} className="qual-line">
+                                  <span className="qual-dot" />
+                                  <span className="qual-text">{line}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="qual-line">
+                                <span className="qual-dot" />
+                                <span className="qual-text">MBBS, Specialist Consultant</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="doctor-chamber-section">
+                          {d.active_room && (
+                            <div className="chamber-info-item">
+                              <span className="chamber-icon-box chamber-icon-building">
+                                <Icon id="ic-building" />
+                              </span>
+                              <span className="chamber-info-text">
+                                <span className="chamber-lbl">Room No:</span>
+                                <b className="chamber-val">{d.active_room}</b>
+                              </span>
+                            </div>
+                          )}
+                          <div className="chamber-info-item">
+                            <span className="chamber-icon-box chamber-icon-user">
+                              <Icon id="ic-user" />
+                            </span>
+                            <span className="chamber-info-text">
+                              <span className="chamber-lbl">Receptionist:</span>
+                              <b className="chamber-val">{d.assigned_receptionist_name}</b>
+                            </span>
+                          </div>
+                          <div className="chamber-info-item helpline-item">
+                            <span className="chamber-icon-box chamber-icon-phone">
+                              <Icon id="ic-phone" />
+                            </span>
+                            <span className="chamber-info-text">
+                              <span className="chamber-lbl">Helpline:</span>
+                              <a
+                                href={`tel:${d.active_contact || '+88096100016211'}`}
+                                className="helpline-link"
+                              >
+                                <b>{d.active_contact || '+88096100016211'}</b>
+                              </a>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="doctor-fees-grid">
+                          <div className="fee-tile">
+                            <span className="fee-tile-label">1st Visit / New</span>
+                            <b className="fee-tile-amount">Tk. {Math.round(d.initial_fee)}</b>
+                          </div>
+                          <div className="fee-tile">
+                            <span className="fee-tile-label">
+                              Follow-up (<small>{d.followup_within_days}d</small>)
+                            </span>
+                            <b className="fee-tile-amount">Tk. {Math.round(d.followup_fee)}</b>
+                          </div>
+                          <div className="fee-tile">
+                            <span className="fee-tile-label">Report Review</span>
+                            <b className="fee-tile-amount">Tk. {Math.round(d.report_fee)}</b>
+                          </div>
+                        </div>
+
+                        <div className="doctor-schedule-preview">
+                          <div className="schedule-label">
+                            <Icon id="ic-clock" />
+                            <span>APPOINTMENT SCHEDULE:</span>
+                          </div>
+                          <div className="schedule-pills-wrap">
+                            {d.weekly.length ? (
+                              d.weekly.map((sched) => (
+                                <div key={sched.id} className="sched-pill">
+                                  <span className="sched-day-badge">
+                                    {sched.weekday_short.toUpperCase()}
+                                  </span>
+                                  <span className="sched-time-text">
+                                    {sched.start_time_12h}–{sched.end_time_12h}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="sched-pill sched-pill-open">
+                                Consultation by Appointment
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="doctor-card-bottom">
+                        <Link
+                          to={`/doctors/${d.profile_slug}`}
+                          className="button button-primary button-full appt-action-btn"
+                        >
+                          <span>Make Appointment</span>
+                          <Icon id="ic-arrow" className="icon btn-arrow-icon" />
+                        </Link>
+                      </div>
+                    </article>
+                  ))
                 ) : (
                   <div className="panel empty-state full-grid">
                     <span className="empty-icon">

@@ -70,6 +70,20 @@ export default function RegisterPage() {
       setUsernameStatus({ state: 'default', message: '' });
       return;
     }
+    if (!/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/.test(val)) {
+      setUsernameStatus({
+        state: 'conflict',
+        message: 'Username may only contain letters, numbers, and dots (.) — no underscores (_).',
+      });
+      return;
+    }
+    if (val.length < 5) {
+      setUsernameStatus({
+        state: 'conflict',
+        message: 'Username must be at least 5 characters.',
+      });
+      return;
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => {
       api
@@ -78,10 +92,13 @@ export default function RegisterPage() {
           signal: controller.signal,
         })
         .then((res) => {
-          if (res.data.status === 'conflict') {
+          if (res.data.status === 'conflict' || res.data.status === 'invalid') {
             setUsernameStatus({
               state: 'conflict',
-              message: 'This username is already taken.',
+              message:
+                res.data.status === 'conflict'
+                  ? 'This username is already taken.'
+                  : res.data.message || 'Invalid username.',
             });
           } else if (res.data.status === 'available') {
             setUsernameStatus({ state: 'ok', message: 'Username is available' });
@@ -147,13 +164,6 @@ export default function RegisterPage() {
               Create a patient account to book specialist appointments, view consultation schedules,
               and track your visits in one place.
             </p>
-            <div className="register-note">
-              <Icon id="ic-check" />
-              <span>
-                Leave <b>Username</b> blank if you prefer an automatically assigned account ID, or
-                enter your own preferred username.
-              </span>
-            </div>
           </div>
 
           <div className="panel padded-panel register-panel">
@@ -253,6 +263,7 @@ export default function RegisterPage() {
                   <label htmlFor="id_username">Username</label>
                   <input
                     id="id_username"
+                    minLength={5}
                     maxLength={150}
                     className={`field-control ${
                       usernameStatus.state === 'conflict'
@@ -261,7 +272,7 @@ export default function RegisterPage() {
                           ? 'input-valid-green'
                           : ''
                     }`}
-                    placeholder="Choose username or leave blank"
+                    placeholder="Letters, numbers, or dot (.)"
                     autoComplete="off"
                     value={form.username}
                     onChange={(e) => setForm({ ...form, username: e.target.value })}

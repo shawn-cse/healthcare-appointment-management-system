@@ -32,8 +32,22 @@ export default function BookPage() {
     setSaving(true);
     try {
       const response = await api.post<{ appointment: { id: number }; message: string }>('/appointments', { slot_id: data.slot.id, visit_type: visit, payment_method: payment });
+      const apptId = response.data.appointment.id;
+      if (payment === 'online' && data.gateway_enabled) {
+        try {
+          const gw = await api.post<{ gateway_url: string }>(`/appointments/${apptId}/pay-online`);
+          if (gw.data.gateway_url) {
+            window.location.href = gw.data.gateway_url;
+            return;
+          }
+        } catch (gwErr) {
+          showToast(getApiErrorMessage(gwErr, 'Appointment reserved, but online checkout could not start yet. You can retry payment below.'), 'warning');
+          navigate(`/appointments/${apptId}`);
+          return;
+        }
+      }
       showToast(response.data.message, 'success');
-      navigate(`/appointments/${response.data.appointment.id}`);
+      navigate(`/appointments/${apptId}`);
     } catch (err) { setError(getApiErrorMessage(err, 'Could not book this appointment.')); }
     finally { setSaving(false); }
   }
@@ -52,7 +66,7 @@ export default function BookPage() {
         </option>)}
       </select></label>
       <BookingRules doctor={data.doctor} visit={visit} />
-      <button className="button button-primary" disabled={saving || !payment}>{saving ? 'Booking…' : 'Confirm appointment'}</button>
+      <button className="button button-primary" disabled={saving || !payment}>{saving ? 'Processing…' : payment === 'online' && data.gateway_enabled ? 'Confirm & Pay Online' : 'Confirm appointment'}</button>
     </form>}
   </AppLayout>;
 }

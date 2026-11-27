@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import api, { getApiErrorMessage } from '../api/api.ts';
 import { Icon } from '../components/Icons.tsx';
 import { ManagementTable } from '../components/ManagementTable.tsx';
@@ -86,7 +87,7 @@ export default function DepartmentsPage() {
           </div>
         </div>
 
-        {loading ? <LoadingScreen /> : <ManagementTable rows={departments} rowKey={(d) => d.id} columns={[
+        {loading ? <LoadingScreen /> : <ManagementTable rows={departments} rowKey={(d) => d.id} showSortSelect={false} paginate={false} columns={[
             { heading: 'Department name', value: (d) => `${d.name} ${d.description}`, cell: (d) => d.name },
             { heading: 'Total doctors', value: (d) => d.doctor_count || 0 },
             { heading: 'Actions', value: () => '', cell: (d) => <div className="consultation-times">
@@ -95,7 +96,7 @@ export default function DepartmentsPage() {
           ]} />}
       </div>
 
-      {modalOpen && (
+      {modalOpen && createPortal(
         <div
           className="sm-modal-backdrop"
           onClick={(e) => {
@@ -160,7 +161,8 @@ export default function DepartmentsPage() {
               </button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
     </AppLayout>
   );

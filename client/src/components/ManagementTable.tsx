@@ -24,8 +24,8 @@ export function PageSizeControl({ size, onChange }: { size: number; onChange: (s
   </select>;
 }
 
-export function ManagementTable<T>({ rows, columns, rowKey, filters, dateColumn = 0 }: {
-  rows: T[]; columns: Column<T>[]; rowKey: (row: T) => string | number; filters?: ReactNode; dateColumn?: number;
+export function ManagementTable<T>({ rows, columns, rowKey, filters, dateColumn = 0, showSortSelect = true, paginate = true }: {
+  rows: T[]; columns: Column<T>[]; rowKey: (row: T) => string | number; filters?: ReactNode; dateColumn?: number; showSortSelect?: boolean; paginate?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [column, setColumn] = useState(dateColumn);
@@ -41,29 +41,34 @@ export function ManagementTable<T>({ rows, columns, rowKey, filters, dateColumn 
     const order = typeof l === 'number' && typeof r === 'number' ? l - r : String(l).localeCompare(String(r), undefined, { numeric: true });
     return descending ? -order : order;
   });
-  const pages = Math.max(1, Math.ceil(results.length / size));
+  const pages = paginate ? Math.max(1, Math.ceil(results.length / size)) : 1;
   const current = Math.min(page, pages);
+  const visibleRows = paginate ? results.slice((current - 1) * size, current * size) : results;
   return <section className="panel management-table">
     <div className="management-table-tools">
       <input className="field-control" type="search" aria-label="Search table" placeholder="Search" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} />
       {filters}
-      <select className="field-control" aria-label="Sort direction" value={String(descending)} onChange={(e) => { setDescending(e.target.value === 'true'); setPage(1); }}>
-        <option value="true">{column === dateColumn ? 'Newest first' : 'Descending'}</option><option value="false">{column === dateColumn ? 'Oldest first' : 'Ascending'}</option>
-      </select>
-      <PageSizeControl size={size} onChange={(next) => { setSize(next); setPage(1); }} />
+      {showSortSelect && (
+        <select className="field-control" aria-label="Sort direction" value={String(descending)} onChange={(e) => { setDescending(e.target.value === 'true'); setPage(1); }}>
+          <option value="true">{column === dateColumn ? 'Newest first' : 'Descending'}</option><option value="false">{column === dateColumn ? 'Oldest first' : 'Ascending'}</option>
+        </select>
+      )}
+      {paginate && <PageSizeControl size={size} onChange={(next) => { setSize(next); setPage(1); }} />}
     </div>
     <div className="excel-table-wrap"><table className="excel-grid-table"><thead><tr>
       {columns.map((item, i) => <th key={item.heading} scope="col" aria-sort={i === column ? descending ? 'descending' : 'ascending' : undefined}>
         <button type="button" onClick={() => { setDescending(i === column && !descending); setColumn(i); setPage(1); }}>{item.heading} {i === column && (descending ? '↓' : '↑')}</button>
       </th>)}
     </tr></thead><tbody>
-      {results.length ? results.slice((current - 1) * size, current * size).map((row) => <tr key={rowKey(row)}>
+      {visibleRows.length ? visibleRows.map((row) => <tr key={rowKey(row)}>
         {columns.map((item) => <td key={item.heading}>{item.cell ? item.cell(row) : item.value(row)}</td>)}
       </tr>) : <tr><td colSpan={columns.length}>No matching records.</td></tr>}
     </tbody></table></div>
-    <div className="management-table-tools"><span>{results.length} records · Page {current} of {pages}</span>
-      <button type="button" className="button button-small button-outline" disabled={current <= 1} onClick={() => setPage(current - 1)}>Previous</button>
-      <button type="button" className="button button-small button-outline" disabled={current >= pages} onClick={() => setPage(current + 1)}>Next</button>
-    </div>
+    {paginate && (
+      <div className="management-table-tools"><span>{results.length} records · Page {current} of {pages}</span>
+        <button type="button" className="button button-small button-outline" disabled={current <= 1} onClick={() => setPage(current - 1)}>Previous</button>
+        <button type="button" className="button button-small button-outline" disabled={current >= pages} onClick={() => setPage(current + 1)}>Next</button>
+      </div>
+    )}
   </section>;
 }

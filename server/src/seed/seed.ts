@@ -4,7 +4,7 @@ import { materializeWeekly } from '../services/appointments.js';
 import { parseIsoDate, parseTimeStr } from '../utils/dateTime.js';
 import { hashPassword } from '../utils/password.js';
 
-const DEPARTMENTS: Array<[string, string]> = [
+export const DEPARTMENTS: Array<[string, string]> = [
   ['Cardiology', 'Heart and cardiovascular care'],
   ['Neurology', 'Brain, spinal cord and nervous system care'],
   ['Orthopedics', 'Bone, joint and musculoskeletal care'],
@@ -15,9 +15,14 @@ const DEPARTMENTS: Array<[string, string]> = [
   ['ENT', 'Ear, nose and throat care'],
   ['Endocrinology', 'Hormonal and metabolic health'],
   ['General Medicine', 'Internal medicine and primary consultation'],
+  ['Ophthalmology', 'Eye, vision, cataract and retinal care'],
+  ['Urology', 'Kidney, bladder, prostate and urinary tract care'],
+  ['Nephrology', 'Kidney disease, dialysis and hypertension care'],
+  ['Pulmonology', 'Lung, respiratory, asthma and chest care'],
+  ['Psychiatry', 'Mental health, behavioral therapy and neuropsychiatry'],
 ];
 
-const MEN: Array<[string, string]> = [
+export const MEN: Array<[string, string]> = [
   ['Karim', 'Hassan'], ['Mahmud', 'Rahman'], ['Tanvir', 'Ahmed'],
   ['Rafiq', 'Islam'], ['Anis', 'Chowdhury'], ['Nayeem', 'Khan'],
   ['Fahim', 'Kabir'], ['Imran', 'Hossain'], ['Sabbir', 'Mahmud'],
@@ -28,17 +33,27 @@ const MEN: Array<[string, string]> = [
   ['Saif', 'Noman'], ['Tariq', 'Rashid'], ['Adnan', 'Faruq'],
   ['Moin', 'Akter'], ['Jubayer', 'Hasib'], ['Arafat', 'Haque'],
   ['Shihab', 'Nasir'], ['Alif', 'Chowdhury'], ['Shuvo', 'Ahmed'],
+  ['Kamrul', 'Hasan'], ['Mostafa', 'Kamal'], ['Rezaul', 'Karim'],
+  ['Monirul', 'Islam'], ['Delwar', 'Hossain'], ['Ziaur', 'Rahman'],
+  ['Habibur', 'Rahman'], ['Nizam', 'Uddin'], ['Enamul', 'Haque'],
+  ['Khaled', 'Mahmud'], ['Ashraful', 'Alam'], ['Sohel', 'Rana'],
+  ['Touhidul', 'Islam'], ['Mehedi', 'Hasan'], ['Rakibul', 'Haque'],
 ];
 
-const WOMEN: Array<[string, string]> = [
+export const WOMEN: Array<[string, string]> = [
   ['Nusrat', 'Jahan'], ['Samira', 'Rahman'], ['Farzana', 'Islam'], ['Nadia', 'Khan'],
   ['Tasnim', 'Akter'], ['Maliha', 'Hasan'], ['Rumana', 'Haque'], ['Sadia', 'Anjum'],
   ['Nafisa', 'Chowdhury'], ['Tanjina', 'Sultana'], ['Ayesha', 'Nawrin'], ['Ishrat', 'Ferdous'],
   ['Mehjabin', 'Alam'], ['Rabeya', 'Khatun'], ['Mariam', 'Begum'], ['Sharmin', 'Sarker'],
   ['Jannatul', 'Fariha'], ['Tahmina', 'Rahman'], ['Rima', 'Hossain'], ['Sabrina', 'Afroz'],
+  ['Farhana', 'Yasmin'], ['Nargis', 'Akter'],
+  ['Salma', 'Sultana'], ['Tania', 'Rahman'],
+  ['Shahnaz', 'Parvin'], ['Laila', 'Arjuman'],
+  ['Dilruba', 'Khanam'], ['Ferdousi', 'Begum'],
+  ['Roksana', 'Begum'], ['Humayra', 'Kabir'],
 ];
 
-interface CredSpec {
+export interface CredSpec {
   qual: string;
   desig: string;
   bmdc: string;
@@ -46,7 +61,7 @@ interface CredSpec {
   title: string;
 }
 
-const CREDENTIALS: Record<number, CredSpec[]> = {
+export const CREDENTIALS: Record<number, CredSpec[]> = {
   0: [
     { qual: 'MBBS, FCPS (Medicine), MD (Cardiology), FACC (USA)\nSpecial Training in Interventional Cardiology & Angioplasty\nSenior Interventional Cardiologist', desig: 'Professor & Head of Department, Cardiology', bmdc: 'BMDC Reg: A-21940', exp: 22, title: 'Prof. Dr.' },
     { qual: 'MBBS, D-Card (BSMMU), FCPS (Cardiology)\nSpecialist in Clinical & Preventive Cardiology, Echocardiography\nAdult Cardiovascular Specialist', desig: 'Associate Professor, Cardiology', bmdc: 'BMDC Reg: A-31852', exp: 16, title: 'Dr.' },
@@ -117,34 +132,72 @@ const CREDENTIALS: Record<number, CredSpec[]> = {
     { qual: 'MBBS, MD (Medicine), Fellow Critical Care Medicine\nAdult Acute Care, Respiratory & Sepsis Specialist\nSenior Consultant Physician', desig: 'Associate Professor, Internal Medicine', bmdc: 'BMDC Reg: A-32190', exp: 15, title: 'Dr.' },
     { qual: 'MBBS, FCPS (Internal Medicine)\nGeneral Medical Care, Diabetes & Lifestyle Disease Specialist\nAssistant Professor, Internal Medicine', desig: 'Assistant Professor, Internal Medicine', bmdc: 'BMDC Reg: A-45890', exp: 8, title: 'Dr.' },
   ],
+  10: [
+    { qual: 'MBBS, DO, FCPS (Ophthalmology), Fellow Vitreo-Retina (India)\nPhaco Cataract Surgery & Diabetic Retinopathy Specialist\nSenior Ophthalmologist & Vitreo-Retinal Surgeon', desig: 'Professor & Head of Department, Ophthalmology', bmdc: 'BMDC Reg: A-22810', exp: 22, title: 'Prof. Dr.' },
+    { qual: 'MBBS, MS (Ophthalmology), Fellow Cornea & Refractive Surgery\nCorneal Transplant, LASIK & Anterior Segment Specialist\nAssociate Professor, Ophthalmology', desig: 'Associate Professor, Ophthalmology', bmdc: 'BMDC Reg: A-34112', exp: 15, title: 'Dr.' },
+    { qual: 'MBBS, FCPS (Ophthalmology), ICO Fellow (UK)\nGlaucoma Diagnosis, Laser & Filtration Surgery Specialist\nConsultant Eye Surgeon', desig: 'Assistant Professor, Ophthalmology', bmdc: 'BMDC Reg: A-43518', exp: 10, title: 'Dr.' },
+    { qual: 'MBBS, MS (Ophthalmology), Fellow Pediatric Ophthalmology\nSquint, Amblyopia & Congenital Cataract Specialist\nSenior Consultant, Ophthalmology', desig: 'Associate Professor, Ophthalmology', bmdc: 'BMDC Reg: A-35904', exp: 14, title: 'Dr.' },
+    { qual: 'MBBS, DO (BSMMU), FCPS (Ophthalmology)\nMicro-Incision Cataract & Oculoplastic Specialist\nAssistant Professor, Ophthalmology', desig: 'Assistant Professor, Ophthalmology', bmdc: 'BMDC Reg: A-49620', exp: 8, title: 'Dr.' },
+  ],
+  11: [
+    { qual: 'MBBS, FCPS (Surgery), MS (Urology), FACS (USA)\nEndourology, PCNL, Laser Lithotripsy & Uro-Oncology Specialist\nSenior Urologist & Transplant Surgeon', desig: 'Professor & Head of Department, Urology', bmdc: 'BMDC Reg: A-20755', exp: 23, title: 'Prof. Dr.' },
+    { qual: 'MBBS, MS (Urology), Fellow Laparoscopic Urology (Singapore)\nProstate Surgery (TURP), Kidney Stone & Reconstructive Urology\nAssociate Professor, Urology', desig: 'Associate Professor, Urology', bmdc: 'BMDC Reg: A-33614', exp: 16, title: 'Dr.' },
+    { qual: 'MBBS, FCPS (Urology), Fellow Andrology\nMale Infertility, Urethral Stricture & Microsurgical Urology\nConsultant Urologist', desig: 'Assistant Professor, Urology', bmdc: 'BMDC Reg: A-44820', exp: 11, title: 'Dr.' },
+    { qual: 'MBBS, MS (Urology), Fellow Female & Functional Urology\nUrinary Incontinence, Neurogenic Bladder & Pelvic Floor Care\nSenior Consultant Urologist', desig: 'Associate Professor, Urology', bmdc: 'BMDC Reg: A-36741', exp: 14, title: 'Dr.' },
+    { qual: 'MBBS, MS (Urology)\nMinimally Invasive Stone & Benign Prostatic Hyperplasia Care\nAssistant Professor, Urology', desig: 'Assistant Professor, Urology', bmdc: 'BMDC Reg: A-48735', exp: 8, title: 'Dr.' },
+  ],
+  12: [
+    { qual: 'MBBS, FCPS (Medicine), MD (Nephrology), FISN\nRenal Transplantation, Hemodialysis & Glomerulonephritis Specialist\nSenior Nephrologist & Transplant Physician', desig: 'Professor & Head of Department, Nephrology', bmdc: 'BMDC Reg: A-21608', exp: 21, title: 'Prof. Dr.' },
+    { qual: 'MBBS, MD (Nephrology), MRCP (UK)\nChronic Kidney Disease, Resistant Hypertension & Peritoneal Dialysis\nAssociate Professor, Nephrology', desig: 'Associate Professor, Nephrology', bmdc: 'BMDC Reg: A-32944', exp: 15, title: 'Dr.' },
+    { qual: 'MBBS, FCPS (Medicine), MD (Nephrology)\nAcute Kidney Injury, Electrolyte Disorders & Critical Care Nephrology\nConsultant Nephrologist', desig: 'Assistant Professor, Nephrology', bmdc: 'BMDC Reg: A-43912', exp: 10, title: 'Dr.' },
+    { qual: 'MBBS, MD (Nephrology), Fellow Renal Pathology\nAutoimmune Kidney Disease, Lupus Nephritis & Diabetic Nephropathy\nSenior Consultant Nephrologist', desig: 'Associate Professor, Nephrology', bmdc: 'BMDC Reg: A-35402', exp: 14, title: 'Dr.' },
+    { qual: 'MBBS, MD (Nephrology)\nPreventive Renal Care, CKD Nutrition & Dialysis Management\nAssistant Professor, Nephrology', desig: 'Assistant Professor, Nephrology', bmdc: 'BMDC Reg: A-49104', exp: 8, title: 'Dr.' },
+  ],
+  13: [
+    { qual: 'MBBS, FCPS (Medicine), MD (Chest Diseases), FCCP (USA)\nInterventional Pulmonology, Bronchoscopy & Thoracic Critical Care\nSenior Pulmonologist & Respiratory Specialist', desig: 'Professor & Head of Department, Pulmonology', bmdc: 'BMDC Reg: A-22180', exp: 22, title: 'Prof. Dr.' },
+    { qual: 'MBBS, DTCD, MD (Respiratory Medicine)\nCOPD, Severe Asthma, Interstitial Lung Disease & Sleep Medicine\nAssociate Professor, Pulmonology', desig: 'Associate Professor, Pulmonology', bmdc: 'BMDC Reg: A-33915', exp: 16, title: 'Dr.' },
+    { qual: 'MBBS, FCPS (Pulmonology), Fellow Thoracic Ultrasound\nPleural Effusion, Tuberculosis & Respiratory Allergy Specialist\nConsultant Pulmonologist', desig: 'Assistant Professor, Pulmonology', bmdc: 'BMDC Reg: A-45109', exp: 10, title: 'Dr.' },
+    { qual: 'MBBS, MD (Chest Diseases), MRCP (UK)\nPost-Infectious Lung Fibrosis, Bronchiectasis & Asthma Care\nSenior Consultant, Respiratory Medicine', desig: 'Associate Professor, Pulmonology', bmdc: 'BMDC Reg: A-36128', exp: 13, title: 'Dr.' },
+    { qual: 'MBBS, DTCD (BSMMU), MD (Pulmonology)\nChronic Cough, Pulmonary Rehab & Sleep Apnea Specialist\nAssistant Professor, Pulmonology', desig: 'Assistant Professor, Pulmonology', bmdc: 'BMDC Reg: A-49482', exp: 8, title: 'Dr.' },
+  ],
+  14: [
+    { qual: 'MBBS, FCPS (Psychiatry), MPhil (Psychiatry)\nMood Disorders, Anxiety, OCD & Adult Neuropsychiatry Specialist\nSenior Psychiatrist & Behavioral Medicine Specialist', desig: 'Professor & Head of Department, Psychiatry', bmdc: 'BMDC Reg: A-23014', exp: 20, title: 'Prof. Dr.' },
+    { qual: 'MBBS, MD (Psychiatry), Fellow Addiction Medicine\nDepression, Bipolar Disorder, Sleep & De-addiction Specialist\nAssociate Professor, Psychiatry', desig: 'Associate Professor, Psychiatry', bmdc: 'BMDC Reg: A-34590', exp: 15, title: 'Dr.' },
+    { qual: 'MBBS, FCPS (Psychiatry)\nStress Management, CBT Counseling & Psychosomatic Medicine\nConsultant Psychiatrist', desig: 'Assistant Professor, Psychiatry', bmdc: 'BMDC Reg: A-46312', exp: 10, title: 'Dr.' },
+    { qual: 'MBBS, MD (Psychiatry), Fellow Child & Adolescent Psychiatry\nPerinatal Mental Health, Women Psychiatry & Adolescent Care\nSenior Consultant Psychiatrist', desig: 'Associate Professor, Psychiatry', bmdc: 'BMDC Reg: A-37205', exp: 13, title: 'Dr.' },
+    { qual: 'MBBS, MPhil (Psychiatry), FCPS (Psychiatry)\nChild Neurodevelopmental, Anxiety & Family Counseling Specialist\nAssistant Professor, Psychiatry', desig: 'Assistant Professor, Psychiatry', bmdc: 'BMDC Reg: A-49811', exp: 8, title: 'Dr.' },
+  ],
 };
 
-const SCHEDULE_PATTERNS = [
+// Strictly disjoint weekly shifts per room (4 non-overlapping shifts per room = zero room conflicts)
+export const SCHEDULE_PATTERNS = [
   { days: [5, 0, 2], start: '09:00', end: '13:00', dur: 240, daysStr: '5,0,2' },
+  { days: [5, 0, 2], start: '17:00', end: '21:00', dur: 240, daysStr: '5,0,2' },
   { days: [6, 1, 3], start: '09:30', end: '13:30', dur: 240, daysStr: '6,1,3' },
-  { days: [5, 6, 1, 3], start: '17:00', end: '21:00', dur: 240, daysStr: '5,6,1,3' },
-  { days: [6, 0, 2, 3], start: '14:00', end: '18:00', dur: 240, daysStr: '6,0,2,3' },
-  { days: [5, 6, 0, 1, 2], start: '17:30', end: '21:30', dur: 240, daysStr: '5,6,0,1,2' },
-  { days: [5, 6, 0, 1, 2], start: '10:00', end: '14:00', dur: 240, daysStr: '5,6,0,1,2' },
-  { days: [0, 2], start: '18:00', end: '20:30', dur: 150, daysStr: '0,2' },
-  { days: [5, 6, 0, 1, 2, 3], start: '10:00', end: '13:30', dur: 210, daysStr: '5,6,0,1,2,3' },
+  { days: [6, 1, 3], start: '17:00', end: '21:00', dur: 240, daysStr: '6,1,3' },
 ];
 
-const CHAMBER_SPECS: Array<[string, string, string]> = [
+export const CHAMBER_SPECS: Array<[string, string, string]> = [
   ['', 'Room 101', 'Ground Floor, Outpatient Wing'],
   ['', 'Room 102', 'Ground Floor, Diagnostic OPD'],
-  ['', 'Room 201', '2nd Floor, Cardiology & Chest'],
-  ['', 'Room 302', '3rd Floor, Specialist Clinic'],
-  ['', 'Room 405', '4th Floor, Surgery Suite'],
-  ['', 'Room 707', '7th Floor, Oncology & Women Care'],
   ['', 'Room 105', '1st Floor, Internal Medicine'],
+  ['', 'Room 201', '2nd Floor, Cardiology & Chest'],
   ['', 'Room 202', '2nd Floor, Pediatrics & Child Care'],
+  ['', 'Room 302', '3rd Floor, Specialist Clinic'],
   ['', 'Room 303', '3rd Floor, Neurology & Brain Care'],
-  ['', 'Room 401', '4th Floor, Diabetes & Endocrine'],
-  ['', 'Room 202', '2nd Floor, Special Consultation'],
   ['', 'Room 305', '3rd Floor, ENT & Head-Neck'],
+  ['', 'Room 401', '4th Floor, Diabetes & Endocrine'],
   ['', 'Room 402', '4th Floor, Dermatology Care'],
+  ['', 'Room 405', '4th Floor, Surgery Suite'],
   ['', 'Room 501', '5th Floor, Executive Lounge'],
+  ['', 'Room 502', '5th Floor, Eye & Vision Center'],
+  ['', 'Room 503', '5th Floor, Urology & Stone Clinic'],
+  ['', 'Room 504', '5th Floor, Nephrology & Dialysis Wing'],
+  ['', 'Room 505', '5th Floor, Chest & Pulmonology Unit'],
+  ['', 'Room 601', '6th Floor, Psychiatry & Counseling Suite'],
+  ['', 'Room 602', '6th Floor, Surgical & Specialty OPD'],
+  ['', 'Room 603', '6th Floor, Specialist Diagnostic OPD'],
+  ['', 'Room 707', '7th Floor, Oncology & Women Care'],
 ];
 
 const RECEPTIONISTS: Array<[string, string]> = [
@@ -163,12 +216,47 @@ const PATIENTS: Array<[string, string]> = [
   ['Arman', 'Kabir'],
 ];
 
-function slugify(text: string): string {
+export function slugify(text: string): string {
   return text
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+export function computeDoctorFees(group: number, j: number, desig: string, exp: number) {
+  let initFee = 1000;
+  let folFee = 700;
+  let folDays = 30;
+  let repFee = 300;
+  let maxCap = 25;
+
+  if (desig.includes('Professor & Head') || desig.includes('Chief') || exp >= 22) {
+    initFee = (group + j) % 2 === 0 ? 1800 : 1500;
+    folFee = initFee === 1800 ? 1200 : 1000;
+    folDays = (group + j) % 2 === 0 ? 45 : 60;
+    repFee = 600;
+    maxCap = 35;
+  } else if (desig.includes('Professor') || exp >= 16) {
+    initFee = (group + j) % 2 === 0 ? 1500 : 1200;
+    folFee = initFee === 1500 ? 1000 : 800;
+    folDays = (group + j) % 2 === 0 ? 30 : 45;
+    repFee = 500;
+    maxCap = 30;
+  } else if (desig.includes('Associate') || exp >= 12) {
+    initFee = (group + j) % 2 === 0 ? 1200 : 1000;
+    folFee = initFee === 1200 ? 800 : 700;
+    folDays = 30;
+    repFee = 400;
+    maxCap = 30;
+  } else {
+    initFee = (group + j) % 2 === 0 ? 1000 : 800;
+    folFee = initFee === 1000 ? 700 : 500;
+    folDays = 30;
+    repFee = 300;
+    maxCap = 25;
+  }
+  return { initFee, folFee, folDays, repFee, maxCap };
 }
 
 export async function seedDatabase(): Promise<void> {
@@ -272,17 +360,12 @@ export async function seedDatabase(): Promise<void> {
     }
   }
 
-  // Chambers
+  // Chambers (unique roomNumber)
   const chambers = [];
   for (const [bld, rm, desc] of CHAMBER_SPECS) {
     let ch = await prisma.chamber.findFirst({
-      where: { roomNumber: rm, description: desc },
+      where: { roomNumber: rm },
     });
-    if (!ch) {
-      ch = await prisma.chamber.findFirst({
-        where: { roomNumber: rm },
-      });
-    }
     if (!ch) {
       ch = await prisma.chamber.create({
         data: {
@@ -300,7 +383,22 @@ export async function seedDatabase(): Promise<void> {
     chambers.push(ch);
   }
 
-  // 50 Doctors (5 per department)
+  // Build non-overlapping (chamberIdx, patternIdx) slots, reserving:
+  // - (Room 102, pattern 2: Sun/Tue/Thu 09:30-13:30) for Mahmud Rahman
+  // - (Room 707, pattern 1: Sat/Mon/Wed 17:00-21:00) for Prof. Shamima Sultana
+  const room102Idx = chambers.findIndex((c) => c.roomNumber === 'Room 102');
+  const room707Idx = chambers.findIndex((c) => c.roomNumber === 'Room 707');
+  const freeAssignments: Array<{ chamber: (typeof chambers)[number]; sched: (typeof SCHEDULE_PATTERNS)[number] }> = [];
+  for (let p = 0; p < SCHEDULE_PATTERNS.length; p++) {
+    for (let cIdx = 0; cIdx < chambers.length; cIdx++) {
+      if (cIdx === room102Idx && p === 2) continue;
+      if (cIdx === room707Idx && p === 1) continue;
+      freeAssignments.push({ chamber: chambers[cIdx], sched: SCHEDULE_PATTERNS[p] });
+    }
+  }
+
+  let slotCursor = 0;
+  // 75 Department Doctors (5 per department: 3 male, 2 female)
   for (let group = 0; group < departments.length; group++) {
     const dep = departments[group];
     const roster: Array<[[string, string], 'male' | 'female']> = [
@@ -313,7 +411,7 @@ export async function seedDatabase(): Promise<void> {
       const username =
         first === 'Karim'
           ? 'karim'
-          : `${first}_${last}`.toLowerCase().replace(/\s+/g, '_');
+          : `${first}.${last}`.toLowerCase().replace(/\s+/g, '.');
       const phone = `018${String(group).padStart(2, '0')}${String(j + 1).padStart(6, '0')}`;
 
       let u = await prisma.user.findUnique({ where: { username } });
@@ -339,56 +437,27 @@ export async function seedDatabase(): Promise<void> {
       const bmdc = cred?.bmdc || `BMDC Reg: A-${32000 + group * 100 + j}`;
       const exp = cred?.exp ?? 5 + ((group + j) % 17);
       const title = cred?.title || 'Dr.';
+      const { initFee, folFee, folDays, repFee, maxCap } = computeDoctorFees(group, j, desig, exp);
 
-      let initFee = 1000;
-      let folFee = 700;
-      let folDays = 30;
-      let repFee = 300;
-      let maxCap = 25;
-
-      if (desig.includes('Professor & Head') || desig.includes('Chief') || exp >= 22) {
-        initFee = (group + j) % 2 === 0 ? 1800 : 1500;
-        folFee = initFee === 1800 ? 1200 : 1000;
-        folDays = (group + j) % 2 === 0 ? 45 : 60;
-        repFee = 600;
-        maxCap = 35;
-      } else if (desig.includes('Professor') || exp >= 16) {
-        initFee = (group + j) % 2 === 0 ? 1500 : 1200;
-        folFee = initFee === 1500 ? 1000 : 800;
-        folDays = (group + j) % 2 === 0 ? 30 : 45;
-        repFee = 500;
-        maxCap = 30;
-      } else if (desig.includes('Associate') || exp >= 12) {
-        initFee = (group + j) % 2 === 0 ? 1200 : 1000;
-        folFee = initFee === 1200 ? 800 : 700;
-        folDays = 30;
-        repFee = 400;
-        maxCap = 30;
-      } else {
-        initFee = (group + j) % 2 === 0 ? 1000 : 800;
-        folFee = initFee === 1000 ? 700 : 500;
-        folDays = 30;
-        repFee = 300;
-        maxCap = 25;
-      }
-
-      const assignedChamber = chambers[(group * 2 + j) % chambers.length];
-      const sched = SCHEDULE_PATTERNS[(group * 3 + j) % SCHEDULE_PATTERNS.length];
+      const isMahmud = username === 'mahmud.rahman';
+      const assigned = isMahmud
+        ? { chamber: chambers[room102Idx], sched: SCHEDULE_PATTERNS[2] }
+        : freeAssignments[slotCursor++];
 
       const doc = await prisma.doctorProfile.create({
         data: {
           userId: u.id,
           departmentId: dep.id,
-          chamberId: assignedChamber.id,
-          chamberDays: sched.daysStr,
+          chamberId: assigned.chamber.id,
+          chamberDays: assigned.sched.daysStr,
           gender,
           qualifications: qual,
           designation: desig,
           registrationNumber: bmdc,
           experienceYears: exp,
           titlePrefix: title,
-          roomNumber: assignedChamber.roomNumber,
-          chamberAddress: assignedChamber.address,
+          roomNumber: assigned.chamber.roomNumber,
+          chamberAddress: assigned.chamber.address,
           contactNumber: '+88096100016211',
           initialFee: initFee,
           followupFee: folFee,
@@ -404,14 +473,14 @@ export async function seedDatabase(): Promise<void> {
         });
       }
 
-      for (const w of sched.days) {
+      for (const w of assigned.sched.days) {
         await prisma.weeklyAvailability.create({
           data: {
             doctorId: doc.id,
             weekday: w,
-            startTime: parseTimeStr(sched.start)!,
-            endTime: parseTimeStr(sched.end)!,
-            durationMinutes: sched.dur,
+            startTime: parseTimeStr(assigned.sched.start)!,
+            endTime: parseTimeStr(assigned.sched.end)!,
+            durationMinutes: assigned.sched.dur,
             capacity: maxCap,
             active: true,
           },
@@ -428,7 +497,7 @@ export async function seedDatabase(): Promise<void> {
     departments[6];
   const shamimaUser = await prisma.user.create({
     data: {
-      username: 'shamima_sultana',
+      username: 'shamima.sultana',
       firstName: 'Chowdhury Shamima',
       lastName: 'Sultana',
       role: 'doctor',
@@ -438,7 +507,7 @@ export async function seedDatabase(): Promise<void> {
       password: defaultPasswordHash,
     },
   });
-  const room707 = chambers.find((c) => c.roomNumber === 'Room 707') || chambers[5];
+  const room707 = chambers[room707Idx] || chambers[chambers.length - 1];
   const shamimaProf = await prisma.doctorProfile.create({
     data: {
       userId: shamimaUser.id,
@@ -487,7 +556,7 @@ export async function seedDatabase(): Promise<void> {
   await materializeWeekly(shamimaProf, 60);
 
   console.log(
-    '[seed] Green Hospital directory ready: 10 departments, 51 doctors, 5 receptionists, 5 patients, 14 chambers.'
+    `[seed] Green Hospital directory ready: ${departments.length} departments, 76 doctors, 5 receptionists, 5 patients, ${chambers.length} chambers.`
   );
 }
 

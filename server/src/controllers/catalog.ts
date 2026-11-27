@@ -69,7 +69,6 @@ export async function publicHome(_req: Request, res: Response): Promise<void> {
       },
     },
     orderBy: { name: 'asc' },
-    take: 10,
   });
 
   const [doctors, doctorCount] = await Promise.all([
@@ -188,8 +187,8 @@ async function resolveDoctor(identifier: string) {
   }
 
   const clean = identStr.toLowerCase();
-  const under = clean.replace(/-/g, '_');
-  const dash = clean.replace(/_/g, '-');
+  const dot = clean.replace(/[-_]/g, '.');
+  const dash = clean.replace(/[._]/g, '-');
 
   const byUsername = await prisma.doctorProfile.findFirst({
     where: {
@@ -197,7 +196,7 @@ async function resolveDoctor(identifier: string) {
         isActive: true,
         OR: [
           { username: { equals: clean, mode: 'insensitive' } },
-          { username: { equals: under, mode: 'insensitive' } },
+          { username: { equals: dot, mode: 'insensitive' } },
           { username: { equals: dash, mode: 'insensitive' } },
         ],
       },
@@ -437,7 +436,14 @@ export async function listDepartments(req: Request, res: Response): Promise<void
   const includeInactive = req.user?.role === 'admin' && req.user.isActive;
 
   const items = await prisma.department.findMany({
-    where: includeInactive ? {} : { isActive: true },
+    where: includeInactive
+      ? {}
+      : {
+          isActive: true,
+          doctors: {
+            some: { isAvailable: true, user: { isActive: true } },
+          },
+        },
     orderBy: { name: 'asc' },
     include: {
       doctors: {

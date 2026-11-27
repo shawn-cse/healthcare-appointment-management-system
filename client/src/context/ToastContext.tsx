@@ -46,7 +46,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             t.type === 'success' ? 'ic-check' : t.type === 'info' ? 'ic-help' : 'ic-alert';
           const title =
             t.type === 'error'
-              ? 'Notice / Error'
+              ? 'Error'
               : t.type === 'success'
                 ? 'Success'
                 : t.type === 'warning'
